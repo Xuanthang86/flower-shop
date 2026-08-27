@@ -1,21 +1,3 @@
-// import Logo from "./Logo";
-// import SearchBox from "./SearchBox";
-// import HeaderIcons from "./HeaderIcons";
-
-// const TopHeader = () => {
-//   return (
-//     <div className="bg-white border-b border-gray-100 py-3">
-//       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-4">
-//         <Logo />
-//         <SearchBox />
-//         <HeaderIcons />
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default TopHeader;
-
 import { FiChevronDown, FiShoppingCart } from "react-icons/fi";
 
 import { Link, NavLink } from "react-router-dom";
