@@ -1,92 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { AuthContext, PERMISSIONS, ROLE_LABELS, ROLES } from "./AuthContext";
-
-const AUTH_STORAGE_KEY = "flower-shop-auth";
-
-const USERS_STORAGE_KEY = "flower-shop-users";
+import {
+  AuthContext,
+  AUTH_STORAGE_KEY,
+  PERMISSIONS,
+  ROLE_LABELS,
+  ROLES,
+  USERS_STORAGE_KEY,
+} from "./AuthContext";
+import { validatePassword } from "@/utils/passwordValidation";
 
 const ADMIN_EMAIL = "admin@flowershop.vn";
-
 const ADMIN_BOOTSTRAP_PASSWORD = "Admin@12345";
 
-/* =========================================================
-   QUYỀN
-========================================================= */
-
-const ROLE_PERMISSIONS = {
-  admin: [
-    PERMISSIONS.VIEW_ADMIN,
-    PERMISSIONS.MANAGE_USERS,
-    PERMISSIONS.MANAGE_PRODUCTS,
-    PERMISSIONS.CREATE_PRODUCTS,
-    PERMISSIONS.UPDATE_PRODUCTS,
-    PERMISSIONS.DELETE_PRODUCTS,
-    PERMISSIONS.MANAGE_ORDERS,
-    PERMISSIONS.VIEW_REPORTS,
-  ],
-
-  manager: [
+const ROLE_PERMISSIONS = Object.freeze({
+  [ROLES.ADMIN]: Object.values(PERMISSIONS),
+  [ROLES.MANAGER]: [
     PERMISSIONS.VIEW_ADMIN,
     PERMISSIONS.MANAGE_ORDERS,
     PERMISSIONS.VIEW_REPORTS,
   ],
-
-  product_manager: [
+  [ROLES.PRODUCT_MANAGER]: [
     PERMISSIONS.VIEW_ADMIN,
     PERMISSIONS.MANAGE_PRODUCTS,
     PERMISSIONS.CREATE_PRODUCTS,
     PERMISSIONS.UPDATE_PRODUCTS,
   ],
-
-  customer: [],
-};
-
-/* =========================================================
-   PASSWORD
-========================================================= */
-
-const passwordCheck = (password) => {
-  const value = String(password || "");
-
-  const errors = [];
-
-  if (value.length < 8) {
-    errors.push("Mật khẩu phải có ít nhất 8 ký tự.");
-  }
-
-  if (value.length > 64) {
-    errors.push("Mật khẩu không được vượt quá 64 ký tự.");
-  }
-
-  if (!/[A-Z]/.test(value)) {
-    errors.push("Mật khẩu phải có ít nhất 1 chữ cái viết hoa.");
-  }
-
-  if (!/[a-z]/.test(value)) {
-    errors.push("Mật khẩu phải có ít nhất 1 chữ cái viết thường.");
-  }
-
-  if (!/[0-9]/.test(value)) {
-    errors.push("Mật khẩu phải có ít nhất 1 chữ số.");
-  }
-
-  if (!/[^A-Za-z0-9]/.test(value)) {
-    errors.push("Mật khẩu phải có ít nhất 1 ký tự đặc biệt.");
-  }
-
-  return {
-    valid: errors.length === 0,
-
-    message: errors.join(" "),
-
-    errors,
-  };
-};
-
-/* =========================================================
-   SAFE PARSE
-========================================================= */
+  [ROLES.CUSTOMER]: [],
+});
 
 const safeParse = (value, fallback) => {
   try {
@@ -96,187 +37,117 @@ const safeParse = (value, fallback) => {
   }
 };
 
-/* =========================================================
-   SANITIZE USER
-========================================================= */
-
-const sanitizeUser = (user) => {
-  if (!user) {
-    return null;
-  }
-
-  const { password, passwordHash, passwordSalt, ...safeUser } = user;
-
-  return {
-    ...safeUser,
-
-    role: safeUser.role || ROLES.CUSTOMER,
-  };
-};
-
-/* =========================================================
-   NORMALIZE USER
-========================================================= */
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
+const normalizePhone = (phone) => String(phone || "").trim();
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const generateId = (prefix = "user") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const normalizeUser = (user) => {
-  if (!user) {
-    return null;
-  }
-
-  const email = String(user.email || "")
-    .trim()
-    .toLowerCase();
+  if (!user) return null;
 
   return {
     ...user,
-
-    id: String(user.id || generateId("user")),
-
+    id: String(user.id || generateId()),
     name: String(user.name || user.fullName || "").trim(),
-
-    email,
-
-    phone: String(user.phone || "").trim(),
-
-    role: Object.values(ROLES).includes(user.role) ? user.role : ROLES.CUSTOMER,
-
+    email: normalizeEmail(user.email),
+    phone: normalizePhone(user.phone),
+    role: Object.values(ROLES).includes(user.role)
+      ? user.role
+      : ROLES.CUSTOMER,
     avatar: user.avatar || "",
-
     disabled: Boolean(user.disabled),
-
     createdAt: user.createdAt || new Date().toISOString(),
   };
 };
 
-/* =========================================================
-   USERS
-========================================================= */
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const {
+    password: _password,
+    passwordHash: _passwordHash,
+    passwordSalt: _passwordSalt,
+    ...safeUser
+  } = user;
+  return safeUser;
+};
 
 const readUsers = () => {
   const parsed = safeParse(localStorage.getItem(USERS_STORAGE_KEY), []);
-
   return Array.isArray(parsed) ? parsed.map(normalizeUser).filter(Boolean) : [];
 };
 
-/* =========================================================
-   SESSION
-========================================================= */
+const writeUsers = (users) => {
+  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+};
 
 const readSession = () => {
   const parsed = safeParse(sessionStorage.getItem(AUTH_STORAGE_KEY), null);
-
-  return parsed?.user ? sanitizeUser(parsed.user) : null;
-};
-
-const clearAuthStorage = () => {
-  sessionStorage.removeItem(AUTH_STORAGE_KEY);
-
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+  return parsed?.user ? sanitizeUser(normalizeUser(parsed.user)) : null;
 };
 
 const saveSession = (user) => {
   sessionStorage.setItem(
     AUTH_STORAGE_KEY,
-    JSON.stringify({
-      user: sanitizeUser(user),
-
-      loginAt: new Date().toISOString(),
-    })
+    JSON.stringify({ user: sanitizeUser(user), loginAt: new Date().toISOString() })
   );
 };
 
-/* =========================================================
-   ADMIN GỐC
-========================================================= */
+const clearSession = () => {
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+};
 
 const ensureBootstrapAdmin = () => {
   const users = readUsers();
-
   const index = users.findIndex((item) => item.email === ADMIN_EMAIL);
 
   if (index === -1) {
     users.unshift({
       id: "admin-001",
-
       name: "Quản trị viên",
-
       email: ADMIN_EMAIL,
-
       phone: "0900000000",
-
       password: ADMIN_BOOTSTRAP_PASSWORD,
-
       role: ROLES.ADMIN,
-
       avatar: "",
-
       disabled: false,
-
       createdAt: "2026-01-01T00:00:00.000Z",
     });
   } else {
-    const oldAdmin = users[index];
-
+    const existing = users[index];
     users[index] = {
-      ...oldAdmin,
-
+      ...existing,
       id: "admin-001",
-
       email: ADMIN_EMAIL,
-
       role: ROLES.ADMIN,
-
       disabled: false,
-
-      name: oldAdmin.name || "Quản trị viên",
-
-      /*
-       * MIGRATE TÀI KHOẢN ADMIN
-       *
-       * Nếu Admin gốc đang dùng
-       * mật khẩu cũ admin123,
-       * chuyển sang Admin@12345.
-       */
+      name: existing.name || "Quản trị viên",
       password:
-        oldAdmin.password === "admin123" || !oldAdmin.password
+        existing.password === "admin123" || !existing.password
           ? ADMIN_BOOTSTRAP_PASSWORD
-          : oldAdmin.password,
+          : existing.password,
     };
   }
 
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-
+  writeUsers(users);
   return users;
 };
 
-/* =========================================================
-   PROVIDER
-========================================================= */
-
 const AuthProvider = ({ children }) => {
   const [users, setUsers] = useState(() => ensureBootstrapAdmin());
-
   const [user, setUser] = useState(() => readSession());
-
   const [loading, setLoading] = useState(false);
 
-  /* =======================================================
-     LƯU USERS
-  ======================================================= */
-
-  useEffect(() => {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-  }, [users]);
-
-  /* =======================================================
-     KIỂM TRA SESSION
-  ======================================================= */
+  const persistUsers = useCallback((nextUsers) => {
+    setUsers(nextUsers);
+    writeUsers(nextUsers);
+  }, []);
 
   useEffect(() => {
     if (!user) {
+      clearSession();
       return undefined;
     }
 
@@ -287,345 +158,240 @@ const AuthProvider = ({ children }) => {
 
       if (!current || current.disabled) {
         setUser(null);
-        clearAuthStorage();
+        clearSession();
         return;
       }
 
-      const safe = sanitizeUser(current);
-
-      setUser((previous) =>
-        JSON.stringify(previous) === JSON.stringify(safe) ? previous : safe
-      );
-
-      saveSession(safe);
+      const safeUser = sanitizeUser(current);
+      setUser((previous) => {
+        if (JSON.stringify(previous) === JSON.stringify(safeUser)) return previous;
+        saveSession(safeUser);
+        return safeUser;
+      });
     };
 
     verifyCurrentAccount();
-
     const handleStorage = (event) => {
-      if (event.key === USERS_STORAGE_KEY) {
-        verifyCurrentAccount();
-      }
+      if (event.key === USERS_STORAGE_KEY) verifyCurrentAccount();
     };
 
     window.addEventListener("storage", handleStorage);
-
     const timer = window.setInterval(verifyCurrentAccount, 1000);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
-
       window.clearInterval(timer);
     };
   }, [user?.id]);
 
-  /* =======================================================
-     LOGIN
-  ======================================================= */
-
   const login = useCallback(async (email, password) => {
     setLoading(true);
-
     try {
-      const normalizedEmail = String(email || "")
-        .trim()
-        .toLowerCase();
+      const foundUser = readUsers().find(
+        (item) => item.email === normalizeEmail(email)
+      );
 
-      const currentUsers = readUsers();
-
-      const found = currentUsers.find((item) => item.email === normalizedEmail);
-
-      if (!found) {
-        return {
-          success: false,
-          message: "Tài khoản không tồn tại.",
-        };
+      if (!foundUser) return { success: false, message: "Tài khoản không tồn tại." };
+      if (foundUser.disabled) {
+        clearSession();
+        return { success: false, message: "Tài khoản này đã bị khóa/vô hiệu hóa." };
+      }
+      if (String(foundUser.password || "") !== String(password || "")) {
+        return { success: false, message: "Mật khẩu không chính xác. Vui lòng thử lại." };
       }
 
-      if (found.disabled) {
-        clearAuthStorage();
-
-        return {
-          success: false,
-          message: "Tài khoản này đã bị khóa/vô hiệu hóa.",
-        };
-      }
-
-      if (String(found.password || "") !== String(password || "")) {
-        return {
-          success: false,
-          message: "Mật khẩu không chính xác. Vui lòng thử lại.",
-        };
-      }
-
-      const safeUser = sanitizeUser(found);
-
+      const safeUser = sanitizeUser(foundUser);
       setUser(safeUser);
-
       saveSession(safeUser);
-
-      return {
-        success: true,
-        user: safeUser,
-      };
+      return { success: true, user: safeUser };
     } finally {
       setLoading(false);
     }
   }, []);
 
-  /* =======================================================
-     LOGOUT
-  ======================================================= */
-
   const logout = useCallback(() => {
     setUser(null);
-    clearAuthStorage();
+    clearSession();
   }, []);
 
-  /* =======================================================
-     REGISTER
-  ======================================================= */
+  const createAccount = useCallback(
+    (userData = {}, forcedRole = ROLES.CUSTOMER) => {
+      const name = String(userData.name || "").trim();
+      const email = normalizeEmail(userData.email);
+      const phone = normalizePhone(userData.phone);
+      const password = String(userData.password || "");
 
-  const register = useCallback((userData) => {
-    const name = String(userData?.name || "").trim();
+      if (!name) return { success: false, message: "Vui lòng nhập họ và tên." };
+      if (!emailPattern.test(email)) return { success: false, message: "Email không đúng định dạng." };
+      if (!phone) return { success: false, message: "Vui lòng nhập số điện thoại." };
+      if (email === ADMIN_EMAIL) return { success: false, message: "Email này được dành riêng cho tài khoản quản trị." };
 
-    const email = String(userData?.email || "")
-      .trim()
-      .toLowerCase();
+      const passwordResult = validatePassword(password);
+      if (!passwordResult.valid) {
+        return { success: false, message: passwordResult.errors.join(" ") };
+      }
 
-    const phone = String(userData?.phone || "").trim();
+      const currentUsers = readUsers();
+      if (currentUsers.some((item) => item.email === email)) {
+        return { success: false, message: "Email này đã được đăng ký." };
+      }
+      if (currentUsers.some((item) => item.phone === phone)) {
+        return { success: false, message: "Số điện thoại này đã được đăng ký." };
+      }
 
-    const password = String(userData?.password || "");
+      const newUser = normalizeUser({
+        id: generateId(forcedRole === ROLES.CUSTOMER ? "customer" : "staff"),
+        name,
+        email,
+        phone,
+        password,
+        role: forcedRole,
+        avatar: userData.avatar || "",
+        disabled: false,
+      });
 
-    if (!name) {
-      return {
-        success: false,
-        message: "Vui lòng nhập họ và tên.",
-      };
-    }
+      persistUsers([...currentUsers, newUser]);
+      return { success: true, user: sanitizeUser(newUser) };
+    },
+    [persistUsers]
+  );
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return {
-        success: false,
-        message: "Email không đúng định dạng.",
-      };
-    }
+  const register = useCallback(
+    (userData = {}) => createAccount(userData, ROLES.CUSTOMER),
+    [createAccount]
+  );
 
-    if (!phone) {
-      return {
-        success: false,
-        message: "Vui lòng nhập số điện thoại.",
-      };
-    }
+  const createStaffAccount = useCallback(
+    (userData = {}) => {
+      if (user?.role !== ROLES.ADMIN) {
+        return { success: false, message: "Chỉ quản trị viên cấp cao mới có quyền tạo tài khoản quản trị." };
+      }
 
-    const checked = passwordCheck(password);
+      const role = userData.role;
+      if (![ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(role)) {
+        return { success: false, message: "Quyền tài khoản không hợp lệ." };
+      }
 
-    if (!checked.valid) {
-      return {
-        success: false,
-        message: checked.message,
-      };
-    }
-
-    if (email === ADMIN_EMAIL) {
-      return {
-        success: false,
-        message: "Email này được dành riêng cho tài khoản quản trị.",
-      };
-    }
-
-    const currentUsers = readUsers();
-
-    if (currentUsers.some((item) => item.email === email)) {
-      return {
-        success: false,
-        message: "Email này đã được đăng ký.",
-      };
-    }
-
-    if (currentUsers.some((item) => item.phone === phone)) {
-      return {
-        success: false,
-        message: "Số điện thoại này đã được đăng ký.",
-      };
-    }
-
-    const newUser = {
-      id: generateId("customer"),
-
-      name,
-
-      email,
-
-      phone,
-
-      password,
-
-      role: ROLES.CUSTOMER,
-
-      avatar: "",
-
-      disabled: false,
-
-      createdAt: new Date().toISOString(),
-    };
-
-    const nextUsers = [...currentUsers, newUser];
-
-    setUsers(nextUsers);
-
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
-
-    return {
-      success: true,
-      user: sanitizeUser(newUser),
-    };
-  }, []);
-
-  /* =======================================================
-     UPDATE PROFILE
-  ======================================================= */
+      return createAccount(userData, role);
+    },
+    [createAccount, user?.role]
+  );
 
   const updateProfile = useCallback(
     (updates = {}) => {
-      if (!user) {
-        return {
-          success: false,
-          message: "Bạn chưa đăng nhập.",
-        };
-      }
+      if (!user) return { success: false, message: "Bạn chưa đăng nhập." };
 
       const currentUsers = readUsers();
+      const index = currentUsers.findIndex((item) => String(item.id) === String(user.id));
+      if (index === -1) return { success: false, message: "Không tìm thấy tài khoản." };
 
-      const index = currentUsers.findIndex(
-        (item) => String(item.id) === String(user.id)
-      );
+      const current = currentUsers[index];
+      const updated = normalizeUser({
+        ...current,
+        name: updates.name ?? current.name,
+        phone: updates.phone ?? current.phone,
+        avatar: updates.avatar ?? current.avatar,
+      });
 
-      if (index === -1) {
-        return {
-          success: false,
-          message: "Không tìm thấy tài khoản.",
-        };
+      if (!updated.name) return { success: false, message: "Họ và tên không được để trống." };
+      if (currentUsers.some((item, itemIndex) => itemIndex !== index && item.phone && item.phone === updated.phone)) {
+        return { success: false, message: "Số điện thoại này đã được tài khoản khác sử dụng." };
       }
 
-      const updatedUser = {
-        ...currentUsers[index],
+      const nextUsers = [...currentUsers];
+      nextUsers[index] = updated;
+      persistUsers(nextUsers);
 
-        name: updates.name ?? currentUsers[index].name,
-
-        phone: updates.phone ?? currentUsers[index].phone,
-
-        avatar: updates.avatar ?? currentUsers[index].avatar,
-      };
-
-      currentUsers[index] = updatedUser;
-
-      setUsers(currentUsers);
-
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(currentUsers));
-
-      const safeUser = sanitizeUser(updatedUser);
-
+      const safeUser = sanitizeUser(updated);
       setUser(safeUser);
-
       saveSession(safeUser);
-
-      return {
-        success: true,
-        user: safeUser,
-      };
+      return { success: true, user: safeUser };
     },
-    [user]
+    [persistUsers, user]
   );
-
-  /* =======================================================
-     CHANGE PASSWORD
-  ======================================================= */
 
   const changePassword = useCallback(
     (currentPassword, newPassword) => {
-      if (!user) {
-        return {
-          success: false,
-          message: "Bạn chưa đăng nhập.",
-        };
+      if (!user) return { success: false, message: "Bạn chưa đăng nhập." };
+      if (String(currentPassword || "") === String(newPassword || "")) {
+        return { success: false, message: "Mật khẩu mới phải khác mật khẩu hiện tại." };
       }
 
-      const checked = passwordCheck(newPassword);
-
-      if (!checked.valid) {
-        return {
-          success: false,
-          message: checked.message,
-        };
-      }
+      const passwordResult = validatePassword(newPassword);
+      if (!passwordResult.valid) return { success: false, message: passwordResult.errors.join(" ") };
 
       const currentUsers = readUsers();
-
-      const index = currentUsers.findIndex(
-        (item) => String(item.id) === String(user.id)
-      );
-
-      if (index === -1) {
-        return {
-          success: false,
-          message: "Không tìm thấy tài khoản.",
-        };
-      }
+      const index = currentUsers.findIndex((item) => String(item.id) === String(user.id));
+      if (index === -1) return { success: false, message: "Không tìm thấy tài khoản." };
 
       const target = currentUsers[index];
-
       if (String(target.password || "") !== String(currentPassword || "")) {
-        return {
-          success: false,
-          message: "Mật khẩu hiện tại không chính xác.",
-        };
+        return { success: false, message: "Mật khẩu hiện tại không chính xác." };
       }
 
-      if (String(currentPassword) === String(newPassword)) {
-        return {
-          success: false,
-          message: "Mật khẩu mới phải khác mật khẩu hiện tại.",
-        };
-      }
+      const updated = { ...target, password: String(newPassword) };
+      const nextUsers = [...currentUsers];
+      nextUsers[index] = updated;
+      persistUsers(nextUsers);
 
-      const updatedUser = {
-        ...target,
-        password: String(newPassword),
-      };
-
-      currentUsers[index] = updatedUser;
-
-      setUsers(currentUsers);
-
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(currentUsers));
-
-      const safeUser = sanitizeUser(updatedUser);
-
+      const safeUser = sanitizeUser(updated);
       setUser(safeUser);
-
       saveSession(safeUser);
-
-      return {
-        success: true,
-        user: safeUser,
-        message: "Đổi mật khẩu thành công.",
-      };
+      return { success: true, user: safeUser, message: "Đổi mật khẩu thành công." };
     },
-    [user]
+    [persistUsers, user]
   );
 
-  /* =======================================================
-     PERMISSION
-  ======================================================= */
+  const updateUser = useCallback(
+    (userId, updates = {}) => {
+      if (user?.role !== ROLES.ADMIN) return { success: false, message: "Bạn không có quyền cập nhật tài khoản." };
+
+      const currentUsers = readUsers();
+      const index = currentUsers.findIndex((item) => String(item.id) === String(userId));
+      if (index === -1) return { success: false, message: "Không tìm thấy tài khoản." };
+
+      const target = currentUsers[index];
+      const nextUser = normalizeUser({ ...target, ...updates, id: target.id, email: target.email });
+
+      if (target.email === ADMIN_EMAIL) {
+        nextUser.email = ADMIN_EMAIL;
+        nextUser.role = ROLES.ADMIN;
+        nextUser.disabled = false;
+      }
+
+      const nextUsers = [...currentUsers];
+      nextUsers[index] = nextUser;
+      persistUsers(nextUsers);
+
+      if (String(user.id) === String(userId)) {
+        const safeUser = sanitizeUser(nextUser);
+        setUser(safeUser);
+        saveSession(safeUser);
+      }
+
+      return { success: true, user: sanitizeUser(nextUser) };
+    },
+    [persistUsers, user]
+  );
+
+  const deleteUser = useCallback(
+    (userId) => {
+      if (user?.role !== ROLES.ADMIN) return { success: false, message: "Bạn không có quyền xóa tài khoản." };
+      if (String(userId) === String(user.id)) return { success: false, message: "Không thể tự xóa tài khoản đang đăng nhập." };
+
+      const currentUsers = readUsers();
+      const target = currentUsers.find((item) => String(item.id) === String(userId));
+      if (!target) return { success: false, message: "Không tìm thấy tài khoản." };
+      if (target.email === ADMIN_EMAIL) return { success: false, message: "Không thể xóa tài khoản quản trị gốc." };
+
+      persistUsers(currentUsers.filter((item) => String(item.id) !== String(userId)));
+      return { success: true };
+    },
+    [persistUsers, user]
+  );
 
   const hasPermission = useCallback(
-    (permission) =>
-      Boolean(
-        user &&
-        !user.disabled &&
-        (ROLE_PERMISSIONS[user.role] || []).includes(permission)
-      ),
+    (permission) => Boolean(user && !user.disabled && ROLE_PERMISSIONS[user.role]?.includes(permission)),
     [user]
   );
 
@@ -634,390 +400,37 @@ const AuthProvider = ({ children }) => {
     [user]
   );
 
-  /* =======================================================
-     CREATE STAFF
-  ======================================================= */
-
-  const createUser = useCallback(
-    (userData) => {
-      if (user?.role !== ROLES.ADMIN) {
-        return {
-          success: false,
-          message:
-            "Chỉ quản trị viên cấp cao mới có quyền tạo tài khoản quản trị.",
-        };
-      }
-
-      const allowedRoles = [ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER];
-
-      if (!allowedRoles.includes(userData?.role)) {
-        return {
-          success: false,
-          message: "Quyền tài khoản không hợp lệ.",
-        };
-      }
-
-      const checked = passwordCheck(userData?.password);
-
-      if (!checked.valid) {
-        return {
-          success: false,
-          message: checked.message,
-        };
-      }
-
-      const name = String(userData?.name || "").trim();
-
-      const email = String(userData?.email || "")
-        .trim()
-        .toLowerCase();
-
-      const phone = String(userData?.phone || "").trim();
-
-      if (!name || !email || !phone) {
-        return {
-          success: false,
-          message: "Vui lòng nhập đầy đủ họ tên, email và số điện thoại.",
-        };
-      }
-
-      const currentUsers = readUsers();
-
-      if (currentUsers.some((item) => item.email === email)) {
-        return {
-          success: false,
-          message: "Email này đã được đăng ký.",
-        };
-      }
-
-      if (currentUsers.some((item) => item.phone === phone)) {
-        return {
-          success: false,
-          message: "Số điện thoại này đã được đăng ký.",
-        };
-      }
-
-      const newUser = {
-        id: generateId("staff"),
-
-        name,
-
-        email,
-
-        phone,
-
-        password: String(userData.password),
-
-        role: userData.role,
-
-        avatar: "",
-
-        disabled: false,
-
-        createdAt: new Date().toISOString(),
-      };
-
-      const nextUsers = [...currentUsers, newUser];
-
-      setUsers(nextUsers);
-
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
-
-      return {
-        success: true,
-        user: sanitizeUser(newUser),
-
-        message: `Đã tạo ${
-          ROLE_LABELS[newUser.role] || newUser.role
-        } thành công.`,
-      };
-    },
-    [user]
+  const permissions = useMemo(
+    () => ROLE_PERMISSIONS[user?.role] || [],
+    [user?.role]
   );
-
-  const createStaffAccount = createUser;
-
-  /* =======================================================
-     UPDATE USER
-  ======================================================= */
-
-  const updateUser = useCallback(
-    (userId, updates = {}) => {
-      if (user?.role !== ROLES.ADMIN) {
-        return {
-          success: false,
-          message: "Bạn không có quyền cập nhật tài khoản.",
-        };
-      }
-
-      const currentUsers = readUsers();
-
-      const index = currentUsers.findIndex(
-        (item) => String(item.id) === String(userId)
-      );
-
-      if (index === -1) {
-        return {
-          success: false,
-          message: "Không tìm thấy tài khoản.",
-        };
-      }
-
-      const target = currentUsers[index];
-
-      let next = {
-        ...target,
-        ...updates,
-
-        id: target.id,
-
-        email: target.email,
-      };
-
-      if (target.email === ADMIN_EMAIL) {
-        next = {
-          ...next,
-
-          email: ADMIN_EMAIL,
-
-          role: ROLES.ADMIN,
-
-          disabled: false,
-        };
-      }
-
-      if (next.password) {
-        const checked = passwordCheck(next.password);
-
-        if (!checked.valid) {
-          return {
-            success: false,
-            message: checked.message,
-          };
-        }
-      }
-
-      currentUsers[index] = next;
-
-      setUsers(currentUsers);
-
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(currentUsers));
-
-      if (String(user.id) === String(userId)) {
-        if (next.disabled) {
-          setUser(null);
-          clearAuthStorage();
-        } else {
-          const safe = sanitizeUser(next);
-
-          setUser(safe);
-
-          saveSession(safe);
-        }
-      }
-
-      return {
-        success: true,
-        user: sanitizeUser(next),
-        message: "Cập nhật tài khoản thành công.",
-      };
-    },
-    [user]
-  );
-
-  /* =======================================================
-     RESET PASSWORD ADMIN
-  ======================================================= */
-
-  const resetUserPassword = useCallback(
-    (userId, newPassword) => {
-      if (user?.role !== ROLES.ADMIN) {
-        return {
-          success: false,
-          message: "Bạn không có quyền đổi mật khẩu tài khoản.",
-        };
-      }
-
-      const checked = passwordCheck(newPassword);
-
-      if (!checked.valid) {
-        return {
-          success: false,
-          message: checked.message,
-        };
-      }
-
-      return updateUser(userId, {
-        password: String(newPassword),
-      });
-    },
-    [updateUser, user]
-  );
-
-  /* =======================================================
-     LOCK / UNLOCK
-  ======================================================= */
-
-  const toggleUserDisabled = useCallback(
-    (userId) => {
-      if (user?.role !== ROLES.ADMIN) {
-        return {
-          success: false,
-          message: "Bạn không có quyền khóa tài khoản.",
-        };
-      }
-
-      const currentUsers = readUsers();
-
-      const target = currentUsers.find(
-        (item) => String(item.id) === String(userId)
-      );
-
-      if (!target) {
-        return {
-          success: false,
-          message: "Không tìm thấy tài khoản.",
-        };
-      }
-
-      if (target.email === ADMIN_EMAIL) {
-        return {
-          success: false,
-          message: "Không thể khóa tài khoản Admin gốc.",
-        };
-      }
-
-      if (String(target.id) === String(user.id)) {
-        return {
-          success: false,
-          message: "Không thể tự khóa tài khoản đang đăng nhập.",
-        };
-      }
-
-      return updateUser(userId, {
-        disabled: !target.disabled,
-      });
-    },
-    [updateUser, user]
-  );
-
-  /* =======================================================
-     DELETE USER
-  ======================================================= */
-
-  const deleteUser = useCallback(
-    (userId) => {
-      if (user?.role !== ROLES.ADMIN) {
-        return {
-          success: false,
-          message: "Bạn không có quyền xóa tài khoản.",
-        };
-      }
-
-      if (String(userId) === String(user?.id)) {
-        return {
-          success: false,
-          message: "Không thể tự xóa tài khoản đang đăng nhập.",
-        };
-      }
-
-      const currentUsers = readUsers();
-
-      const target = currentUsers.find(
-        (item) => String(item.id) === String(userId)
-      );
-
-      if (target?.email === ADMIN_EMAIL) {
-        return {
-          success: false,
-          message: "Không thể xóa tài khoản Admin gốc.",
-        };
-      }
-
-      const next = currentUsers.filter(
-        (item) => String(item.id) !== String(userId)
-      );
-
-      setUsers(next);
-
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(next));
-
-      return {
-        success: true,
-        message: "Đã xóa tài khoản.",
-      };
-    },
-    [user]
-  );
-
-  /* =======================================================
-     VALUE
-  ======================================================= */
 
   const value = useMemo(
     () => ({
       user,
       users,
       loading,
-
       login,
       logout,
-
       register,
-
+      createStaffAccount,
       updateProfile,
       changePassword,
-
-      createUser,
-      createStaffAccount,
-
       updateUser,
-      resetUserPassword,
-      toggleUserDisabled,
       deleteUser,
-
       hasPermission,
       hasRole,
-
-      isAdmin: user?.role === ROLES.ADMIN && !user?.disabled,
-
-      isManager:
-        !user?.disabled &&
-        (user?.role === ROLES.ADMIN || user?.role === ROLES.MANAGER),
-
-      isProductManager:
-        !user?.disabled &&
-        (user?.role === ROLES.ADMIN || user?.role === ROLES.PRODUCT_MANAGER),
-
-      permissions: user ? ROLE_PERMISSIONS[user.role] || [] : [],
-
+      isAdmin: user?.role === ROLES.ADMIN,
+      isManager: user?.role === ROLES.ADMIN || user?.role === ROLES.MANAGER,
+      isProductManager: user?.role === ROLES.ADMIN || user?.role === ROLES.PRODUCT_MANAGER,
+      permissions,
       roles: ROLES,
-
       roleLabels: ROLE_LABELS,
-
-      ROLE_LABELS,
-
-      permissionConstants: PERMISSIONS,
-
-      validatePassword: passwordCheck,
     }),
     [
-      user,
-      users,
-      loading,
-      login,
-      logout,
-      register,
-      updateProfile,
-      changePassword,
-      createUser,
-      createStaffAccount,
-      updateUser,
-      resetUserPassword,
-      toggleUserDisabled,
-      deleteUser,
-      hasPermission,
-      hasRole,
+      user, users, loading, login, logout, register, createStaffAccount,
+      updateProfile, changePassword, updateUser, deleteUser,
+      hasPermission, hasRole, permissions,
     ]
   );
 
