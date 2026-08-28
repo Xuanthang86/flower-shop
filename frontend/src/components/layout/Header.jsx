@@ -1,12 +1,28 @@
+/*
+============================================================
+FLOWER SHOP — HEADER
+============================================================
+
+CẬP NHẬT:
+- Không còn AnnouncementBar bên trong Header.
+- AnnouncementBar được MainLayout quản lý.
+- Search duy nhất sử dụng SearchBox.jsx.
+- Danh mục lấy từ catalog.
+- Không tạo data danh mục thứ ba.
+- Desktop + mobile dùng cùng SearchBox.
+============================================================
+*/
+
 import { useEffect, useRef, useState } from "react";
 
-import { NavLink, Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
-import { FiChevronDown, FiMenu, FiSearch, FiX } from "react-icons/fi";
+import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
 
 import HeaderIcons from "./HeaderIcons";
+import SearchBox from "./SearchBox";
 
-import { readProductCategories } from "@/constants/productCategories";
+import { readCategories, CATEGORY_UPDATED_EVENT } from "@/services/catalog";
 
 const navClass = ({ isActive }) =>
   `relative py-2 text-sm font-medium transition ${
@@ -14,7 +30,7 @@ const navClass = ({ isActive }) =>
   }`;
 
 const Header = () => {
-  const [categories, setCategories] = useState(() => readProductCategories());
+  const [categories, setCategories] = useState(() => readCategories());
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -24,44 +40,36 @@ const Header = () => {
 
   const productMenuRef = useRef(null);
 
-  /* =====================================================
-     ĐỒNG BỘ DANH MỤC
-  ===================================================== */
+  /*
+  ==========================================================
+  CATEGORY SYNC
+  ==========================================================
+  */
 
   useEffect(() => {
     const refreshCategories = () => {
-      setCategories(readProductCategories());
+      setCategories(readCategories());
     };
 
-    const handleStorage = (event) => {
-      if (event.key === "flower-shop-categories") {
-        refreshCategories();
-      }
-    };
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
-    window.addEventListener("storage", handleStorage);
-
-    window.addEventListener(
-      "flower-shop-categories-updated",
-      refreshCategories
-    );
+    window.addEventListener("storage", refreshCategories);
 
     return () => {
-      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
-      window.removeEventListener(
-        "flower-shop-categories-updated",
-        refreshCategories
-      );
+      window.removeEventListener("storage", refreshCategories);
     };
   }, []);
 
-  /* =====================================================
-     CLICK RA NGOÀI
-  ===================================================== */
+  /*
+  ==========================================================
+  OUTSIDE CLICK
+  ==========================================================
+  */
 
   useEffect(() => {
-    const handleOutside = (event) => {
+    const handleOutsideClick = (event) => {
       if (
         productMenuRef.current &&
         !productMenuRef.current.contains(event.target)
@@ -70,9 +78,11 @@ const Header = () => {
       }
     };
 
-    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("mousedown", handleOutsideClick);
 
-    return () => document.removeEventListener("mousedown", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
   }, []);
 
   const closeMobile = () => {
@@ -82,27 +92,25 @@ const Header = () => {
 
   const closeAll = () => {
     setDesktopProductsOpen(false);
-
     closeMobile();
   };
 
-  return (
-    <header className="w-full bg-white border-b border-gray-100 shadow-sm relative z-[80]">
-      <div className="bg-pink-600 text-white text-xs">
-        <div className="max-w-7xl mx-auto px-4 h-8 flex items-center justify-center text-center">
-          🌸 Miễn phí giao hàng cho đơn từ 500.000đ | Đặt trước 14h giao trong
-          ngày
-        </div>
-      </div>
+  const activeCategories = categories
+    .filter((category) => category.active !== false)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="min-h-[76px] flex items-center gap-4 lg:gap-6">
+  return (
+    <header className="relative z-[80] w-full border-b border-gray-100 bg-white shadow-sm">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="flex min-h-[76px] items-center gap-4 lg:gap-6">
+          {/* LOGO */}
+
           <Link
             to="/"
             onClick={closeAll}
-            className="flex items-center gap-3 shrink-0"
+            className="flex shrink-0 items-center gap-3"
           >
-            <div className="w-11 h-11 rounded-full bg-pink-600 text-white flex items-center justify-center text-xl shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-pink-600 text-xl text-white shadow-sm">
               🌸
             </div>
 
@@ -115,9 +123,9 @@ const Header = () => {
             </div>
           </Link>
 
-          {/* DESKTOP */}
+          {/* DESKTOP NAV */}
 
-          <nav className="hidden lg:flex items-center gap-7">
+          <nav className="hidden items-center gap-7 lg:flex">
             <NavLink to="/" className={navClass}>
               Trang chủ
             </NavLink>
@@ -138,23 +146,25 @@ const Header = () => {
               </button>
 
               {desktopProductsOpen && (
-                <div className="absolute left-0 top-full mt-2 w-60 bg-white border border-gray-100 rounded-xl shadow-xl p-2 z-50">
+                <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
                   <Link
                     to="/products"
                     onClick={() => setDesktopProductsOpen(false)}
-                    className="block px-3 py-2.5 rounded-lg font-medium text-gray-800 hover:bg-pink-50 hover:text-pink-600"
+                    className="block rounded-lg px-3 py-2.5 font-medium text-gray-800 hover:bg-pink-50 hover:text-pink-600"
                   >
                     Tất cả sản phẩm
                   </Link>
 
-                  {categories.map((category) => (
+                  {activeCategories.map((category) => (
                     <Link
                       key={category.id}
-                      to={`/products?category=${category.query}`}
+                      to={`/products?category=${encodeURIComponent(
+                        category.slug
+                      )}`}
                       onClick={() => setDesktopProductsOpen(false)}
-                      className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-pink-50 hover:text-pink-600"
+                      className="block rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-pink-50 hover:text-pink-600"
                     >
-                      {category.label}
+                      {category.name}
                     </Link>
                   ))}
                 </div>
@@ -172,19 +182,13 @@ const Header = () => {
 
           {/* SEARCH */}
 
-          <div className="hidden md:flex flex-1 max-w-sm ml-auto">
-            <div className="w-full flex items-center border border-gray-200 rounded-full bg-gray-50">
-              <FiSearch className="ml-4 text-gray-400" size={18} />
-
-              <input
-                type="search"
-                placeholder="Tìm hoa theo tên..."
-                className="w-full bg-transparent px-3 py-2.5 outline-none text-sm"
-              />
-            </div>
+          <div className="ml-auto hidden max-w-xl flex-1 md:flex">
+            <SearchBox />
           </div>
 
-          <div className="ml-auto lg:ml-0 flex items-center gap-2">
+          {/* ICONS */}
+
+          <div className="flex items-center gap-2">
             <div className="hidden md:block">
               <HeaderIcons />
             </div>
@@ -192,7 +196,7 @@ const Header = () => {
             <button
               type="button"
               onClick={() => setMobileOpen((value) => !value)}
-              className="lg:hidden w-10 h-10 rounded-lg flex items-center justify-center text-gray-700 hover:bg-pink-50"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-pink-50 lg:hidden"
               aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
             >
               {mobileOpen ? <FiX size={23} /> : <FiMenu size={23} />}
@@ -203,15 +207,9 @@ const Header = () => {
         {/* MOBILE */}
 
         {mobileOpen && (
-          <div className="lg:hidden border-t border-gray-100 py-4">
-            <div className="mb-4 flex items-center border border-gray-200 rounded-full bg-gray-50">
-              <FiSearch className="ml-4 text-gray-400" size={18} />
-
-              <input
-                type="search"
-                placeholder="Tìm hoa theo tên..."
-                className="w-full bg-transparent px-3 py-2.5 outline-none text-sm"
-              />
+          <div className="border-t border-gray-100 py-4 lg:hidden">
+            <div className="mb-4">
+              <SearchBox />
             </div>
 
             <nav className="flex flex-col">
@@ -222,7 +220,7 @@ const Header = () => {
               <button
                 type="button"
                 onClick={() => setMobileProductsOpen((value) => !value)}
-                className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-700"
+                className="flex w-full items-center justify-between py-2 text-sm font-medium text-gray-700"
               >
                 <span>Sản phẩm</span>
 
@@ -235,7 +233,7 @@ const Header = () => {
               </button>
 
               {mobileProductsOpen && (
-                <div className="ml-3 mb-2 border-l border-pink-100 pl-3">
+                <div className="mb-2 ml-3 border-l border-pink-100 pl-3">
                   <Link
                     to="/products"
                     onClick={closeMobile}
@@ -244,14 +242,16 @@ const Header = () => {
                     Tất cả sản phẩm
                   </Link>
 
-                  {categories.map((category) => (
+                  {activeCategories.map((category) => (
                     <Link
                       key={category.id}
-                      to={`/products?category=${category.query}`}
+                      to={`/products?category=${encodeURIComponent(
+                        category.slug
+                      )}`}
                       onClick={closeMobile}
-                      className="block py-1.5 text-sm text-gray-500 hover:text-pink-600"
+                      className="block py-2 text-sm text-gray-600 hover:text-pink-600"
                     >
-                      {category.label}
+                      {category.name}
                     </Link>
                   ))}
                 </div>
@@ -266,7 +266,7 @@ const Header = () => {
               </NavLink>
             </nav>
 
-            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+            <div className="mt-4 border-t border-gray-100 pt-4">
               <HeaderIcons />
             </div>
           </div>

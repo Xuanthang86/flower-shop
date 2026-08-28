@@ -3,15 +3,16 @@
 FLOWER SHOP — ANNOUNCEMENT BAR
 ============================================================
 
-Cập nhật:
-- Nhiều thông báo nổi bật.
-- Tự động chuyển nội dung.
-- Không dùng marquee HTML.
-- Animation nhẹ, phù hợp Header.
+CẬP NHẬT:
+- Hiển thị nhiều thông báo nổi bật.
+- Chạy ngang liên tục.
+- Không dùng <marquee>.
+- Không dùng setInterval.
+- Dừng khi người dùng hover.
+- Hỗ trợ prefers-reduced-motion.
+- Không chứa dữ liệu danh mục/sản phẩm.
 ============================================================
 */
-
-import { useEffect, useState } from "react";
 
 import Container from "@/components/common/Container";
 
@@ -23,25 +24,27 @@ const ANNOUNCEMENTS = [
 ];
 
 const AnnouncementBar = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentIndex((current) => (current + 1) % ANNOUNCEMENTS.length);
-    }, 3500);
-
-    return () => window.clearInterval(timer);
-  }, []);
+  const renderMessages = (group) =>
+    ANNOUNCEMENTS.map((message, index) => (
+      <span key={`${group}-${index}`} className="announcement-item">
+        {message}
+        <span className="announcement-separator" aria-hidden="true">
+          •
+        </span>
+      </span>
+    ));
 
   return (
-    <div className="bg-pink-600 text-white overflow-hidden">
-      <Container className="h-10 flex items-center justify-center text-sm">
-        <div
-          key={currentIndex}
-          className="animate-[fadeIn_0.5s_ease-in-out] text-center px-4"
-          aria-live="polite"
-        >
-          {ANNOUNCEMENTS[currentIndex]}
+    <div className="announcement-bar" aria-label="Thông báo nổi bật">
+      <Container className="announcement-container">
+        <div className="announcement-viewport">
+          <div className="announcement-track">
+            <div className="announcement-group">{renderMessages("first")}</div>
+
+            <div className="announcement-group" aria-hidden="true">
+              {renderMessages("second")}
+            </div>
+          </div>
         </div>
       </Container>
     </div>

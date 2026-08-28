@@ -1,227 +1,265 @@
-/*
-============================================================
-FLOWER SHOP — ADMIN APPEARANCE
-============================================================
-
-Admin chỉ chỉnh giao diện cơ bản.
-Không cần sửa code.
-
-Có:
-- Màu chủ đạo
-- Màu phụ
-- Màu chữ
-- Font
-- Cỡ chữ
-- Bo góc
-- Khôi phục mặc định
-============================================================
-*/
-
+import { useEffect, useState } from "react";
 import { FiRotateCcw, FiSave } from "react-icons/fi";
 
-import { DEFAULT_THEME, useTheme } from "@/context/ThemeProvider";
+import { useTheme } from "@/context/ThemeContext";
+
+const FONT_OPTIONS = [
+  {
+    value:
+      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    label: "Inter / System UI",
+  },
+  {
+    value: "Arial, Helvetica, sans-serif",
+    label: "Arial",
+  },
+  {
+    value: "Georgia, serif",
+    label: "Georgia",
+  },
+  {
+    value: "Verdana, sans-serif",
+    label: "Verdana",
+  },
+];
 
 const AdminAppearancePage = () => {
-  const { theme, updateTheme, resetTheme } = useTheme();
+  const { theme, setTheme, resetTheme } = useTheme();
+
+  const [draft, setDraft] = useState(theme);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setDraft(theme);
+  }, [theme]);
+
+  const handleSave = () => {
+    setTheme(draft);
+
+    setMessage("Đã lưu giao diện thành công.");
+  };
+
+  const handleReset = () => {
+    resetTheme();
+
+    setMessage("Đã khôi phục giao diện mặc định.");
+  };
+
+  const updateDraft = (field, value) => {
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
 
   return (
     <section className="min-h-screen bg-gray-50 py-10">
-      <div className="max-w-5xl mx-auto px-4">
+      <div className="mx-auto max-w-6xl px-4">
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+          <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
             Tùy chỉnh giao diện
           </h1>
 
           <p className="mt-2 text-gray-500">
-            Thay đổi giao diện cơ bản mà không cần chỉnh sửa code.
+            Thay đổi các thiết lập giao diện cơ bản mà không cần sửa mã nguồn.
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Màu chủ đạo
-              </label>
+        {message && (
+          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {message}
+          </div>
+        )}
 
-              <div className="flex gap-3">
-                <input
-                  type="color"
-                  value={theme.primaryColor}
+        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+            <div className="space-y-7">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Màu chủ đạo
+                </label>
+
+                <div className="flex gap-3">
+                  <input
+                    type="color"
+                    value={draft.primary}
+                    onChange={(event) =>
+                      updateDraft("primary", event.target.value)
+                    }
+                    className="h-12 w-14 cursor-pointer rounded-lg border p-1"
+                  />
+
+                  <input
+                    type="text"
+                    value={draft.primary}
+                    onChange={(event) =>
+                      updateDraft("primary", event.target.value)
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 px-4 py-3 outline-none focus:border-pink-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Màu hover
+                </label>
+
+                <div className="flex gap-3">
+                  <input
+                    type="color"
+                    value={draft.primaryHover}
+                    onChange={(event) =>
+                      updateDraft("primaryHover", event.target.value)
+                    }
+                    className="h-12 w-14 cursor-pointer rounded-lg border p-1"
+                  />
+
+                  <input
+                    type="text"
+                    value={draft.primaryHover}
+                    onChange={(event) =>
+                      updateDraft("primaryHover", event.target.value)
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 px-4 py-3 outline-none focus:border-pink-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Font chữ
+                </label>
+
+                <select
+                  value={draft.fontFamily}
                   onChange={(event) =>
-                    updateTheme({
-                      primaryColor: event.target.value,
-                    })
+                    updateDraft("fontFamily", event.target.value)
                   }
-                  className="w-14 h-11 rounded cursor-pointer"
-                />
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 outline-none focus:border-pink-500"
+                >
+                  {FONT_OPTIONS.map((font) => (
+                    <option key={font.value} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Cỡ chữ
+                  </label>
+
+                  <span className="text-sm text-pink-600">
+                    {draft.fontSize}px
+                  </span>
+                </div>
 
                 <input
-                  value={theme.primaryColor}
+                  type="range"
+                  min="14"
+                  max="20"
+                  step="1"
+                  value={draft.fontSize}
                   onChange={(event) =>
-                    updateTheme({
-                      primaryColor: event.target.value,
-                    })
+                    updateDraft("fontSize", Number(event.target.value))
                   }
-                  className="flex-1 border border-gray-200 rounded-lg px-4"
+                  className="w-full"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Màu phụ</label>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Độ bo góc
+                  </label>
 
-              <div className="flex gap-3">
-                <input
-                  type="color"
-                  value={theme.secondaryColor}
-                  onChange={(event) =>
-                    updateTheme({
-                      secondaryColor: event.target.value,
-                    })
-                  }
-                  className="w-14 h-11 rounded cursor-pointer"
-                />
+                  <span className="text-sm text-pink-600">
+                    {draft.radius}px
+                  </span>
+                </div>
 
                 <input
-                  value={theme.secondaryColor}
+                  type="range"
+                  min="6"
+                  max="24"
+                  step="1"
+                  value={draft.radius}
                   onChange={(event) =>
-                    updateTheme({
-                      secondaryColor: event.target.value,
-                    })
+                    updateDraft("radius", Number(event.target.value))
                   }
-                  className="flex-1 border border-gray-200 rounded-lg px-4"
+                  className="w-full"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Màu chữ</label>
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-6 py-3 font-semibold text-white transition hover:bg-pink-700"
+                >
+                  <FiSave />
+                  Lưu giao diện
+                </button>
 
-              <div className="flex gap-3">
-                <input
-                  type="color"
-                  value={theme.textColor}
-                  onChange={(event) =>
-                    updateTheme({
-                      textColor: event.target.value,
-                    })
-                  }
-                  className="w-14 h-11 rounded cursor-pointer"
-                />
-
-                <input
-                  value={theme.textColor}
-                  onChange={(event) =>
-                    updateTheme({
-                      textColor: event.target.value,
-                    })
-                  }
-                  className="flex-1 border border-gray-200 rounded-lg px-4"
-                />
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  <FiRotateCcw />
+                  Khôi phục
+                </button>
               </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Font chữ</label>
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="font-bold text-gray-900">Xem trước</h2>
 
-              <select
-                value={theme.fontFamily}
-                onChange={(event) =>
-                  updateTheme({
-                    fontFamily: event.target.value,
-                  })
-                }
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 bg-white"
+            <div
+              className="mt-5 rounded-xl border border-gray-200 p-5"
+              style={{
+                fontFamily: draft.fontFamily,
+                fontSize: `${draft.fontSize}px`,
+              }}
+            >
+              <div
+                className="flex h-12 items-center justify-center text-white font-semibold"
+                style={{
+                  backgroundColor: draft.primary,
+                  borderRadius: `${draft.radius}px`,
+                }}
               >
-                <option value="Inter, system-ui, sans-serif">Inter</option>
+                Flower Shop
+              </div>
 
-                <option value="Arial, sans-serif">Arial</option>
+              <h3 className="mt-5 text-xl font-bold">Hoa tươi mỗi ngày</h3>
 
-                <option value="Georgia, serif">Georgia</option>
-
-                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Cỡ chữ cơ bản
-              </label>
-
-              <input
-                type="number"
-                min="12"
-                max="22"
-                value={theme.baseFontSize}
-                onChange={(event) =>
-                  updateTheme({
-                    baseFontSize: Number(event.target.value),
-                  })
-                }
-                className="w-full border border-gray-200 rounded-lg px-4 py-3"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Bo góc</label>
-
-              <input
-                type="range"
-                min="0"
-                max="24"
-                value={theme.borderRadius}
-                onChange={(event) =>
-                  updateTheme({
-                    borderRadius: Number(event.target.value),
-                  })
-                }
-                className="w-full"
-              />
-
-              <p className="text-sm text-gray-500 mt-1">
-                {theme.borderRadius}px
+              <p className="mt-2 text-sm text-gray-500">
+                Giao diện xem trước giúp Admin kiểm tra thay đổi trước khi sử
+                dụng.
               </p>
-            </div>
-          </div>
 
-          <div className="mt-8 p-6 rounded-xl bg-[var(--fs-secondary)]">
-            <p
-              style={{
-                color: "var(--fs-text)",
-                fontFamily: "var(--fs-font-family)",
-                fontSize: "var(--fs-base-font-size)",
-              }}
-            >
-              Đây là khu vực xem trước giao diện.
+              <button
+                type="button"
+                className="mt-5 px-5 py-2.5 text-sm font-semibold text-white"
+                style={{
+                  backgroundColor: draft.primary,
+                  borderRadius: `${draft.radius}px`,
+                }}
+              >
+                Xem sản phẩm
+              </button>
+            </div>
+
+            <p className="mt-5 text-xs leading-5 text-gray-500">
+              Các thiết lập này chỉ tác động đến phần nhận diện giao diện cơ
+              bản. Không thay đổi logic tài khoản, đơn hàng hoặc dữ liệu sản
+              phẩm.
             </p>
-
-            <button
-              type="button"
-              style={{
-                backgroundColor: "var(--fs-primary)",
-                borderRadius: "var(--fs-radius)",
-              }}
-              className="mt-4 px-5 py-3 text-white font-semibold"
-            >
-              Nút xem trước
-            </button>
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={resetTheme}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              <FiRotateCcw />
-              Khôi phục mặc định
-            </button>
-
-            <div className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-green-50 text-green-700">
-              <FiSave />
-              Thay đổi được lưu tự động
-            </div>
           </div>
         </div>
       </div>

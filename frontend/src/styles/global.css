@@ -1,36 +1,33 @@
-/* /*
-============================================================
-FLOWER SHOP — GLOBAL STYLES
-============================================================
-*/
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-*/
-
 /*
 ============================================================
 FLOWER SHOP — GLOBAL STYLES
 ============================================================
 */
 
+/*
+============================================================
+THEME VARIABLES
+============================================================
+*/
+
 :root {
   --fs-primary: #db2777;
+  --fs-primary-hover: #be185d;
   --fs-secondary: #fce7f3;
   --fs-text: #1f2937;
-  --fs-font-family: Inter, system-ui, sans-serif;
+
+  --fs-font-family:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
   --fs-base-font-size: 16px;
   --fs-radius: 12px;
 }
+
+/*
+============================================================
+BASE
+============================================================
+*/
 
 html,
 body {
@@ -39,6 +36,85 @@ body {
   font-size: var(--fs-base-font-size);
 }
 
+body {
+  margin: 0;
+}
+
+/*
+============================================================
+ANNOUNCEMENT BAR
+============================================================
+*/
+
+.announcement-bar {
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--fs-primary);
+  color: #ffffff;
+}
+
+.announcement-container {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.announcement-viewport {
+  width: 100%;
+  overflow: hidden;
+}
+
+.announcement-track {
+  display: flex;
+  width: max-content;
+  min-width: max-content;
+  animation: flower-shop-announcement-scroll 30s linear infinite;
+  will-change: transform;
+}
+
+.announcement-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.announcement-item {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0 28px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 40px;
+}
+
+.announcement-separator {
+  margin-left: 28px;
+  opacity: 0.65;
+}
+
+.announcement-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes flower-shop-announcement-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/*
+============================================================
+FADE
+============================================================
+*/
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -48,5 +124,39 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/*
+============================================================
+ACCESSIBILITY
+============================================================
+*/
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-track {
+    animation: none;
+  }
+}
+
+/*
+============================================================
+RESPONSIVE
+============================================================
+*/
+
+@media (max-width: 640px) {
+  .announcement-container {
+    height: 36px;
+  }
+
+  .announcement-item {
+    padding: 0 20px;
+    font-size: 12px;
+    line-height: 36px;
+  }
+
+  .announcement-separator {
+    margin-left: 20px;
   }
 }

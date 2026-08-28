@@ -1,15 +1,15 @@
 /*
 ============================================================
-FLOWER SHOP — HEADER SEARCH
+FLOWER SHOP — GLOBAL SEARCH BOX
 ============================================================
 
-Cập nhật:
-- Search duy nhất trên Header.
-- Enter để tìm kiếm.
-- Click icon để tìm kiếm.
-- Chuyển tới /products?search=...
-- Nếu đang ở ProductsPage vẫn giữ từ khóa.
-- Không còn cần một search riêng ở ProductsPage.
+QUY TẮC:
+- Đây là thanh tìm kiếm duy nhất của website.
+- Header sử dụng component này.
+- ProductsPage không tạo search riêng.
+- Không có từ khóa → không chuyển trang.
+- Có từ khóa → /products?search=...
+- Xóa từ khóa không làm mất category.
 ============================================================
 */
 
@@ -19,73 +19,109 @@ import { FiSearch, FiX } from "react-icons/fi";
 
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-const SearchBox = () => {
+const SearchBox = ({ className = "" }) => {
   const navigate = useNavigate();
-
   const location = useLocation();
 
   const [searchParams] = useSearchParams();
 
-  const [keyword, setKeyword] = useState(
-    () => searchParams.get("search") || ""
-  );
+  const urlKeyword = searchParams.get("search") || "";
+
+  const [keyword, setKeyword] = useState(urlKeyword);
 
   useEffect(() => {
-    setKeyword(searchParams.get("search") || "");
-  }, [searchParams, location.pathname]);
+    setKeyword(urlKeyword);
+  }, [urlKeyword, location.pathname]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
 
     const value = keyword.trim();
 
-    if (!value) {
-      navigate("/products");
+    /*
+    ----------------------------------------------------------
+    KHÔNG CÓ TỪ KHÓA
+    ----------------------------------------------------------
 
+    Không được tự động chuyển sang Products.
+    ----------------------------------------------------------
+    */
+
+    if (!value) {
       return;
     }
 
-    navigate(`/products?search=${encodeURIComponent(value)}`);
+    const params = new URLSearchParams();
+
+    params.set("search", value);
+
+    const category = searchParams.get("category");
+
+    if (category) {
+      params.set("category", category);
+    }
+
+    navigate(`/products?${params.toString()}`);
   };
 
   const handleClear = () => {
     setKeyword("");
 
+    /*
+    ----------------------------------------------------------
+    Nếu đang ở Products:
+    giữ category nhưng xóa search.
+    ----------------------------------------------------------
+    */
+
     if (location.pathname === "/products") {
-      navigate("/products");
+      const params = new URLSearchParams(searchParams);
+
+      params.delete("search");
+
+      const query = params.toString();
+
+      navigate(query ? `/products?${query}` : "/products");
     }
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex-1 max-w-xl mx-4"
       role="search"
+      className={`w-full ${className}`}
     >
-      <div className="flex items-center border-2 border-pink-500 rounded-full overflow-hidden bg-white">
+      <div className="flex w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white">
+        <FiSearch
+          size={18}
+          className="ml-4 shrink-0 text-gray-400"
+          aria-hidden="true"
+        />
+
         <input
-          type="search"
+          type="text"
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
           placeholder="Tìm hoa theo tên..."
           aria-label="Tìm kiếm sản phẩm"
-          className="w-full px-4 py-2.5 outline-none text-sm text-gray-700"
+          autoComplete="off"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-gray-700 outline-none"
         />
 
         {keyword && (
           <button
             type="button"
             onClick={handleClear}
-            className="px-2 text-gray-400 hover:text-gray-700"
-            aria-label="Xóa tìm kiếm"
+            className="flex h-9 w-9 shrink-0 items-center justify-center text-gray-400 transition hover:text-gray-700"
+            aria-label="Xóa từ khóa"
           >
-            <FiX size={16} />
+            <FiX size={17} />
           </button>
         )}
 
         <button
           type="submit"
-          className="bg-pink-600 hover:bg-pink-700 text-white px-5 py-2.5 transition flex items-center justify-center shrink-0"
+          className="flex shrink-0 items-center justify-center bg-pink-600 px-5 py-2.5 text-white transition hover:bg-pink-700"
           aria-label="Tìm kiếm"
         >
           <FiSearch size={18} />
