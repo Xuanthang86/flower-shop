@@ -1,77 +1,63 @@
-import birthdayImage from "@/assets/images/categories/category-birthday.jpg";
-import openingImage from "@/assets/images/categories/category-opening.jpg";
-import weddingImage from "@/assets/images/categories/category-wedding.jpg";
-import graduationImage from "@/assets/images/categories/category-graduation.jpg";
-import funeralImage from "@/assets/images/categories/category-funeral.jpg";
+/*
+============================================================
+FLOWER SHOP — HOME DATA COMPATIBILITY LAYER
+============================================================
 
-/* =========================================================
-   DANH MỤC NỔI BẬT
-   ========================================================= */
+Mục đích:
+- Không còn là nguồn dữ liệu sản phẩm thứ hai.
+- Không chứa danh mục riêng.
+- Chuyển tiếp dữ liệu từ Data Layer.
 
-export const categories = [
-  {
-    id: 1,
-    name: "Hoa khai trương",
-    slug: "hoa-khai-truong",
-    image: openingImage,
-  },
-  {
-    id: 2,
-    name: "Hoa sinh nhật",
-    slug: "hoa-sinh-nhat",
-    image: birthdayImage,
-  },
-  {
-    id: 3,
-    name: "Hoa cưới",
-    slug: "hoa-cuoi",
-    image: weddingImage,
-  },
-  {
-    id: 4,
-    name: "Hoa tốt nghiệp",
-    slug: "hoa-tot-nghiep",
-    image: graduationImage,
-  },
-  {
-    id: 5,
-    name: "Hoa chia buồn",
-    slug: "hoa-chia-buon",
-    image: funeralImage,
-  },
-];
+TẠI SAO FILE NÀY VẪN TỒN TẠI?
 
-/* =========================================================
-   SẢN PHẨM NỔI BẬT
-   =========================================================
+Một số component cũ của project vẫn đang import:
 
-   Phần này có thể giữ lại nếu project hiện tại của bạn
-   vẫn đang sử dụng featuredProducts ở nơi khác.
+    categories
+    featuredProducts
+
+Vì vậy file này tạm thời giữ compatibility layer để
+không gây lỗi:
+
+"The requested module ... does not provide an export named
+'categories'"
+
+Sau khi toàn bộ project chuyển sang catalog.js, file này
+có thể được loại bỏ.
+============================================================
 */
 
-export const featuredProducts = [
-  {
-    id: 1,
-    name: "Sweet Rose",
-    price: 450000,
-    image: "/images/flower1.jpg",
-  },
-  {
-    id: 2,
-    name: "Lovely Tulip",
-    price: 520000,
-    image: "/images/flower2.jpg",
-  },
-  {
-    id: 3,
-    name: "White Lily",
-    price: 650000,
-    image: "/images/flower3.jpg",
-  },
-  {
-    id: 4,
-    name: "Sunflower",
-    price: 390000,
-    image: "/images/flower4.jpg",
-  },
-];
+import { readProductCategories } from "./productCategories";
+
+import { readProducts } from "@/services/catalog";
+
+/*
+============================================================
+CATEGORIES
+============================================================
+
+Không tạo dữ liệu mới.
+Chỉ đọc từ nguồn danh mục chuẩn.
+============================================================
+*/
+
+export const categories = readProductCategories();
+
+/*
+============================================================
+FEATURED PRODUCTS
+============================================================
+
+Không tạo bộ sản phẩm riêng.
+
+Dữ liệu được lấy từ products.js thông qua catalog service.
+============================================================
+*/
+
+export const featuredProducts = readProducts()
+  .filter((product) => product?.isNew || Number(product?.salesCount || 0) > 0)
+  .sort(
+    (a, b) =>
+      Number(b?.isNew || false) - Number(a?.isNew || false) ||
+      Number(b?.salesCount || 0) - Number(a?.salesCount || 0)
+  )
+  .slice(0, 8);

@@ -1,3 +1,52 @@
+/* /*
+============================================================
+FLOWER SHOP — GLOBAL STYLES
+============================================================
+*/
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+*/
+
+/*
+============================================================
+FLOWER SHOP — GLOBAL STYLES
+============================================================
+*/
+
+:root {
+  --fs-primary: #db2777;
+  --fs-secondary: #fce7f3;
+  --fs-text: #1f2937;
+  --fs-font-family: Inter, system-ui, sans-serif;
+  --fs-base-font-size: 16px;
+  --fs-radius: 12px;
+}
+
+html,
 body {
-  background: #fff;
+  font-family: var(--fs-font-family);
+  color: var(--fs-text);
+  font-size: var(--fs-base-font-size);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
