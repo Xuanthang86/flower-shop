@@ -3,13 +3,20 @@
 FLOWER SHOP — GLOBAL SEARCH BOX
 ============================================================
 
-QUY TẮC:
-- Đây là thanh tìm kiếm duy nhất của website.
-- Header sử dụng component này.
-- ProductsPage không tạo search riêng.
-- Không có từ khóa → không chuyển trang.
-- Có từ khóa → /products?search=...
-- Xóa từ khóa không làm mất category.
+Mục đích:
+- Chỉ có MỘT thanh tìm kiếm dùng toàn website.
+- Header desktop sử dụng component này.
+- Header mobile sử dụng component này.
+- ProductsPage KHÔNG tạo thêm search riêng.
+- Từ khóa được lưu trên URL:
+      /products?search=hoa
+- Có category:
+      /products?category=hoa-sinh-nhat&search=hoa
+- Không có từ khóa:
+      Không tự động chuyển trang.
+- Nút X chỉ xuất hiện một lần.
+- Enter hoặc kính lúp mới thực hiện tìm kiếm.
+
 ============================================================
 */
 
@@ -21,6 +28,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 const SearchBox = ({ className = "" }) => {
   const navigate = useNavigate();
+
   const location = useLocation();
 
   const [searchParams] = useSearchParams();
@@ -29,9 +37,21 @@ const SearchBox = ({ className = "" }) => {
 
   const [keyword, setKeyword] = useState(urlKeyword);
 
+  /*
+  ==========================================================
+  ĐỒNG BỘ URL → INPUT
+  ==========================================================
+  */
+
   useEffect(() => {
     setKeyword(urlKeyword);
   }, [urlKeyword, location.pathname]);
+
+  /*
+  ==========================================================
+  SEARCH
+  ==========================================================
+  */
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -39,12 +59,8 @@ const SearchBox = ({ className = "" }) => {
     const value = keyword.trim();
 
     /*
-    ----------------------------------------------------------
-    KHÔNG CÓ TỪ KHÓA
-    ----------------------------------------------------------
-
-    Không được tự động chuyển sang Products.
-    ----------------------------------------------------------
+    Không có từ khóa:
+    không chuyển trang.
     */
 
     if (!value) {
@@ -55,6 +71,11 @@ const SearchBox = ({ className = "" }) => {
 
     params.set("search", value);
 
+    /*
+    Giữ category nếu đang
+    tìm kiếm trong một danh mục.
+    */
+
     const category = searchParams.get("category");
 
     if (category) {
@@ -64,14 +85,18 @@ const SearchBox = ({ className = "" }) => {
     navigate(`/products?${params.toString()}`);
   };
 
+  /*
+  ==========================================================
+  CLEAR
+  ==========================================================
+  */
+
   const handleClear = () => {
     setKeyword("");
 
     /*
-    ----------------------------------------------------------
     Nếu đang ở Products:
-    giữ category nhưng xóa search.
-    ----------------------------------------------------------
+    xóa search nhưng giữ category.
     */
 
     if (location.pathname === "/products") {
@@ -82,7 +107,15 @@ const SearchBox = ({ className = "" }) => {
       const query = params.toString();
 
       navigate(query ? `/products?${query}` : "/products");
+
+      return;
     }
+
+    /*
+    Nếu đang ở trang khác:
+    chỉ xóa input.
+    Không tự động chuyển trang.
+    */
   };
 
   return (
@@ -91,38 +124,48 @@ const SearchBox = ({ className = "" }) => {
       role="search"
       className={`w-full ${className}`}
     >
-      <div className="flex w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white">
-        <FiSearch
-          size={18}
-          className="ml-4 shrink-0 text-gray-400"
-          aria-hidden="true"
-        />
+      <div className="flex w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white shadow-sm">
+        {/* ICON SEARCH */}
+        <span className="ml-4 shrink-0 text-gray-400" aria-hidden="true">
+          <FiSearch size={18} />
+        </span>
 
+        {/* INPUT */}
         <input
           type="text"
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Tìm hoa theo tên..."
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              handleClear();
+            }
+          }}
+          placeholder="Tìm kiếm sản phẩm..."
           aria-label="Tìm kiếm sản phẩm"
           autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-gray-700 outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-gray-700 outline-none placeholder:text-gray-400"
         />
 
-        {keyword && (
+        {/* CLEAR — CHỈ MỘT NÚT */}
+        {keyword.length > 0 && (
           <button
             type="button"
             onClick={handleClear}
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-gray-400 transition hover:text-gray-700"
+            className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Xóa từ khóa"
+            title="Xóa từ khóa"
           >
             <FiX size={17} />
           </button>
         )}
 
+        {/* SEARCH BUTTON */}
         <button
           type="submit"
-          className="flex shrink-0 items-center justify-center bg-pink-600 px-5 py-2.5 text-white transition hover:bg-pink-700"
+          disabled={!keyword.trim()}
+          className="flex h-11 w-12 shrink-0 items-center justify-center bg-pink-600 text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Tìm kiếm"
+          title="Tìm kiếm"
         >
           <FiSearch size={18} />
         </button>

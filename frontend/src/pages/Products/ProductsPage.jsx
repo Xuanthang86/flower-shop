@@ -1,13 +1,39 @@
-import { useMemo, useState, useEffect } from "react";
+/*
+============================================================
+FLOWER SHOP — PRODUCTS PAGE
+============================================================
+
+CẬP NHẬT:
+- Không còn thanh tìm kiếm thứ hai.
+- Search duy nhất nằm ở Header/SearchBox.
+- Đọc search từ URL.
+- Đọc category từ URL.
+- Đọc products từ catalog.js.
+- Đọc categories từ catalog.js.
+- 20 sản phẩm/trang.
+- Đồng bộ khi Admin thay đổi sản phẩm/danh mục.
+- Không tạo data sản phẩm riêng.
+============================================================
+*/
+
+import { useEffect, useMemo, useState } from "react";
+
 import { Link, useSearchParams } from "react-router-dom";
+
 import {
-  FiHeart,
-  FiShoppingCart,
   FiChevronLeft,
   FiChevronRight,
+  FiHeart,
+  FiShoppingCart,
 } from "react-icons/fi";
 
-import { PRODUCT_CATEGORIES, products } from "@/data/products";
+import {
+  readProducts,
+  readCategories,
+  PRODUCT_UPDATED_EVENT,
+  CATEGORY_UPDATED_EVENT,
+} from "@/services/catalog";
+
 import { useCart } from "@/context/useCart";
 import { useAuth } from "@/context/AuthContext";
 
@@ -15,21 +41,70 @@ const PRODUCTS_PER_PAGE = 20;
 
 const WISHLIST_KEY = "flower-shop-wishlist";
 
+const formatPrice = (price) =>
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(Number(price || 0));
+
 const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const categoryFromUrl = searchParams.get("category") || "all";
+  const { addToCart } = useCart();
 
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const { user } = useAuth();
+
+  const [products, setProducts] = useState(() => readProducts());
+
+  const [categories, setCategories] = useState(() => readCategories());
+
   const [wishlistIds, setWishlistIds] = useState([]);
 
-  const { addToCart } = useCart();
-  const { user } = useAuth();
+  const [currentPage, setCurrentPage] = useState(1);
 
   /*
   ==========================================================
-  ĐỌC WISHLIST
+  URL STATE
+  ==========================================================
+  */
+
+  const activeCategory = searchParams.get("category") || "all";
+
+  const searchKeyword = searchParams.get("search") || "";
+
+  /*
+  ==========================================================
+  SYNC CATALOG
+  ==========================================================
+  */
+
+  useEffect(() => {
+    const refreshProducts = () => {
+      setProducts(readProducts());
+    };
+
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
+
+    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+    window.addEventListener("storage", refreshProducts);
+
+    return () => {
+      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+      window.removeEventListener("storage", refreshProducts);
+    };
+  }, []);
+
+  /*
+  ==========================================================
+  WISHLIST
   ==========================================================
   */
 
@@ -54,42 +129,170 @@ const ProductsPage = () => {
 
   /*
   ==========================================================
-  DANH MỤC HIỆN TẠI
+  FILTER
   ==========================================================
   */
 
-  const activeCategory = categoryFromUrl;
+  const filteredProducts = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchCategory =
+        activeCategory === "all" ||
+        String(product.category) === String(activeCategory);
+
+      if (!matchCategory) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      return [
+        product.name,
+        product.category,
+        product.description,
+        product.badge,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [products, activeCategory, searchKeyword]);
 
   /*
   ==========================================================
-  ĐỔI DANH MỤC
+  RESET PAGE
   ==========================================================
   */
 
-  const handleCategoryChange = (category) => {
+  useEffect(() => {
     setCurrentPage(1);
+  }, [activeCategory, searchKeyword]);
 
-    if (category === "all") {
-      setSearchParams({});
-      return;
+  /*
+  ==========================================================
+  PAGINATION
+  ==========================================================
+  */
+
+  const totalProducts = filteredProducts.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
+
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const startIndex =
+    totalProducts === 0 ? 0 : (safeCurrentPage - 1) * PRODUCTS_PER_PAGE;
+
+  const endIndex = Math.min(startIndex + PRODUCTS_PER_PAGE, totalProducts);
+
+  const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  /*
+  ==========================================================
+  CATEGORY
+  ==========================================================
+  */
+
+  const activeCategories = categories
+    .filter((category) => category.active !== false)
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+
+  const getCategoryName = (slug) => {
+    if (slug === "all") {
+      return "Tất cả sản phẩm";
     }
 
-    setSearchParams({
-      category,
-    });
+    return (
+      categories.find((category) => String(category.slug) === String(slug))
+        ?.name || "Danh mục sản phẩm"
+    );
   };
 
   /*
   ==========================================================
-  FORMAT GIÁ
+  CHANGE CATEGORY
   ==========================================================
   */
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
+  const handleCategoryChange = (category) => {
+    const params = new URLSearchParams(searchParams);
+
+    params.delete("search");
+
+    if (category === "all") {
+      params.delete("category");
+    } else {
+      params.set("category", category);
+    }
+
+    setSearchParams(params);
+
+    setCurrentPage(1);
+  };
+
+  /*
+  ==========================================================
+  WISHLIST
+  ==========================================================
+  */
+
+  const toggleWishlist = (product) => {
+    if (!user) {
+      window.alert("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+
+      return;
+    }
+
+    const userId = user.id || user.email;
+
+    const key = `${WISHLIST_KEY}-${userId}`;
+
+    let currentIds = [];
+
+    try {
+      const raw = localStorage.getItem(key);
+
+      const parsed = raw ? JSON.parse(raw) : [];
+
+      currentIds = Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      currentIds = [];
+    }
+
+    const productId = String(product.id);
+
+    const updatedIds = currentIds.includes(productId)
+      ? currentIds.filter((id) => id !== productId)
+      : [...currentIds, productId];
+
+    localStorage.setItem(key, JSON.stringify(updatedIds));
+
+    setWishlistIds(updatedIds);
+  };
+
+  /*
+  ==========================================================
+  ADD CART
+  ==========================================================
+  */
+
+  const handleAddToCart = (product) => {
+    const result = addToCart(product);
+
+    if (!result?.success) {
+      window.alert(
+        result?.message ||
+          "Vui lòng đăng nhập trước khi thêm sản phẩm vào giỏ hàng."
+      );
+
+      return;
+    }
+
+    window.alert(`Đã thêm "${product.name}" vào giỏ hàng.`);
   };
 
   /*
@@ -120,137 +323,7 @@ const ProductsPage = () => {
 
   /*
   ==========================================================
-  LỌC SẢN PHẨM
-  ==========================================================
-  */
-
-  const filteredProducts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    return products.filter((product) => {
-      const matchCategory =
-        activeCategory === "all" || product.category === activeCategory;
-
-      const matchSearch =
-        !keyword ||
-        product.name.toLowerCase().includes(keyword) ||
-        product.description.toLowerCase().includes(keyword);
-
-      return matchCategory && matchSearch;
-    });
-  }, [activeCategory, search]);
-
-  /*
-  ==========================================================
-  PHÂN TRANG
-  ==========================================================
-  */
-
-  const totalProducts = filteredProducts.length;
-
-  const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
-
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  const startIndex =
-    totalProducts === 0 ? 0 : (safeCurrentPage - 1) * PRODUCTS_PER_PAGE;
-
-  const endIndex = Math.min(startIndex + PRODUCTS_PER_PAGE, totalProducts);
-
-  const currentProducts = filteredProducts.slice(startIndex, endIndex);
-
-  /*
-  ==========================================================
-  RESET PAGE KHI URL DANH MỤC THAY ĐỔI
-  ==========================================================
-  */
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeCategory]);
-
-  /*
-  ==========================================================
-  TÊN DANH MỤC
-  ==========================================================
-  */
-
-  const getCategoryName = (slug) => {
-    return (
-      PRODUCT_CATEGORIES.find((category) => category.slug === slug)?.name ||
-      "Danh mục sản phẩm"
-    );
-  };
-
-  const isAllCategory = activeCategory === "all";
-
-  /*
-  ==========================================================
-  WISHLIST
-  ==========================================================
-  */
-
-  const toggleWishlist = (product) => {
-    if (!user) {
-      window.alert("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
-
-      return;
-    }
-
-    const userId = user.id || user.email;
-
-    const key = `${WISHLIST_KEY}-${userId}`;
-
-    let currentIds = [];
-
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = raw ? JSON.parse(raw) : [];
-
-      currentIds = Array.isArray(parsed) ? parsed.map(String) : [];
-    } catch {
-      currentIds = [];
-    }
-
-    const productId = String(product.id);
-
-    let updatedIds;
-
-    if (currentIds.includes(productId)) {
-      updatedIds = currentIds.filter((id) => id !== productId);
-    } else {
-      updatedIds = [...currentIds, productId];
-    }
-
-    localStorage.setItem(key, JSON.stringify(updatedIds));
-
-    setWishlistIds(updatedIds);
-  };
-
-  /*
-  ==========================================================
-  THÊM GIỎ HÀNG
-  ==========================================================
-  */
-
-  const handleAddToCart = (product) => {
-    const result = addToCart(product);
-
-    if (!result?.success) {
-      window.alert(
-        result?.message ||
-          "Vui lòng đăng nhập trước khi thêm sản phẩm vào giỏ hàng."
-      );
-
-      return;
-    }
-
-    window.alert(`Đã thêm "${product.name}" vào giỏ hàng.`);
-  };
-
-  /*
-  ==========================================================
-  CHUYỂN TRANG
+  PAGINATION
   ==========================================================
   */
 
@@ -267,51 +340,48 @@ const ProductsPage = () => {
     });
   };
 
-  /*
-  ==========================================================
-  PAGINATION
-  ==========================================================
-  */
-
   const renderPagination = () => {
     if (totalPages <= 1) {
       return null;
     }
 
     return (
-      <div className="mt-12 flex items-center justify-center gap-2 flex-wrap">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           disabled={safeCurrentPage === 1}
           onClick={() => goToPage(safeCurrentPage - 1)}
-          className="w-10 h-10 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:border-pink-400 hover:text-pink-600 transition"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-pink-400 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Trang trước"
         >
           <FiChevronLeft />
         </button>
 
-        {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-          (page) => (
-            <button
-              key={page}
-              type="button"
-              onClick={() => goToPage(page)}
-              className={`w-10 h-10 rounded-lg font-medium transition ${
-                safeCurrentPage === page
-                  ? "bg-pink-600 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:border-pink-400 hover:text-pink-600"
-              }`}
-            >
-              {page}
-            </button>
-          )
-        )}
+        {Array.from(
+          {
+            length: totalPages,
+          },
+          (_, index) => index + 1
+        ).map((page) => (
+          <button
+            key={page}
+            type="button"
+            onClick={() => goToPage(page)}
+            className={`h-10 w-10 rounded-lg font-medium transition ${
+              safeCurrentPage === page
+                ? "bg-pink-600 text-white"
+                : "border border-gray-200 bg-white text-gray-600 hover:border-pink-400 hover:text-pink-600"
+            }`}
+          >
+            {page}
+          </button>
+        ))}
 
         <button
           type="button"
           disabled={safeCurrentPage === totalPages}
           onClick={() => goToPage(safeCurrentPage + 1)}
-          className="w-10 h-10 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:border-pink-400 hover:text-pink-600 transition"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-pink-400 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Trang sau"
         >
           <FiChevronRight />
@@ -327,59 +397,42 @@ const ProductsPage = () => {
   */
 
   return (
-    <section className="min-h-screen bg-gray-50 py-10 md:py-14">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* HEADER */}
-
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
+    <section className="min-h-screen bg-gray-50 py-8 md:py-10">
+      <div className="mx-auto max-w-7xl px-4">
+        {/* TITLE */}
+        <div className="mb-7 text-center">
+          <h1 className="text-3xl font-bold text-gray-800 md:text-4xl">
             Sản phẩm
           </h1>
 
-          <p className="mt-3 text-gray-500">
+          <p className="mt-2 text-gray-500">
             Khám phá những mẫu hoa đẹp dành cho mọi dịp đặc biệt.
           </p>
         </div>
 
-        {/* SEARCH */}
-
-        <div className="max-w-xl mx-auto mb-8">
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Tìm kiếm sản phẩm..."
-            className="w-full h-12 px-5 rounded-xl border border-gray-300 bg-white outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-          />
-        </div>
-
         {/* CATEGORY */}
-
-        <div className="flex flex-wrap justify-center gap-3 mb-10">
+        <div className="mb-7 flex flex-wrap justify-center gap-2.5">
           <button
             type="button"
             onClick={() => handleCategoryChange("all")}
-            className={`px-5 py-2.5 rounded-full text-sm font-medium transition ${
+            className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
               activeCategory === "all"
                 ? "bg-pink-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:text-pink-600 hover:border-pink-300"
+                : "border border-gray-200 bg-white text-gray-600 hover:border-pink-300 hover:text-pink-600"
             }`}
           >
             Tất cả
           </button>
 
-          {PRODUCT_CATEGORIES.map((category) => (
+          {activeCategories.map((category) => (
             <button
               key={category.id}
               type="button"
               onClick={() => handleCategoryChange(category.slug)}
-              className={`px-5 py-2.5 rounded-full text-sm font-medium transition ${
+              className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
                 activeCategory === category.slug
                   ? "bg-pink-600 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:text-pink-600 hover:border-pink-300"
+                  : "border border-gray-200 bg-white text-gray-600 hover:border-pink-300 hover:text-pink-600"
               }`}
             >
               {category.name}
@@ -387,68 +440,54 @@ const ProductsPage = () => {
           ))}
         </div>
 
-        {/* TOP INFO */}
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        {/* SEARCH RESULT INFO */}
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">
-              {isAllCategory
-                ? "Tất cả sản phẩm"
-                : getCategoryName(activeCategory)}
+              {getCategoryName(activeCategory)}
             </h2>
 
-            <p className="text-sm text-gray-500 mt-1">
-              {totalProducts > 0 ? (
-                <>
-                  Hiển thị{" "}
-                  <span className="font-semibold text-gray-800">
-                    {startIndex + 1}-{endIndex}
-                  </span>
-                  /
-                  <span className="font-semibold text-gray-800">
-                    {totalProducts}
-                  </span>{" "}
-                  sản phẩm
-                </>
-              ) : (
-                <>
-                  Hiển thị{" "}
-                  <span className="font-semibold text-gray-800">0</span>/
-                  <span className="font-semibold text-gray-800">0</span> sản
-                  phẩm
-                </>
-              )}
-            </p>
+            {searchKeyword && (
+              <p className="mt-1 text-sm text-gray-500">
+                Kết quả tìm kiếm cho:{" "}
+                <span className="font-semibold text-pink-600">
+                  "{searchKeyword}"
+                </span>
+              </p>
+            )}
           </div>
+
+          <p className="text-sm text-gray-500">
+            {totalProducts === 0
+              ? "Không có sản phẩm"
+              : `Hiển thị ${startIndex + 1}-${endIndex}/${totalProducts} sản phẩm`}
+          </p>
         </div>
 
         {/* PRODUCTS */}
-
         {currentProducts.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {currentProducts.map((product) => {
                 const isFavorite = wishlistIds.includes(String(product.id));
 
                 return (
                   <article
                     key={product.id}
-                    className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition"
+                    className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-lg"
                   >
-                    {/* IMAGE */}
-
                     <div className="relative aspect-square overflow-hidden bg-gray-100">
                       <Link to={`/products/${product.id}`}>
                         <img
                           src={product.image}
                           alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         />
                       </Link>
 
                       {product.badge && (
                         <span
-                          className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold ${getBadgeClass(
+                          className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${getBadgeClass(
                             product.badge
                           )}`}
                         >
@@ -459,10 +498,10 @@ const ProductsPage = () => {
                       <button
                         type="button"
                         onClick={() => toggleWishlist(product)}
-                        className={`absolute top-3 right-3 w-9 h-9 rounded-full bg-white/95 flex items-center justify-center shadow-sm transition ${
+                        className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow-sm transition ${
                           isFavorite
-                            ? "text-pink-600 bg-pink-50"
-                            : "text-gray-500 hover:text-pink-600"
+                            ? "bg-pink-50 text-pink-600"
+                            : "bg-white/95 text-gray-500 hover:text-pink-600"
                         }`}
                         aria-label={
                           isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"
@@ -472,22 +511,20 @@ const ProductsPage = () => {
                       </button>
                     </div>
 
-                    {/* CONTENT */}
-
                     <div className="p-4">
-                      {isAllCategory && (
-                        <p className="text-xs text-pink-600 font-medium mb-1">
+                      {activeCategory === "all" && (
+                        <p className="mb-1 text-xs font-medium text-pink-600">
                           {getCategoryName(product.category)}
                         </p>
                       )}
 
                       <Link to={`/products/${product.id}`}>
-                        <h3 className="font-semibold text-gray-800 line-clamp-2 min-h-[48px] hover:text-pink-600 transition">
+                        <h3 className="min-h-[48px] line-clamp-2 font-semibold text-gray-800 transition hover:text-pink-600">
                           {product.name}
                         </h3>
                       </Link>
 
-                      <p className="mt-2 text-sm text-gray-500 line-clamp-2 min-h-[40px]">
+                      <p className="mt-2 min-h-[40px] line-clamp-2 text-sm text-gray-500">
                         {product.description}
                       </p>
 
@@ -506,7 +543,7 @@ const ProductsPage = () => {
                       <button
                         type="button"
                         onClick={() => handleAddToCart(product)}
-                        className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-pink-600 text-white font-medium hover:bg-pink-700 transition"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-pink-600 py-2.5 font-medium text-white transition hover:bg-pink-700"
                       >
                         <FiShoppingCart />
                         Thêm vào giỏ
@@ -520,18 +557,23 @@ const ProductsPage = () => {
             {renderPagination()}
           </>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
+          <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center">
             <p className="text-gray-500">Không tìm thấy sản phẩm phù hợp.</p>
 
             <button
               type="button"
               onClick={() => {
-                setSearch("");
-                handleCategoryChange("all");
+                const params = new URLSearchParams();
+
+                if (activeCategory !== "all") {
+                  params.set("category", activeCategory);
+                }
+
+                setSearchParams(params);
               }}
-              className="mt-4 text-pink-600 font-medium hover:text-pink-700"
+              className="mt-4 font-medium text-pink-600 hover:text-pink-700"
             >
-              Xem tất cả sản phẩm
+              Xóa tìm kiếm
             </button>
           </div>
         )}

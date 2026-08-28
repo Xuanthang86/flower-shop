@@ -1,54 +1,95 @@
+/*
+============================================================
+FLOWER SHOP — FEATURED PRODUCTS
+============================================================
+
+CẬP NHẬT:
+- Không đọc products.js trực tiếp.
+- Không đọc category data riêng.
+- Dùng catalog.js.
+- Tự cập nhật khi Admin thay đổi sản phẩm/danh mục.
+- Giảm khoảng trắng trên trang chủ.
+============================================================
+*/
+
+import { useEffect, useMemo, useState } from "react";
+
 import { Link } from "react-router-dom";
+
 import { FiShoppingCart } from "react-icons/fi";
 
-import { PRODUCT_CATEGORIES, products } from "@/data/products";
+import {
+  readProducts,
+  readCategories,
+  PRODUCT_UPDATED_EVENT,
+  CATEGORY_UPDATED_EVENT,
+} from "@/services/catalog";
+
+const formatPrice = (price) =>
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(Number(price || 0));
 
 const FeaturedProducts = () => {
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
+  const [products, setProducts] = useState(() => readProducts());
 
-  /*
-  ==========================================================
-  LẤY 4 SẢN PHẨM MỖI DANH MỤC
-  ==========================================================
+  const [categories, setCategories] = useState(() => readCategories());
 
-  Ưu tiên:
-  1. Sản phẩm mới
-  2. Số lượng bán cao
-  ==========================================================
-  */
+  useEffect(() => {
+    const refreshProducts = () => setProducts(readProducts());
 
-  const featuredByCategory = PRODUCT_CATEGORIES.map((category) => {
-    const categoryProducts = products
-      .filter((product) => product.category === category.slug)
-      .sort((a, b) => {
-        const aIsNew = a.isNew ? 1 : 0;
-        const bIsNew = b.isNew ? 1 : 0;
+    const refreshCategories = () => setCategories(readCategories());
 
-        if (aIsNew !== bIsNew) {
-          return bIsNew - aIsNew;
-        }
+    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
-        return (b.salesCount || 0) - (a.salesCount || 0);
-      })
-      .slice(0, 4);
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
-    return {
-      ...category,
-      products: categoryProducts,
+    window.addEventListener("storage", refreshProducts);
+
+    return () => {
+      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+      window.removeEventListener("storage", refreshProducts);
     };
-  });
+  }, []);
+
+  const featuredByCategory = useMemo(
+    () =>
+      categories
+        .filter((category) => category.active !== false)
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        .map((category) => {
+          const categoryProducts = products
+            .filter(
+              (product) => String(product.category) === String(category.slug)
+            )
+            .sort((a, b) => {
+              const newDifference =
+                Number(Boolean(b.isNew)) - Number(Boolean(a.isNew));
+
+              if (newDifference !== 0) {
+                return newDifference;
+              }
+
+              return Number(b.salesCount || 0) - Number(a.salesCount || 0);
+            })
+            .slice(0, 4);
+
+          return {
+            ...category,
+            products: categoryProducts,
+          };
+        }),
+    [categories, products]
+  );
 
   return (
-    <section className="py-16 md:py-20 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* HEADER */}
-
-        <div className="text-center mb-10">
+    <section className="bg-gray-50 py-4 md:py-6">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="mb-7 text-center">
           <h2 className="text-3xl font-bold text-gray-800">Sản phẩm nổi bật</h2>
 
           <p className="mt-2 text-gray-500">
@@ -57,83 +98,76 @@ const FeaturedProducts = () => {
         </div>
 
         {featuredByCategory.map((category) => (
-          <div key={category.id} className="mb-14 last:mb-0">
-            {/* CATEGORY HEADER */}
-
-            <div className="flex items-center justify-between mb-5">
+          <div key={category.id} className="mb-8 last:mb-0">
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-xl md:text-2xl font-bold text-gray-800">
+                <h3 className="text-xl font-bold text-gray-800 md:text-2xl">
                   {category.name}
                 </h3>
 
-                <p className="text-sm text-gray-500 mt-1">Sản phẩm nổi bật</p>
+                <p className="mt-1 text-sm text-gray-500">Sản phẩm nổi bật</p>
               </div>
 
               <Link
-                to={`/products?category=${category.slug}`}
-                className="text-sm font-medium text-pink-600 hover:text-pink-700 transition"
+                to={`/products?category=${encodeURIComponent(category.slug)}`}
+                className="text-sm font-medium text-pink-600 hover:text-pink-700"
               >
                 Xem tất cả →
               </Link>
             </div>
 
-            {/* PRODUCTS */}
-
             {category.products.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
                 {category.products.map((product) => (
                   <article
                     key={product.id}
-                    className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 group"
+                    className="group overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:shadow-lg"
                   >
-                    {/* IMAGE */}
-
                     <Link to={`/products/${product.id}`} className="block">
                       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
+                        {product.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            loading="lazy"
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                            Chưa có hình ảnh
+                          </div>
+                        )}
 
                         {product.badge && (
-                          <span className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-pink-600 text-white text-[10px] md:text-xs font-semibold">
+                          <span className="absolute left-2 top-2 rounded-full bg-pink-600 px-2.5 py-1 text-[10px] font-semibold text-white md:text-xs">
                             {product.badge}
                           </span>
                         )}
                       </div>
                     </Link>
 
-                    {/* CONTENT */}
-
                     <div className="p-3 md:p-4">
                       <Link to={`/products/${product.id}`}>
-                        <h4 className="font-semibold text-sm md:text-base text-gray-800 hover:text-pink-600 line-clamp-2 min-h-[40px] md:min-h-[48px] transition">
+                        <h4 className="min-h-[40px] line-clamp-2 text-sm font-semibold text-gray-800 transition hover:text-pink-600 md:min-h-[48px] md:text-base">
                           {product.name}
                         </h4>
                       </Link>
 
                       <div className="mt-2">
-                        <span className="text-sm md:text-base font-bold text-pink-600">
+                        <span className="font-bold text-pink-600">
                           {formatPrice(product.price)}
                         </span>
 
                         {product.oldPrice && (
-                          <span className="ml-1 text-[11px] md:text-xs text-gray-400 line-through">
+                          <span className="ml-1 text-xs text-gray-400 line-through">
                             {formatPrice(product.oldPrice)}
                           </span>
                         )}
                       </div>
 
-                      {typeof product.salesCount === "number" && (
-                        <p className="mt-1 text-xs text-gray-400">
-                          Đã bán {product.salesCount}
-                        </p>
-                      )}
-
                       <Link
                         to={`/products/${product.id}`}
-                        className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-pink-600 text-white text-xs md:text-sm font-medium hover:bg-pink-700 transition"
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-pink-600 py-2 text-xs font-medium text-white transition hover:bg-pink-700 md:text-sm"
                       >
                         <FiShoppingCart size={15} />
                         Xem sản phẩm
@@ -142,11 +176,7 @@ const FeaturedProducts = () => {
                   </article>
                 ))}
               </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
-                Chưa có sản phẩm trong danh mục này.
-              </div>
-            )}
+            ) : null}
           </div>
         ))}
       </div>
