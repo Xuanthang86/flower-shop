@@ -1,22 +1,15 @@
 import { Outlet } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import TopHeader from "@/components/layout/TopHeader";
+import AnnouncementBar from "@/components/layout/AnnouncementBar";
 import Footer from "@/components/layout/Footer";
 
-const MainLayout = () => {
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* HEADER */}
-      <Header />
-
-      {/* NỘI DUNG */}
-      <main className="flex-1">
-        <Outlet />
-      </main>
-
-      {/* FOOTER */}
-      <Footer />
-    </div>
-  );
-};
+const MainLayout = () => (
+  <div className="min-h-screen flex flex-col">
+    <AnnouncementBar />
+    <TopHeader />
+    <main className="flex-1"><Outlet /></main>
+    <Footer />
+  </div>
+);
 
 export default MainLayout;

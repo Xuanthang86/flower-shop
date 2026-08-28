@@ -1,3 +1,26 @@
-body {
-  background: #fff;
+:root {
+  --color-primary: #db2777;
+  --color-primary-hover: #be185d;
+  --color-primary-soft: #fce7f3;
+  --color-text: #1f2937;
+  --color-muted: #6b7280;
+  --font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --base-font-size: 16px;
+  --radius-base: 12px;
 }
+
+html { font-size: var(--base-font-size); }
+body { margin: 0; background: #fff; color: var(--color-text); font-family: var(--font-family); }
+
+/* Các token này cho phép Admin đổi phần nhận diện cơ bản mà không chạm logic. */
+.bg-pink-600 { background-color: var(--color-primary) !important; }
+.hover\\:bg-pink-700:hover { background-color: var(--color-primary-hover) !important; }
+.text-pink-600 { color: var(--color-primary) !important; }
+.hover\\:text-pink-600:hover { color: var(--color-primary) !important; }
+.border-pink-300 { border-color: color-mix(in srgb, var(--color-primary) 35%, white) !important; }
+.bg-pink-50 { background-color: color-mix(in srgb, var(--color-primary) 8%, white) !important; }
+
+.announcement-marquee { animation: announcement-scroll 28s linear infinite; will-change: transform; }
+.announcement-marquee:hover { animation-play-state: paused; }
+@keyframes announcement-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .announcement-marquee { animation: none; } }
