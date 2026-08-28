@@ -2,6 +2,28 @@
 ============================================================
 FLOWER SHOP — MAIN ENTRY
 ============================================================
+
+Mục đích:
+- Điểm khởi động duy nhất của ứng dụng React.
+- Thiết lập BrowserRouter.
+- Khởi tạo ThemeProvider.
+- Khởi tạo AuthProvider.
+- Khởi tạo OrderProvider.
+- Khởi tạo CartProvider.
+
+Thứ tự Provider:
+BrowserRouter
+    ↓
+ThemeProvider
+    ↓
+AuthProvider
+    ↓
+OrderProvider
+    ↓
+CartProvider
+    ↓
+App
+============================================================
 */
 
 import React from "react";
