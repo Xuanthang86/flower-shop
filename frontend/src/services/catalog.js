@@ -42,9 +42,33 @@ import {
   normalizeCategories,
 } from "@/constants/productCategories";
 
+/*
+============================================================
+STORAGE KEYS
+============================================================
+*/
+
 export const PRODUCT_STORAGE_KEY = "flower-shop-products";
 
+/*
+============================================================
+EVENT NAMES
+============================================================
+*/
+
 export const PRODUCT_UPDATED_EVENT = "flower-shop-products-updated";
+
+/*
+QUAN TRỌNG:
+CATEGORY_UPDATED_EVENT được định nghĩa tại
+productCategories.js.
+
+Tại đây export lại để các component chỉ cần import
+từ catalog.js thay vì phải biết cấu trúc bên trong
+productCategories.js.
+*/
+
+export { CATEGORY_UPDATED_EVENT };
 
 /*
 ============================================================
@@ -169,7 +193,15 @@ SAFE JSON WRITE
 */
 
 const writeJson = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+
+    return true;
+  } catch (error) {
+    console.error(`Không thể lưu dữ liệu ${key}:`, error);
+
+    return false;
+  }
 };
 
 /*
@@ -191,11 +223,7 @@ export const readProducts = () => {
   if (!Array.isArray(stored)) {
     const seeded = normalizeProducts(defaultProducts);
 
-    try {
-      writeJson(PRODUCT_STORAGE_KEY, seeded);
-    } catch (error) {
-      console.error("Không thể khởi tạo sản phẩm:", error);
-    }
+    writeJson(PRODUCT_STORAGE_KEY, seeded);
 
     return seeded;
   }
@@ -204,16 +232,6 @@ export const readProducts = () => {
   ----------------------------------------------------------
   Đã có dữ liệu localStorage
   → merge với seed để phục hồi field bị thiếu.
-
-  Ví dụ:
-  localStorage:
-      image: ""
-
-  seed:
-      image: sweetRose
-
-  kết quả:
-      image: sweetRose
   ----------------------------------------------------------
   */
 
@@ -221,16 +239,11 @@ export const readProducts = () => {
 
   /*
   ----------------------------------------------------------
-  Nếu dữ liệu sau normalize khác với localStorage,
-  lưu lại phiên bản đã phục hồi.
+  Lưu lại phiên bản đã normalize.
   ----------------------------------------------------------
   */
 
-  try {
-    writeJson(PRODUCT_STORAGE_KEY, normalized);
-  } catch (error) {
-    console.error("Không thể cập nhật dữ liệu sản phẩm:", error);
-  }
+  writeJson(PRODUCT_STORAGE_KEY, normalized);
 
   return normalized;
 };
@@ -253,7 +266,7 @@ export const saveProducts = (products) => {
 
 /*
 ============================================================
-GET PRODUCT
+GET PRODUCT BY ID
 ============================================================
 */
 
@@ -262,7 +275,7 @@ export const getProductById = (productId, products = readProducts()) =>
 
 /*
 ============================================================
-GET BY CATEGORY
+GET PRODUCTS BY CATEGORY
 ============================================================
 */
 
@@ -276,7 +289,7 @@ export const getProductsByCategory = (
 
 /*
 ============================================================
-SEARCH
+SEARCH PRODUCTS
 ============================================================
 */
 
@@ -336,11 +349,7 @@ export const readCategories = () => {
 
   const seeded = normalizeCategories(DEFAULT_PRODUCT_CATEGORIES);
 
-  try {
-    writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, seeded);
-  } catch (error) {
-    console.error("Không thể khởi tạo danh mục:", error);
-  }
+  writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, seeded);
 
   return seeded;
 };
@@ -363,7 +372,7 @@ export const saveCategories = (categories) => {
 
 /*
 ============================================================
-GET CATEGORY
+GET CATEGORY BY SLUG
 ============================================================
 */
 
@@ -389,6 +398,5 @@ CATALOG SNAPSHOT
 
 export const getCatalogSnapshot = () => ({
   products: readProducts(),
-
   categories: readCategories(),
 });
