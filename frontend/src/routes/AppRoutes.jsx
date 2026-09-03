@@ -30,10 +30,10 @@ import AdminOrderDetailPage from "@/pages/Admin/AdminOrderDetailPage";
 import AdminUsersPage from "@/pages/Admin/AdminUsersPage";
 import AdminProductsPage from "@/pages/Admin/AdminProductsPage";
 import AdminAppearancePage from "@/pages/Admin/AdminAppearancePage";
+import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
+import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
-
-import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
 
 const LoadingPage = ({ text }) => (
   <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
@@ -134,6 +134,8 @@ const AppRoutes = () => (
       <Route path="/cart" element={<CartPage />} />
 
       <Route path="/blog" element={<BlogPage />} />
+
+      <Route path="/blog/:postId" element={<BlogPage />} />
 
       <Route path="/contact" element={<ContactPage />} />
 
@@ -238,6 +240,15 @@ const AppRoutes = () => (
         element={
           <AdminOnlyRoute>
             <AdminUsersPage />
+          </AdminOnlyRoute>
+        }
+      />
+
+      <Route
+        path="/admin/blog"
+        element={
+          <AdminOnlyRoute>
+            <AdminBlogManagementPage />
           </AdminOnlyRoute>
         }
       />

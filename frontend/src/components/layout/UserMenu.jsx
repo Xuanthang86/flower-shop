@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   FiBox,
   FiChevronDown,
+  FiChevronRight,
   FiHeart,
   FiImage,
   FiKey,
@@ -17,7 +18,7 @@ import {
 import { ROLE_LABELS, ROLES, useAuth } from "@/context/AuthContext";
 
 const menuItemClass =
-  "flex items-center gap-3 px-4 py-3 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
+  "flex w-full items-center gap-3 px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
 
 const UserMenu = () => {
   const { user, logout } = useAuth();
@@ -26,12 +27,15 @@ const UserMenu = () => {
 
   const [open, setOpen] = useState(false);
 
+  const [managementOpen, setManagementOpen] = useState(false);
+
   const menuRef = useRef(null);
 
   useEffect(() => {
     const handleOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setOpen(false);
+        setManagementOpen(false);
       }
     };
 
@@ -62,12 +66,33 @@ const UserMenu = () => {
   const avatar = user.avatar || user.photoURL || "";
 
   const isAdmin = user.role === ROLES.ADMIN;
+
   const isManager = user.role === ROLES.MANAGER;
+
   const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
+
   const isCustomer = user.role === ROLES.CUSTOMER;
+
+  const canManageOrders = isAdmin || isManager;
+
+  const canManageProducts = isAdmin || isProductManager;
+
+  const canManageBlog = isAdmin;
+
+  const canManageImages = isAdmin;
+
+  const canManageUsers = isAdmin;
+
+  const hasManagementAccess =
+    canManageOrders ||
+    canManageProducts ||
+    canManageBlog ||
+    canManageImages ||
+    canManageUsers;
 
   const closeMenu = () => {
     setOpen(false);
+    setManagementOpen(false);
   };
 
   const handleLogout = () => {
@@ -116,8 +141,8 @@ const UserMenu = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[100] mt-3 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-          <div className="bg-pink-50 px-4 py-4">
+        <div className="absolute right-0 top-full z-[100] mt-3 w-80 overflow-visible rounded-xl border border-gray-200 bg-white shadow-xl">
+          <div className="overflow-hidden rounded-t-xl bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
                 {avatar ? (
@@ -188,57 +213,95 @@ const UserMenu = () => {
               </>
             )}
 
-            {(isAdmin || isManager) && (
-              <Link
-                to="/admin/orders"
-                onClick={closeMenu}
-                className={menuItemClass}
-              >
-                <FiPackage size={18} />
-                <span>Quản lý đơn hàng</span>
-              </Link>
-            )}
+            {hasManagementAccess && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setManagementOpen((value) => !value)}
+                  className={menuItemClass}
+                >
+                  <FiSettings size={18} />
 
-            {(isAdmin || isProductManager) && (
-              <Link
-                to="/admin/products"
-                onClick={closeMenu}
-                className={menuItemClass}
-              >
-                <FiBox size={18} />
-                <span>Quản lý sản phẩm</span>
-              </Link>
+                  <span className="flex-1">Quản lý</span>
+
+                  <FiChevronRight
+                    size={17}
+                    className={
+                      managementOpen ? "rotate-90 transition" : "transition"
+                    }
+                  />
+                </button>
+
+                {managementOpen && (
+                  <div className="ml-4 border-l border-pink-100 py-1">
+                    {canManageOrders && (
+                      <Link
+                        to="/admin/orders"
+                        onClick={closeMenu}
+                        className={menuItemClass}
+                      >
+                        <FiPackage size={17} />
+                        <span>Quản lý đơn hàng</span>
+                      </Link>
+                    )}
+
+                    {canManageProducts && (
+                      <Link
+                        to="/admin/products"
+                        onClick={closeMenu}
+                        className={menuItemClass}
+                      >
+                        <FiBox size={17} />
+                        <span>Quản lý sản phẩm</span>
+                      </Link>
+                    )}
+
+                    {canManageBlog && (
+                      <Link
+                        to="/admin/blog"
+                        onClick={closeMenu}
+                        className={menuItemClass}
+                      >
+                        <FiEditIcon />
+                        <span>Quản lý bài viết</span>
+                      </Link>
+                    )}
+
+                    {canManageImages && (
+                      <Link
+                        to="/admin/images"
+                        onClick={closeMenu}
+                        className={menuItemClass}
+                      >
+                        <FiImage size={17} />
+                        <span>Quản lý hình ảnh</span>
+                      </Link>
+                    )}
+
+                    {canManageUsers && (
+                      <Link
+                        to="/admin/users"
+                        onClick={closeMenu}
+                        className={menuItemClass}
+                      >
+                        <FiUser size={17} />
+                        <span>Quản lý tài khoản</span>
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {isAdmin && (
-              <>
-                <Link
-                  to="/admin/users"
-                  onClick={closeMenu}
-                  className={menuItemClass}
-                >
-                  <FiSettings size={18} />
-                  <span>Quản lý tài khoản</span>
-                </Link>
-
-                <Link
-                  to="/admin/images"
-                  onClick={closeMenu}
-                  className={menuItemClass}
-                >
-                  <FiImage size={18} />
-                  <span>Quản lý hình ảnh</span>
-                </Link>
-
-                <Link
-                  to="/admin/appearance"
-                  onClick={closeMenu}
-                  className={menuItemClass}
-                >
-                  <FiSettings size={18} />
-                  <span>Tùy chỉnh giao diện</span>
-                </Link>
-              </>
+              <Link
+                to="/admin/appearance"
+                onClick={closeMenu}
+                className={menuItemClass}
+              >
+                <FiSettings size={18} />
+                <span>Tùy chỉnh giao diện</span>
+              </Link>
             )}
           </div>
 
@@ -246,7 +309,7 @@ const UserMenu = () => {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
+              className="flex w-full items-center gap-3 rounded-b-xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
             >
               <FiLogOut size={18} />
               <span>Đăng xuất</span>
@@ -257,5 +320,22 @@ const UserMenu = () => {
     </div>
   );
 };
+
+const FiEditIcon = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
 
 export default UserMenu;

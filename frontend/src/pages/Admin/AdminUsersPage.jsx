@@ -1,22 +1,7 @@
-/*
-============================================================
-FLOWER SHOP — ADMIN USERS
-============================================================
-
-CẬP NHẬT:
-- Tạo tài khoản: form chính.
-- Sửa tài khoản: Modal riêng.
-- Đổi mật khẩu: Modal riêng.
-- Không đưa dữ liệu Edit xuống form Create.
-- Modal có backdrop + backdrop blur.
-- Admin hiện tại không thể tự xóa/khóa.
-- Admin cấp cao không thể bị hạ quyền.
-============================================================
-*/
-
 import { useMemo, useState } from "react";
 
 import {
+  FiChevronDown,
   FiEdit2,
   FiEye,
   FiEyeOff,
@@ -74,6 +59,8 @@ const AdminUsersPage = () => {
 
   const [formData, setFormData] = useState(EMPTY_FORM);
 
+  const [createOpen, setCreateOpen] = useState(false);
+
   const [editingUser, setEditingUser] = useState(null);
 
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -86,13 +73,11 @@ const AdminUsersPage = () => {
 
   const [showResetPassword, setShowResetPassword] = useState(false);
 
-  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [message, setMessage] = useState("");
 
   const [error, setError] = useState("");
-
-  const [submitting, setSubmitting] = useState(false);
 
   const sortedUsers = useMemo(
     () =>
@@ -141,12 +126,6 @@ const AdminUsersPage = () => {
 
     clearMessages();
   };
-
-  /*
-    ========================================================
-    CREATE
-    ========================================================
-    */
 
   const handleCreate = (event) => {
     event.preventDefault();
@@ -207,16 +186,11 @@ const AdminUsersPage = () => {
 
       setFormData(EMPTY_FORM);
       setShowPassword(false);
+      setCreateOpen(false);
     } finally {
       setSubmitting(false);
     }
   };
-
-  /*
-    ========================================================
-    EDIT MODAL
-    ========================================================
-    */
 
   const openEdit = (account) => {
     clearMessages();
@@ -230,16 +204,11 @@ const AdminUsersPage = () => {
       password: "",
       role: account.role || "manager",
     });
-
-    setShowEditPassword(false);
   };
 
   const closeEdit = () => {
     setEditingUser(null);
-
     setEditForm(EMPTY_FORM);
-
-    setShowEditPassword(false);
   };
 
   const handleUpdate = (event) => {
@@ -247,9 +216,7 @@ const AdminUsersPage = () => {
 
     clearMessages();
 
-    if (!editingUser) {
-      return;
-    }
+    if (!editingUser) return;
 
     if (!editForm.name.trim()) {
       setError("Vui lòng nhập họ tên.");
@@ -283,12 +250,6 @@ const AdminUsersPage = () => {
     }
   };
 
-  /*
-    ========================================================
-    DELETE
-    ========================================================
-    */
-
   const handleDelete = (account) => {
     clearMessages();
 
@@ -302,11 +263,11 @@ const AdminUsersPage = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa tài khoản "${account.name || account.email}"?`
-    );
-
-    if (!confirmed) {
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xóa tài khoản "${account.name || account.email}"?`
+      )
+    ) {
       return;
     }
 
@@ -318,12 +279,6 @@ const AdminUsersPage = () => {
       setMessage(result.message || "Đã xóa tài khoản.");
     }
   };
-
-  /*
-    ========================================================
-    LOCK
-    ========================================================
-    */
 
   const handleToggle = (account) => {
     clearMessages();
@@ -352,27 +307,18 @@ const AdminUsersPage = () => {
     );
   };
 
-  /*
-    ========================================================
-    RESET PASSWORD
-    ========================================================
-    */
-
   const openReset = (account) => {
     clearMessages();
 
     setResetPasswordUser(account);
 
     setResetPassword("");
-
     setShowResetPassword(false);
   };
 
   const closeReset = () => {
     setResetPasswordUser(null);
-
     setResetPassword("");
-
     setShowResetPassword(false);
   };
 
@@ -451,135 +397,160 @@ const AdminUsersPage = () => {
         )}
 
         {/* CREATE */}
-
-        <div className="mb-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-gray-800">
-              Tạo tài khoản quản trị
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Tạo Admin, Manager hoặc Quản lý sản phẩm.
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleCreate}
-            className="grid grid-cols-1 gap-5 md:grid-cols-2"
+        <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={() => setCreateOpen((value) => !value)}
+            className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-gray-50"
           >
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Họ và tên *
-              </label>
-
-              <input
-                value={formData.name}
-                onChange={(event) =>
-                  updateField(setFormData, "name", event.target.value)
-                }
-                className={fieldClass}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Email *
-              </label>
-
-              <div className="flex">
-                <input
-                  value={formData.emailPrefix}
-                  onChange={(event) =>
-                    updateField(setFormData, "emailPrefix", event.target.value)
-                  }
-                  className={`${fieldClass} rounded-r-none`}
-                  required
-                />
-
-                <span className="flex shrink-0 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-4 text-sm text-gray-600">
-                  {EMAIL_DOMAIN}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Số điện thoại *
-              </label>
-
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(event) =>
-                  updateField(setFormData, "phone", event.target.value)
-                }
-                className={fieldClass}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Mật khẩu *
-              </label>
-
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(event) =>
-                    updateField(setFormData, "password", event.target.value)
-                  }
-                  className={`${fieldClass} pr-12`}
-                  required
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  {showPassword ? <FiEyeOff /> : <FiEye />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Quyền *
-              </label>
-
-              <select
-                value={formData.role}
-                onChange={(event) =>
-                  updateField(setFormData, "role", event.target.value)
-                }
-                className={fieldClass}
-              >
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-pink-600 py-3 font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
-              >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
                 <FiPlus />
-                {submitting ? "Đang xử lý..." : "Tạo tài khoản"}
-              </button>
+              </div>
+
+              <div>
+                <h2 className="font-bold text-gray-800">
+                  Tạo tài khoản quản trị
+                </h2>
+
+                <p className="text-sm text-gray-500">
+                  {createOpen
+                    ? "Thu gọn biểu mẫu khi không sử dụng."
+                    : "Bấm để mở biểu mẫu tạo tài khoản."}
+                </p>
+              </div>
             </div>
-          </form>
+
+            <FiChevronDown
+              className={createOpen ? "rotate-180 transition" : "transition"}
+            />
+          </button>
+
+          {createOpen && (
+            <div className="border-t border-gray-100 p-6 md:p-8">
+              <form
+                onSubmit={handleCreate}
+                className="grid grid-cols-1 gap-5 md:grid-cols-2"
+              >
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Họ và tên *
+                  </label>
+
+                  <input
+                    value={formData.name}
+                    onChange={(event) =>
+                      updateField(setFormData, "name", event.target.value)
+                    }
+                    className={fieldClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Email *
+                  </label>
+
+                  <div className="flex">
+                    <input
+                      value={formData.emailPrefix}
+                      onChange={(event) =>
+                        updateField(
+                          setFormData,
+                          "emailPrefix",
+                          event.target.value
+                        )
+                      }
+                      className={`${fieldClass} rounded-r-none`}
+                      required
+                    />
+
+                    <span className="flex shrink-0 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-4 text-sm text-gray-600">
+                      {EMAIL_DOMAIN}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Số điện thoại *
+                  </label>
+
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(event) =>
+                      updateField(setFormData, "phone", event.target.value)
+                    }
+                    className={fieldClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Mật khẩu *
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(event) =>
+                        updateField(setFormData, "password", event.target.value)
+                      }
+                      className={`${fieldClass} pr-12`}
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                    >
+                      {showPassword ? <FiEyeOff /> : <FiEye />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Quyền *
+                  </label>
+
+                  <select
+                    value={formData.role}
+                    onChange={(event) =>
+                      updateField(setFormData, "role", event.target.value)
+                    }
+                    className={fieldClass}
+                  >
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-pink-600 py-3 font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
+                  >
+                    <FiPlus />
+
+                    {submitting ? "Đang xử lý..." : "Tạo tài khoản"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* TABLE */}
-
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-6 py-5">
             <h2 className="text-xl font-bold text-gray-800">
@@ -737,10 +708,7 @@ const AdminUsersPage = () => {
         </div>
       </div>
 
-      {/* ==================================================
-             EDIT MODAL
-        ================================================== */}
-
+      {/* EDIT */}
       {editingUser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div
@@ -749,11 +717,9 @@ const AdminUsersPage = () => {
           />
 
           <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
               <div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  Chỉnh sửa tài khoản
-                </h2>
+                <h2 className="text-xl font-bold">Chỉnh sửa tài khoản</h2>
 
                 <p className="mt-1 text-sm text-gray-500">
                   {editingUser.email}
@@ -771,7 +737,7 @@ const AdminUsersPage = () => {
 
             <form onSubmit={handleUpdate} className="space-y-5 p-6">
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="mb-2 block text-sm font-medium">
                   Họ và tên *
                 </label>
 
@@ -786,9 +752,7 @@ const AdminUsersPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Email
-                </label>
+                <label className="mb-2 block text-sm font-medium">Email</label>
 
                 <input
                   value={editingUser.email || ""}
@@ -798,12 +762,11 @@ const AdminUsersPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="mb-2 block text-sm font-medium">
                   Số điện thoại *
                 </label>
 
                 <input
-                  type="tel"
                   value={editForm.phone}
                   onChange={(event) =>
                     updateField(setEditForm, "phone", event.target.value)
@@ -814,16 +777,16 @@ const AdminUsersPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="mb-2 block text-sm font-medium">
                   Quyền tài khoản
                 </label>
 
                 <select
                   value={editForm.role}
+                  disabled={editingUser.role === "admin"}
                   onChange={(event) =>
                     updateField(setEditForm, "role", event.target.value)
                   }
-                  disabled={editingUser.role === "admin"}
                   className={fieldClass}
                 >
                   {ROLE_OPTIONS.map((option) => (
@@ -832,19 +795,13 @@ const AdminUsersPage = () => {
                     </option>
                   ))}
                 </select>
-
-                {editingUser.role === "admin" && (
-                  <p className="mt-2 text-xs text-red-600">
-                    Tài khoản Admin cấp cao không được hạ quyền.
-                  </p>
-                )}
               </div>
 
               <div className="flex justify-end gap-3 border-t border-gray-100 pt-5">
                 <button
                   type="button"
                   onClick={closeEdit}
-                  className="rounded-lg border border-gray-200 px-5 py-3 text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-200 px-5 py-3"
                 >
                   Hủy
                 </button>
@@ -852,7 +809,7 @@ const AdminUsersPage = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
+                  className="rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
                 >
                   {submitting ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>
@@ -862,10 +819,7 @@ const AdminUsersPage = () => {
         </div>
       )}
 
-      {/* ==================================================
-             RESET PASSWORD MODAL
-        ================================================== */}
-
+      {/* RESET PASSWORD */}
       {resetPasswordUser && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
           <div
@@ -876,9 +830,7 @@ const AdminUsersPage = () => {
           <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  Đổi mật khẩu
-                </h2>
+                <h2 className="text-xl font-bold">Đổi mật khẩu</h2>
 
                 <p className="mt-1 text-sm text-gray-500">
                   {resetPasswordUser.name || resetPasswordUser.email}
@@ -895,7 +847,7 @@ const AdminUsersPage = () => {
             </div>
 
             <form onSubmit={handleReset}>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="mb-2 block text-sm font-medium">
                 Mật khẩu mới *
               </label>
 
@@ -929,14 +881,14 @@ const AdminUsersPage = () => {
                 <button
                   type="button"
                   onClick={closeReset}
-                  className="flex-1 rounded-lg border border-gray-200 py-3 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 rounded-lg border border-gray-200 py-3"
                 >
                   Hủy
                 </button>
 
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-pink-600 py-3 font-semibold text-white hover:bg-pink-700"
+                  className="flex-1 rounded-lg bg-pink-600 py-3 font-semibold text-white"
                 >
                   Lưu mật khẩu
                 </button>

@@ -1,16 +1,3 @@
-/*
-============================================================
-FLOWER SHOP — HEADER
-============================================================
-
-- AnnouncementBar không nằm trong Header.
-- Search duy nhất dùng SearchBox.
-- Category lấy từ catalog.js.
-- Không có data danh mục thứ ba.
-- Font header sử dụng CSS variable.
-============================================================
-*/
-
 import { useEffect, useRef, useState } from "react";
 
 import { Link, NavLink } from "react-router-dom";
@@ -31,9 +18,7 @@ const Header = () => {
   const [categories, setCategories] = useState(() => readCategories());
 
   const [mobileOpen, setMobileOpen] = useState(false);
-
   const [desktopProductsOpen, setDesktopProductsOpen] = useState(false);
-
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
 
   const productMenuRef = useRef(null);
@@ -44,12 +29,10 @@ const Header = () => {
     };
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refresh);
-
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refresh);
-
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -88,7 +71,7 @@ const Header = () => {
   return (
     <header className="relative z-[80] w-full border-b border-gray-100 bg-white shadow-sm">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="flex min-h-[78px] items-center gap-4 lg:gap-7">
+        <div className="flex min-h-[76px] items-center gap-3 lg:gap-5">
           <Link
             to="/"
             onClick={closeAll}
@@ -107,7 +90,7 @@ const Header = () => {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-7 lg:flex">
+          <nav className="hidden items-center gap-5 lg:flex">
             <NavLink
               to="/"
               className={navClass}
@@ -183,11 +166,11 @@ const Header = () => {
             </NavLink>
           </nav>
 
-          <div className="ml-auto hidden min-w-0 max-w-xl flex-1 md:flex">
+          <div className="ml-auto hidden min-w-0 md:flex md:items-center md:justify-end">
             <SearchBox />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <div className="hidden md:block">
               <HeaderIcons />
             </div>
@@ -206,7 +189,7 @@ const Header = () => {
         {mobileOpen && (
           <div className="border-t border-gray-100 py-4 lg:hidden">
             <div className="mb-4">
-              <SearchBox />
+              <SearchBox className="max-w-none" />
             </div>
 
             <nav className="flex flex-col">

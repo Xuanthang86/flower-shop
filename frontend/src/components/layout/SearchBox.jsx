@@ -54,11 +54,11 @@ const SearchBox = ({ className = "" }) => {
     <form
       onSubmit={handleSubmit}
       role="search"
-      className={`w-full max-w-[340px] ${className}`}
+      className={`w-full max-w-[300px] ${className}`}
     >
-      <div className="flex h-11 w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white shadow-sm">
+      <div className="flex h-10 w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white shadow-sm">
         <span className="ml-3 shrink-0 text-gray-400" aria-hidden="true">
-          <FiSearch size={17} />
+          <FiSearch size={16} />
         </span>
 
         <input
@@ -81,22 +81,22 @@ const SearchBox = ({ className = "" }) => {
           <button
             type="button"
             onClick={handleClear}
-            className="mr-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+            className="mr-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Xóa từ khóa"
             title="Xóa từ khóa"
           >
-            <FiX size={16} />
+            <FiX size={15} />
           </button>
         )}
 
         <button
           type="submit"
           disabled={!keyword.trim()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center bg-pink-600 text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-10 w-10 shrink-0 items-center justify-center bg-pink-600 text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Tìm kiếm"
           title="Tìm kiếm"
         >
-          <FiSearch size={17} />
+          <FiSearch size={16} />
         </button>
       </div>
     </form>

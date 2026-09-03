@@ -441,25 +441,24 @@ const ProductsPage = () => {
         </div>
 
         {/* SEARCH RESULT INFO */}
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-800">
-              {getCategoryName(activeCategory)}
-            </h2>
 
-            {searchKeyword && (
-              <p className="mt-1 text-sm text-gray-500">
-                Kết quả tìm kiếm cho:{" "}
-                <span className="font-semibold text-pink-600">
-                  "{searchKeyword}"
-                </span>
-              </p>
-            )}
-          </div>
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-800">
+            {getCategoryName(activeCategory)}
+          </h2>
 
-          <p className="text-sm text-gray-500">
+          {searchKeyword && (
+            <p className="mt-1 text-sm text-gray-500">
+              Kết quả tìm kiếm cho:{" "}
+              <span className="font-semibold text-pink-600">
+                "{searchKeyword}"
+              </span>
+            </p>
+          )}
+
+          <p className="mt-1 text-sm text-gray-500">
             {totalProducts === 0
-              ? "Không có sản phẩm"
+              ? "Hiển thị 0/0 sản phẩm"
               : `Hiển thị ${startIndex + 1}-${endIndex}/${totalProducts} sản phẩm`}
           </p>
         </div>

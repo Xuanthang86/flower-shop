@@ -83,7 +83,7 @@ const Hero = () => {
       <Container>
         <div className="mx-auto w-full max-w-7xl">
           <div className="relative mx-auto w-full overflow-hidden rounded-2xl bg-white shadow-lg">
-            <div className="aspect-[16/6] min-h-[190px] w-full md:min-h-[280px] lg:min-h-[360px]">
+            <div className="aspect-[16/6] min-h-[125px] w-full md:min-h-[185px] lg:min-h-[240px]">
               <img
                 key={activeBanner.id}
                 src={activeBanner.image}
