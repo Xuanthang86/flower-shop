@@ -24,18 +24,20 @@ const BlogPage = () => {
     };
   }, []);
 
+  const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+
   return (
     <section className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4">
         <h1 className="text-3xl font-bold text-gray-800">Bài viết</h1>
 
-        {settings.blogPosts.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="mt-6 rounded-xl bg-white p-8 text-center text-gray-500">
             Chưa có bài viết.
           </div>
         ) : (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {settings.blogPosts.map((post) => (
+          <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post) => (
               <article
                 key={post.id}
                 className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"
@@ -57,9 +59,12 @@ const BlogPage = () => {
                     <p className="mt-1 text-xs text-gray-400">{post.date}</p>
                   )}
 
-                  <p className="mt-3 text-sm leading-6 text-gray-600">
-                    {post.content}
-                  </p>
+                  <div
+                    className="blog-content mt-4 text-sm leading-7 text-gray-600"
+                    dangerouslySetInnerHTML={{
+                      __html: post.content || "",
+                    }}
+                  />
                 </div>
               </article>
             ))}

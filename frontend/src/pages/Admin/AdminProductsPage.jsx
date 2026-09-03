@@ -3,22 +3,18 @@
 FLOWER SHOP — ADMIN PRODUCTS
 ============================================================
 
-CẬP NHẬT:
 - Catalog duy nhất thông qua catalog.js.
 - Tìm kiếm sản phẩm.
 - 20 sản phẩm/trang.
+- Hiển thị thống kê phân trang.
 - Danh mục thu gọn/mở rộng.
-- Thêm danh mục bằng MODAL.
-- Sửa danh mục bằng MODAL.
+- Thêm/sửa danh mục bằng MODAL.
 - Xóa danh mục.
-- Tóm tắt danh mục.
-- Hình ảnh danh mục.
-- Trạng thái danh mục.
 - Thêm sản phẩm thu gọn/mở rộng.
 - Sửa sản phẩm bằng MODAL.
 - Xóa sản phẩm.
-- Không đọc localStorage trực tiếp.
-- Input file có khung rõ ràng.
+- Hình ảnh danh mục chỉ có một lớp viền.
+- Preview sản phẩm dùng object-contain.
 ============================================================
 */
 
@@ -73,7 +69,7 @@ const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
 const fileInputClass =
-  "block w-full cursor-pointer rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-600 transition hover:border-pink-400 hover:bg-pink-50 file:mr-4 file:rounded-md file:border-0 file:bg-pink-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-pink-700";
+  "block w-full cursor-pointer rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-600 transition hover:border-pink-400 file:mr-4 file:rounded-md file:border-0 file:bg-pink-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-pink-700";
 
 const formatPrice = (value) =>
   `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
@@ -107,16 +103,14 @@ const AdminProductsPage = () => {
 
   const [error, setError] = useState("");
 
-  /*
-  ==========================================================
-  REFRESH
-  ==========================================================
-  */
-
   useEffect(() => {
-    const refreshProducts = () => setProducts(readProducts());
+    const refreshProducts = () => {
+      setProducts(readProducts());
+    };
 
-    const refreshCategories = () => setCategories(readCategories());
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
 
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
@@ -124,20 +118,18 @@ const AdminProductsPage = () => {
 
     window.addEventListener("storage", refreshProducts);
 
+    window.addEventListener("storage", refreshCategories);
+
     return () => {
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
       window.removeEventListener("storage", refreshProducts);
+
+      window.removeEventListener("storage", refreshCategories);
     };
   }, []);
-
-  /*
-  ==========================================================
-  FILTER
-  ==========================================================
-  */
 
   const filteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -159,12 +151,6 @@ const AdminProductsPage = () => {
     setCurrentPage(1);
   }, [keyword]);
 
-  /*
-  ==========================================================
-  PAGINATION
-  ==========================================================
-  */
-
   const totalProducts = filteredProducts.length;
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
@@ -178,22 +164,14 @@ const AdminProductsPage = () => {
 
   const visibleProducts = filteredProducts.slice(startIndex, endIndex);
 
-  /*
-  ==========================================================
-  MESSAGES
-  ==========================================================
-  */
+  const displayStart = totalProducts === 0 ? 0 : startIndex + 1;
+
+  const displayEnd = totalProducts === 0 ? 0 : endIndex;
 
   const clearMessages = () => {
     setMessage("");
     setError("");
   };
-
-  /*
-  ==========================================================
-  IMAGE
-  ==========================================================
-  */
 
   const readImageFile = (event, setter) => {
     const file = event.target.files?.[0];
@@ -225,24 +203,14 @@ const AdminProductsPage = () => {
     reader.readAsDataURL(file);
   };
 
-  /*
-  ==========================================================
-  CATEGORY MODAL
-  ==========================================================
-  */
-
   const openCreateCategory = () => {
     clearMessages();
 
     setEditingCategory(null);
 
-    setCategoryForm(EMPTY_CATEGORY);
-
-    /*
-      QUAN TRỌNG:
-      Đây là phần bị thiếu
-      trong code cũ.
-      */
+    setCategoryForm({
+      ...EMPTY_CATEGORY,
+    });
 
     setShowCategoryModal(true);
   };
@@ -267,7 +235,9 @@ const AdminProductsPage = () => {
 
     setEditingCategory(null);
 
-    setCategoryForm(EMPTY_CATEGORY);
+    setCategoryForm({
+      ...EMPTY_CATEGORY,
+    });
   };
 
   const handleCategoryChange = (event) => {
@@ -402,18 +372,14 @@ const AdminProductsPage = () => {
     }
   };
 
-  /*
-  ==========================================================
-  PRODUCT
-  ==========================================================
-  */
-
   const openCreateProduct = () => {
     clearMessages();
 
     setEditingProduct(null);
 
-    setProductForm(EMPTY_PRODUCT);
+    setProductForm({
+      ...EMPTY_PRODUCT,
+    });
 
     setShowCreateProduct(true);
   };
@@ -441,7 +407,9 @@ const AdminProductsPage = () => {
 
     setEditingProduct(null);
 
-    setProductForm(EMPTY_PRODUCT);
+    setProductForm({
+      ...EMPTY_PRODUCT,
+    });
   };
 
   const handleProductChange = (event) => {
@@ -455,42 +423,58 @@ const AdminProductsPage = () => {
     clearMessages();
   };
 
-  const handleCreateProduct = (event) => {
-    event.preventDefault();
-
-    clearMessages();
-
+  const validateProduct = () => {
     const name = productForm.name.trim();
 
     const price = Number(productForm.price);
 
     if (!name) {
       setError("Vui lòng nhập tên sản phẩm.");
-      return;
+      return null;
     }
 
     if (!Number.isFinite(price) || price <= 0) {
       setError("Giá sản phẩm phải lớn hơn 0.");
-      return;
+      return null;
     }
 
     if (!productForm.category) {
       setError("Vui lòng chọn danh mục.");
+      return null;
+    }
+
+    return {
+      name,
+      price,
+      oldPrice: productForm.oldPrice ? Number(productForm.oldPrice) : null,
+      badge: productForm.badge.trim(),
+      category: productForm.category,
+      description: productForm.description.trim(),
+      image: productForm.image || "",
+    };
+  };
+
+  const handleCreateProduct = (event) => {
+    event.preventDefault();
+
+    clearMessages();
+
+    const data = validateProduct();
+
+    if (!data) {
       return;
     }
 
     try {
       const newProduct = {
         id: `product-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name,
-        price,
-        oldPrice: productForm.oldPrice ? Number(productForm.oldPrice) : null,
-        badge: productForm.badge.trim(),
-        category: productForm.category,
-        description: productForm.description.trim(),
-        image: productForm.image || "",
+
+        ...data,
+
         salesCount: 0,
+
         isNew: true,
+
         createdAt: new Date().toISOString(),
       };
 
@@ -498,7 +482,9 @@ const AdminProductsPage = () => {
 
       setProducts(saved);
 
-      setProductForm(EMPTY_PRODUCT);
+      setProductForm({
+        ...EMPTY_PRODUCT,
+      });
 
       setShowCreateProduct(false);
 
@@ -519,22 +505,9 @@ const AdminProductsPage = () => {
       return;
     }
 
-    const name = productForm.name.trim();
+    const data = validateProduct();
 
-    const price = Number(productForm.price);
-
-    if (!name) {
-      setError("Vui lòng nhập tên sản phẩm.");
-      return;
-    }
-
-    if (!Number.isFinite(price) || price <= 0) {
-      setError("Giá sản phẩm phải lớn hơn 0.");
-      return;
-    }
-
-    if (!productForm.category) {
-      setError("Vui lòng chọn danh mục.");
+    if (!data) {
       return;
     }
 
@@ -543,15 +516,7 @@ const AdminProductsPage = () => {
         String(product.id) === String(editingProduct.id)
           ? {
               ...product,
-              name,
-              price,
-              oldPrice: productForm.oldPrice
-                ? Number(productForm.oldPrice)
-                : null,
-              badge: productForm.badge.trim(),
-              category: productForm.category,
-              description: productForm.description.trim(),
-              image: productForm.image || product.image || "",
+              ...data,
             }
           : product
       );
@@ -590,12 +555,6 @@ const AdminProductsPage = () => {
     }
   };
 
-  /*
-  ==========================================================
-  IMAGE HANDLERS
-  ==========================================================
-  */
-
   const handleCategoryImage = (event) =>
     readImageFile(event, (image) =>
       setCategoryForm((current) => ({
@@ -612,12 +571,6 @@ const AdminProductsPage = () => {
       }))
     );
 
-  /*
-  ==========================================================
-  PAGINATION
-  ==========================================================
-  */
-
   const goToPage = (page) => {
     if (page < 1 || page > totalPages) {
       return;
@@ -630,12 +583,6 @@ const AdminProductsPage = () => {
       behavior: "smooth",
     });
   };
-
-  /*
-  ==========================================================
-  FORM COMPONENT
-  ==========================================================
-  */
 
   const CategoryForm = () => (
     <form onSubmit={handleSaveCategory} className="space-y-5">
@@ -674,26 +621,27 @@ const AdminProductsPage = () => {
           Hình ảnh danh mục
         </label>
 
-        <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-4">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleCategoryImage}
-            className={fileInputClass}
-          />
+        {/* CHỈ CÒN MỘT LỚP VIỀN */}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleCategoryImage}
+          className={fileInputClass}
+        />
 
-          <p className="mt-2 text-xs text-gray-500">
-            PNG, JPG, WEBP — tối đa 2MB.
-          </p>
+        <p className="mt-2 text-xs text-gray-500">
+          PNG, JPG, WEBP — tối đa 2MB.
+        </p>
 
-          {categoryForm.image && (
+        {categoryForm.image && (
+          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <img
               src={categoryForm.image}
               alt="Xem trước danh mục"
-              className="mt-4 h-40 w-full rounded-lg object-cover"
+              className="h-40 w-full rounded-lg object-cover"
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-4">
@@ -844,11 +792,18 @@ const AdminProductsPage = () => {
 
       {productForm.image && (
         <div className="md:col-span-2">
-          <img
-            src={productForm.image}
-            alt="Xem trước sản phẩm"
-            className="h-48 w-full rounded-xl object-cover"
-          />
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Xem trước hình ảnh
+          </label>
+
+          {/* KHUNG CỐ ĐỊNH + OBJECT-CONTAIN */}
+          <div className="flex h-56 w-full items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-4 md:h-64">
+            <img
+              src={productForm.image}
+              alt="Xem trước sản phẩm"
+              className="h-full w-full object-contain"
+            />
+          </div>
         </div>
       )}
 
@@ -856,7 +811,14 @@ const AdminProductsPage = () => {
         <button
           type="button"
           onClick={
-            editing ? closeProductModal : () => setShowCreateProduct(false)
+            editing
+              ? closeProductModal
+              : () => {
+                  setShowCreateProduct(false);
+                  setProductForm({
+                    ...EMPTY_PRODUCT,
+                  });
+                }
           }
           className="rounded-lg border border-gray-200 px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50"
         >
@@ -1067,11 +1029,11 @@ const AdminProductsPage = () => {
         {/* PRODUCT LIST */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-6 py-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="font-bold text-gray-800">Danh sách sản phẩm</h2>
+            <h2 className="font-bold text-gray-800">Tất cả sản phẩm</h2>
 
-              <p className="text-sm text-gray-500">{totalProducts} sản phẩm</p>
-            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Hiển thị {displayStart}-{displayEnd}/{totalProducts} sản phẩm
+            </p>
           </div>
 
           <div className="divide-y divide-gray-100">

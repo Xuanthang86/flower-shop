@@ -1,33 +1,3 @@
-/*
-============================================================
-FLOWER SHOP — SITE SETTINGS SERVICE
-============================================================
-
-MỤC ĐÍCH:
-- Quản lý nội dung giao diện website.
-- Không để JSX chứa các nội dung có thể thay đổi.
-- Admin có thể cập nhật mà không sửa code.
-
-QUẢN LÝ:
-- Announcement
-- Hero
-- Banner
-- Tiêu đề danh mục
-- Tiêu đề sản phẩm
-- Logo khách hàng tiêu biểu
-- Footer
-- Blog
-- Contact
-
-DỮ LIỆU LƯU:
-localStorage
-
-SAU NÀY:
-Có thể thay localStorage bằng API/database mà không
-phải thay đổi toàn bộ component giao diện.
-============================================================
-*/
-
 export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
@@ -41,16 +11,16 @@ const DEFAULT_SETTINGS = {
   ],
 
   hero: {
-    eyebrow: "FLOWER SHOP",
-    titleBefore: "Gửi yêu thương qua",
-    titleHighlight: "từng bó hoa",
-    description:
-      "Hàng trăm mẫu hoa tươi được thiết kế bởi florist chuyên nghiệp, giao nhanh trong ngày.",
-    primaryButtonText: "Mua ngay",
-    secondaryButtonText: "Xem bộ sưu tập",
+    eyebrow: "",
+    titleBefore: "",
+    titleHighlight: "",
+    description: "",
+    primaryButtonText: "",
+    secondaryButtonText: "",
     primaryButtonLink: "/products",
     secondaryButtonLink: "/products",
-    bannerImage: "",
+
+    banners: [],
   },
 
   sections: {
@@ -82,33 +52,64 @@ const DEFAULT_SETTINGS = {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-const mergeSettings = (stored) => ({
-  ...clone(DEFAULT_SETTINGS),
-  ...(stored || {}),
-  hero: {
-    ...clone(DEFAULT_SETTINGS.hero),
-    ...(stored?.hero || {}),
-  },
-  sections: {
-    ...clone(DEFAULT_SETTINGS.sections),
-    ...(stored?.sections || {}),
-  },
-  footer: {
-    ...clone(DEFAULT_SETTINGS.footer),
-    ...(stored?.footer || {}),
-  },
-  contact: {
-    ...clone(DEFAULT_SETTINGS.contact),
-    ...(stored?.contact || {}),
-  },
-  announcementMessages: Array.isArray(stored?.announcementMessages)
-    ? stored.announcementMessages
-    : clone(DEFAULT_SETTINGS.announcementMessages),
-  customerLogos: Array.isArray(stored?.customerLogos)
-    ? stored.customerLogos
-    : [],
-  blogPosts: Array.isArray(stored?.blogPosts) ? stored.blogPosts : [],
-});
+const normalizeBanners = (stored) => {
+  if (Array.isArray(stored?.hero?.banners)) {
+    return stored.hero.banners.filter((banner) => banner && banner.image);
+  }
+
+  if (stored?.hero?.bannerImage) {
+    return [
+      {
+        id: `banner-migrated-${Date.now()}`,
+        image: stored.hero.bannerImage,
+        alt: "Banner Flower Shop",
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  return [];
+};
+
+const mergeSettings = (stored) => {
+  const banners = normalizeBanners(stored);
+
+  return {
+    ...clone(DEFAULT_SETTINGS),
+    ...(stored || {}),
+
+    hero: {
+      ...clone(DEFAULT_SETTINGS.hero),
+      ...(stored?.hero || {}),
+      banners,
+    },
+
+    sections: {
+      ...clone(DEFAULT_SETTINGS.sections),
+      ...(stored?.sections || {}),
+    },
+
+    footer: {
+      ...clone(DEFAULT_SETTINGS.footer),
+      ...(stored?.footer || {}),
+    },
+
+    contact: {
+      ...clone(DEFAULT_SETTINGS.contact),
+      ...(stored?.contact || {}),
+    },
+
+    announcementMessages: Array.isArray(stored?.announcementMessages)
+      ? stored.announcementMessages
+      : clone(DEFAULT_SETTINGS.announcementMessages),
+
+    customerLogos: Array.isArray(stored?.customerLogos)
+      ? stored.customerLogos
+      : [],
+
+    blogPosts: Array.isArray(stored?.blogPosts) ? stored.blogPosts : [],
+  };
+};
 
 const safeRead = () => {
   try {

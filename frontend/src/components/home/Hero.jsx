@@ -1,18 +1,5 @@
-/*
-============================================================
-FLOWER SHOP — HERO
-============================================================
-
-- Nội dung lấy từ siteSettings.
-- Banner có thể thay đổi bởi Admin.
-- Banner tự fit khung.
-- Không hard-code nội dung Hero.
-============================================================
-*/
-
 import { useEffect, useState } from "react";
-
-import { Link } from "react-router-dom";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 import Container from "@/components/common/Container";
 
@@ -26,9 +13,12 @@ import defaultHeroImage from "@/assets/images/hero/hero-bouquet.jpg";
 const Hero = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
+  const [currentIndex, setCurrentIndex] = useState(0);
+
   useEffect(() => {
     const refresh = () => {
       setSettings(readSiteSettings());
+      setCurrentIndex(0);
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
@@ -42,53 +32,103 @@ const Hero = () => {
     };
   }, []);
 
-  const hero = settings.hero;
+  const banners = settings.hero?.banners || [];
 
-  const bannerImage = hero.bannerImage || defaultHeroImage;
+  useEffect(() => {
+    if (banners.length <= 1) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setCurrentIndex((index) => (index >= banners.length - 1 ? 0 : index + 1));
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [banners.length]);
+
+  useEffect(() => {
+    if (currentIndex >= banners.length && banners.length > 0) {
+      setCurrentIndex(0);
+    }
+  }, [currentIndex, banners.length]);
+
+  const goPrevious = () => {
+    if (!banners.length) {
+      return;
+    }
+
+    setCurrentIndex((index) => (index <= 0 ? banners.length - 1 : index - 1));
+  };
+
+  const goNext = () => {
+    if (!banners.length) {
+      return;
+    }
+
+    setCurrentIndex((index) => (index >= banners.length - 1 ? 0 : index + 1));
+  };
+
+  const fallbackBanner = {
+    id: "default-hero",
+    image: defaultHeroImage,
+    alt: "Flower Shop",
+  };
+
+  const displayBanners = banners.length > 0 ? banners : [fallbackBanner];
+
+  const activeBanner = displayBanners[currentIndex] || displayBanners[0];
 
   return (
-    <section className="bg-pink-50">
+    <section className="bg-pink-50 py-5 md:py-7">
       <Container>
-        <div className="grid grid-cols-1 items-center gap-6 py-6 md:py-7 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
-          <div className="text-center lg:text-left">
-            <p className="font-semibold uppercase tracking-[0.18em] text-pink-600">
-              {hero.eyebrow}
-            </p>
-
-            <h1 className="mt-2 text-3xl font-bold leading-tight text-gray-900 md:text-4xl lg:text-5xl">
-              {hero.titleBefore}{" "}
-              <span className="text-pink-600">{hero.titleHighlight}</span>
-            </h1>
-
-            <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-gray-600 lg:mx-0">
-              {hero.description}
-            </p>
-
-            <div className="mt-5 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <Link
-                to={hero.primaryButtonLink || "/products"}
-                className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
-              >
-                {hero.primaryButtonText}
-              </Link>
-
-              <Link
-                to={hero.secondaryButtonLink || "/products"}
-                className="rounded-lg border border-pink-600 px-5 py-2.5 text-sm font-semibold text-pink-600 transition hover:bg-pink-100"
-              >
-                {hero.secondaryButtonText}
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex justify-center lg:justify-end">
-            <div className="relative aspect-[16/8] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-lg">
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="relative mx-auto w-full overflow-hidden rounded-2xl bg-white shadow-lg">
+            <div className="aspect-[16/6] min-h-[190px] w-full md:min-h-[280px] lg:min-h-[360px]">
               <img
-                src={bannerImage}
-                alt={hero.titleHighlight}
+                key={activeBanner.id}
+                src={activeBanner.image}
+                alt={activeBanner.alt || "Flower Shop"}
                 className="h-full w-full object-cover"
               />
             </div>
+
+            {displayBanners.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={goPrevious}
+                  className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-md transition hover:bg-white hover:text-pink-600 md:left-5"
+                  aria-label="Banner trước"
+                >
+                  <FiChevronLeft size={22} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-md transition hover:bg-white hover:text-pink-600 md:right-5"
+                  aria-label="Banner tiếp theo"
+                >
+                  <FiChevronRight size={22} />
+                </button>
+
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2">
+                  {displayBanners.map((banner, index) => (
+                    <button
+                      key={banner.id || index}
+                      type="button"
+                      onClick={() => setCurrentIndex(index)}
+                      className={`h-2.5 rounded-full transition-all ${
+                        index === currentIndex
+                          ? "w-7 bg-pink-600"
+                          : "w-2.5 bg-white/80"
+                      }`}
+                      aria-label={`Chuyển tới banner ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </Container>

@@ -33,6 +33,8 @@ import AdminAppearancePage from "@/pages/Admin/AdminAppearancePage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
+import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
+
 const LoadingPage = ({ text }) => (
   <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
     <div className="text-center">
@@ -245,6 +247,15 @@ const AppRoutes = () => (
         element={
           <AdminOnlyRoute>
             <AdminAppearancePage />
+          </AdminOnlyRoute>
+        }
+      />
+
+      <Route
+        path="/admin/images"
+        element={
+          <AdminOnlyRoute>
+            <AdminImageManagementPage />
           </AdminOnlyRoute>
         }
       />
