@@ -3,18 +3,17 @@
 FLOWER SHOP — THEME PROVIDER
 ============================================================
 
-Cho phép Admin chỉnh các thuộc tính giao diện cơ bản
-mà không phải sửa JSX/CSS.
+Quản lý giao diện cơ bản:
 
-Lưu vào localStorage.
+- Màu chủ đạo
+- Màu phụ
+- Màu chữ
+- Font chữ
+- Cỡ chữ cơ bản
+- Bo góc
+- Cỡ chữ Header
 
-Các thuộc tính:
-- primaryColor
-- secondaryColor
-- textColor
-- fontFamily
-- baseFontSize
-- borderRadius
+Không tạo ThemeContext riêng.
 ============================================================
 */
 
@@ -26,9 +25,13 @@ export const DEFAULT_THEME = {
   primaryColor: "#db2777",
   secondaryColor: "#fce7f3",
   textColor: "#1f2937",
-  fontFamily: "Inter, system-ui, sans-serif",
+
+  fontFamily:
+    "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+
   baseFontSize: 16,
   borderRadius: 12,
+  headerFontSize: 15,
 };
 
 const ThemeContext = createContext(null);
@@ -47,7 +50,9 @@ const readTheme = () => {
       ...DEFAULT_THEME,
       ...parsed,
     };
-  } catch {
+  } catch (error) {
+    console.error("Không thể đọc theme:", error);
+
     return DEFAULT_THEME;
   }
 };
@@ -56,6 +61,8 @@ const applyTheme = (theme) => {
   const root = document.documentElement;
 
   root.style.setProperty("--fs-primary", theme.primaryColor);
+
+  root.style.setProperty("--fs-primary-hover", theme.primaryColor);
 
   root.style.setProperty("--fs-secondary", theme.secondaryColor);
 
@@ -66,6 +73,8 @@ const applyTheme = (theme) => {
   root.style.setProperty("--fs-base-font-size", `${theme.baseFontSize}px`);
 
   root.style.setProperty("--fs-radius", `${theme.borderRadius}px`);
+
+  root.style.setProperty("--fs-header-font-size", `${theme.headerFontSize}px`);
 };
 
 export const ThemeProvider = ({ children }) => {
@@ -74,7 +83,11 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     applyTheme(theme);
 
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
+    } catch (error) {
+      console.error("Không thể lưu theme:", error);
+    }
   }, [theme]);
 
   const updateTheme = (updates) => {

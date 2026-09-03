@@ -4,12 +4,6 @@ FLOWER SHOP — GLOBAL STYLES
 ============================================================
 */
 
-/*
-============================================================
-THEME VARIABLES
-============================================================
-*/
-
 :root {
   --fs-primary: #db2777;
   --fs-primary-hover: #be185d;
@@ -21,6 +15,7 @@ THEME VARIABLES
 
   --fs-base-font-size: 16px;
   --fs-radius: 12px;
+  --fs-header-font-size: 15px;
 }
 
 /*
@@ -30,14 +25,22 @@ BASE
 */
 
 html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html,
 body {
+  margin: 0;
+  padding: 0;
   font-family: var(--fs-font-family);
   color: var(--fs-text);
   font-size: var(--fs-base-font-size);
 }
 
 body {
-  margin: 0;
+  background: #ffffff;
 }
 
 /*
@@ -49,13 +52,14 @@ ANNOUNCEMENT BAR
 .announcement-bar {
   width: 100%;
   overflow: hidden;
-  background-color: var(--fs-primary);
+  background: var(--fs-primary);
   color: #ffffff;
 }
 
 .announcement-container {
-  height: 40px;
   display: flex;
+  width: 100%;
+  height: 40px;
   align-items: center;
   overflow: hidden;
 }
@@ -68,30 +72,33 @@ ANNOUNCEMENT BAR
 .announcement-track {
   display: flex;
   width: max-content;
-  min-width: max-content;
-  animation: flower-shop-announcement-scroll 30s linear infinite;
+  flex-shrink: 0;
+  transform: translate3d(0, 0, 0);
+  animation: flower-shop-announcement-scroll 24s linear infinite;
   will-change: transform;
 }
 
 .announcement-group {
   display: flex;
-  align-items: center;
   flex-shrink: 0;
+  align-items: center;
+  min-width: max-content;
 }
 
 .announcement-item {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  min-width: max-content;
+  padding: 0 26px;
   white-space: nowrap;
-  padding: 0 28px;
   font-size: 14px;
   font-weight: 500;
   line-height: 40px;
 }
 
 .announcement-separator {
-  margin-left: 28px;
+  margin-left: 26px;
   opacity: 0.65;
 }
 
@@ -99,31 +106,19 @@ ANNOUNCEMENT BAR
   animation-play-state: paused;
 }
 
-@keyframes flower-shop-announcement-scroll {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /*
-============================================================
-FADE
-============================================================
+Quan trọng:
+Hai group có cùng nội dung nên khi group đầu chạy hết,
+group thứ hai tiếp tục đúng vị trí.
 */
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
+@keyframes flower-shop-announcement-scroll {
+  0% {
+    transform: translate3d(0, 0, 0);
   }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  100% {
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -136,7 +131,44 @@ ACCESSIBILITY
 @media (prefers-reduced-motion: reduce) {
   .announcement-track {
     animation: none;
+    transform: none;
   }
+}
+
+/*
+============================================================
+HOME SPACING
+============================================================
+*/
+
+.home-section {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+.home-section-tight {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+/*
+============================================================
+HEADER
+============================================================
+*/
+
+.flower-shop-header-link {
+  font-size: var(--fs-header-font-size);
+}
+
+/*
+============================================================
+IMAGE
+============================================================
+*/
+
+img {
+  max-width: 100%;
 }
 
 /*
@@ -151,12 +183,12 @@ RESPONSIVE
   }
 
   .announcement-item {
-    padding: 0 20px;
+    padding: 0 18px;
     font-size: 12px;
     line-height: 36px;
   }
 
   .announcement-separator {
-    margin-left: 20px;
+    margin-left: 18px;
   }
 }

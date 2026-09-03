@@ -3,13 +3,11 @@
 FLOWER SHOP — HEADER
 ============================================================
 
-CẬP NHẬT:
-- Không còn AnnouncementBar bên trong Header.
-- AnnouncementBar được MainLayout quản lý.
-- Search duy nhất sử dụng SearchBox.jsx.
-- Danh mục lấy từ catalog.
-- Không tạo data danh mục thứ ba.
-- Desktop + mobile dùng cùng SearchBox.
+- AnnouncementBar không nằm trong Header.
+- Search duy nhất dùng SearchBox.
+- Category lấy từ catalog.js.
+- Không có data danh mục thứ ba.
+- Font header sử dụng CSS variable.
 ============================================================
 */
 
@@ -25,7 +23,7 @@ import SearchBox from "./SearchBox";
 import { readCategories, CATEGORY_UPDATED_EVENT } from "@/services/catalog";
 
 const navClass = ({ isActive }) =>
-  `relative py-2 text-sm font-medium transition ${
+  `relative py-2 font-semibold transition ${
     isActive ? "text-pink-600" : "text-gray-700 hover:text-pink-600"
   }`;
 
@@ -40,33 +38,21 @@ const Header = () => {
 
   const productMenuRef = useRef(null);
 
-  /*
-  ==========================================================
-  CATEGORY SYNC
-  ==========================================================
-  */
-
   useEffect(() => {
-    const refreshCategories = () => {
+    const refresh = () => {
       setCategories(readCategories());
     };
 
-    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refresh);
 
-    window.addEventListener("storage", refreshCategories);
+    window.addEventListener("storage", refresh);
 
     return () => {
-      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refresh);
 
-      window.removeEventListener("storage", refreshCategories);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
-
-  /*
-  ==========================================================
-  OUTSIDE CLICK
-  ==========================================================
-  */
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -85,6 +71,10 @@ const Header = () => {
     };
   }, []);
 
+  const activeCategories = categories
+    .filter((category) => category.active !== false)
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+
   const closeMobile = () => {
     setMobileOpen(false);
     setMobileProductsOpen(false);
@@ -95,16 +85,10 @@ const Header = () => {
     closeMobile();
   };
 
-  const activeCategories = categories
-    .filter((category) => category.active !== false)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
   return (
     <header className="relative z-[80] w-full border-b border-gray-100 bg-white shadow-sm">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="flex min-h-[76px] items-center gap-4 lg:gap-6">
-          {/* LOGO */}
-
+        <div className="flex min-h-[78px] items-center gap-4 lg:gap-7">
           <Link
             to="/"
             onClick={closeAll}
@@ -123,10 +107,14 @@ const Header = () => {
             </div>
           </Link>
 
-          {/* DESKTOP NAV */}
-
           <nav className="hidden items-center gap-7 lg:flex">
-            <NavLink to="/" className={navClass}>
+            <NavLink
+              to="/"
+              className={navClass}
+              style={{
+                fontSize: "var(--fs-header-font-size)",
+              }}
+            >
               Trang chủ
             </NavLink>
 
@@ -134,11 +122,14 @@ const Header = () => {
               <button
                 type="button"
                 onClick={() => setDesktopProductsOpen((value) => !value)}
-                className="flex items-center gap-1 py-2 text-sm font-medium text-gray-700 hover:text-pink-600"
+                className="flex items-center gap-1 py-2 font-semibold text-gray-700 hover:text-pink-600"
+                style={{
+                  fontSize: "var(--fs-header-font-size)",
+                }}
               >
                 Sản phẩm
                 <FiChevronDown
-                  size={15}
+                  size={16}
                   className={
                     desktopProductsOpen ? "rotate-180 transition" : "transition"
                   }
@@ -146,11 +137,11 @@ const Header = () => {
               </button>
 
               {desktopProductsOpen && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+                <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
                   <Link
                     to="/products"
                     onClick={() => setDesktopProductsOpen(false)}
-                    className="block rounded-lg px-3 py-2.5 font-medium text-gray-800 hover:bg-pink-50 hover:text-pink-600"
+                    className="block rounded-lg px-3 py-2.5 font-semibold text-gray-800 hover:bg-pink-50 hover:text-pink-600"
                   >
                     Tất cả sản phẩm
                   </Link>
@@ -162,7 +153,7 @@ const Header = () => {
                         category.slug
                       )}`}
                       onClick={() => setDesktopProductsOpen(false)}
-                      className="block rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-pink-50 hover:text-pink-600"
+                      className="block rounded-lg px-3 py-2.5 text-gray-600 hover:bg-pink-50 hover:text-pink-600"
                     >
                       {category.name}
                     </Link>
@@ -171,22 +162,30 @@ const Header = () => {
               )}
             </div>
 
-            <NavLink to="/blog" className={navClass}>
+            <NavLink
+              to="/blog"
+              className={navClass}
+              style={{
+                fontSize: "var(--fs-header-font-size)",
+              }}
+            >
               Bài viết
             </NavLink>
 
-            <NavLink to="/contact" className={navClass}>
+            <NavLink
+              to="/contact"
+              className={navClass}
+              style={{
+                fontSize: "var(--fs-header-font-size)",
+              }}
+            >
               Liên hệ
             </NavLink>
           </nav>
 
-          {/* SEARCH */}
-
-          <div className="ml-auto hidden max-w-xl flex-1 md:flex">
+          <div className="ml-auto hidden min-w-0 max-w-xl flex-1 md:flex">
             <SearchBox />
           </div>
-
-          {/* ICONS */}
 
           <div className="flex items-center gap-2">
             <div className="hidden md:block">
@@ -204,8 +203,6 @@ const Header = () => {
           </div>
         </div>
 
-        {/* MOBILE */}
-
         {mobileOpen && (
           <div className="border-t border-gray-100 py-4 lg:hidden">
             <div className="mb-4">
@@ -220,7 +217,7 @@ const Header = () => {
               <button
                 type="button"
                 onClick={() => setMobileProductsOpen((value) => !value)}
-                className="flex w-full items-center justify-between py-2 text-sm font-medium text-gray-700"
+                className="flex w-full items-center justify-between py-2 font-semibold text-gray-700"
               >
                 <span>Sản phẩm</span>
 
@@ -237,7 +234,7 @@ const Header = () => {
                   <Link
                     to="/products"
                     onClick={closeMobile}
-                    className="block py-2 text-sm font-medium"
+                    className="block py-2 font-semibold"
                   >
                     Tất cả sản phẩm
                   </Link>

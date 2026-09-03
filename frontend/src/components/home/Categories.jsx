@@ -2,25 +2,36 @@
 ============================================================
 FLOWER SHOP — HOME CATEGORIES
 ============================================================
+
+- Dùng catalog.js.
+- Không dùng data danh mục thứ hai.
+- Nội dung tiêu đề lấy từ siteSettings.
+- Khoảng cách được thu gọn.
+============================================================
 */
 
 import { useEffect, useState } from "react";
 
 import { Link } from "react-router-dom";
 
-import SectionTitle from "./SectionTitle";
+import { readCategories, CATEGORY_UPDATED_EVENT } from "@/services/catalog";
 
-import { CATEGORY_UPDATED_EVENT } from "@/constants/productCategories";
-
-import { readCategories } from "@/services/catalog";
+import {
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
 
 const Categories = () => {
   const [categories, setCategories] = useState(() =>
-    readCategories().filter((category) => category.active !== false)
+    readCategories()
+      .filter((category) => category.active !== false)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
   );
 
+  const [settings, setSettings] = useState(() => readSiteSettings());
+
   useEffect(() => {
-    const refresh = () => {
+    const refreshCategories = () => {
       setCategories(
         readCategories()
           .filter((category) => category.active !== false)
@@ -28,14 +39,26 @@ const Categories = () => {
       );
     };
 
-    window.addEventListener(CATEGORY_UPDATED_EVENT, refresh);
+    const refreshSettings = () => {
+      setSettings(readSiteSettings());
+    };
 
-    window.addEventListener("storage", refresh);
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
+    window.addEventListener("storage", refreshCategories);
+
+    window.addEventListener("storage", refreshSettings);
 
     return () => {
-      window.removeEventListener(CATEGORY_UPDATED_EVENT, refresh);
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
-      window.removeEventListener("storage", refresh);
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
+      window.removeEventListener("storage", refreshCategories);
+
+      window.removeEventListener("storage", refreshSettings);
     };
   }, []);
 
@@ -44,22 +67,27 @@ const Categories = () => {
   }
 
   return (
-    <section className="bg-white py-4 md:py-6">
+    <section className="home-section-tight bg-white">
       <div className="mx-auto max-w-7xl px-4">
-        <SectionTitle
-          title="Danh mục nổi bật"
-          subtitle="Lựa chọn hoa phù hợp với từng dịp đặc biệt"
-        />
+        <div className="mb-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-800 md:text-3xl">
+            {settings.sections.categoriesTitle}
+          </h2>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5 md:gap-5">
+          <p className="mt-1 text-sm text-gray-500 md:text-base">
+            {settings.sections.categoriesSubtitle}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {categories.map((category) => (
             <Link
               key={category.id}
               to={`/products?category=${encodeURIComponent(category.slug)}`}
               className="group block"
             >
-              <article className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <div className="relative aspect-[4/3] overflow-hidden bg-pink-50">
+              <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                <div className="aspect-[4/3] overflow-hidden bg-pink-50">
                   {category.image ? (
                     <img
                       src={category.image}
@@ -68,14 +96,14 @@ const Categories = () => {
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-pink-300">
+                    <div className="flex h-full items-center justify-center text-xs text-pink-300">
                       Chưa có hình ảnh
                     </div>
                   )}
                 </div>
 
-                <div className="p-3 text-center">
-                  <h3 className="font-semibold text-gray-800 transition-colors group-hover:text-pink-600">
+                <div className="p-2.5 text-center">
+                  <h3 className="font-bold uppercase text-gray-800 group-hover:text-pink-600">
                     {category.name}
                   </h3>
 
@@ -84,8 +112,6 @@ const Categories = () => {
                       {category.summary}
                     </p>
                   )}
-
-                  <p className="mt-1 text-xs text-pink-500">Xem sản phẩm →</p>
                 </div>
               </article>
             </Link>
