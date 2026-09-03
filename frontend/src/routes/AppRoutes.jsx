@@ -96,16 +96,6 @@ const AdminOnlyRoute = ({ children }) => {
   return children;
 };
 
-/*
- * ============================================================
- * ADMIN ENTRY
- *
- * /admin KHÔNG còn chuyển sang /admin/orders.
- *
- * /admin chính là dashboard quản lý trung tâm.
- * ============================================================
- */
-
 const AdminEntry = () => {
   const { user, loading } = useAuth();
 
@@ -133,10 +123,6 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route element={<MainLayout />}>
-        {/* ==================================================
-            WEBSITE
-        ================================================== */}
-
         <Route path="/" element={<HomePage />} />
 
         <Route path="/products" element={<ProductsPage />} />
@@ -156,17 +142,9 @@ const AppRoutes = () => {
 
         <Route path="/contact" element={<ContactPage />} />
 
-        {/* ==================================================
-            AUTH
-        ================================================== */}
-
         <Route path="/login" element={<LoginPage />} />
 
         <Route path="/register" element={<RegisterPage />} />
-
-        {/* ==================================================
-            CUSTOMER
-        ================================================== */}
 
         <Route
           path="/checkout"
@@ -231,16 +209,10 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            MANAGEMENT DASHBOARD
-        ================================================== */}
-
+        {/* DASHBOARD QUẢN LÝ */}
         <Route path="/admin" element={<AdminEntry />} />
 
-        {/* ==================================================
-            ORDER MANAGEMENT
-        ================================================== */}
-
+        {/* QUẢN LÝ ĐƠN HÀNG */}
         <Route
           path="/admin/orders"
           element={
@@ -259,10 +231,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            PRODUCT MANAGEMENT
-        ================================================== */}
-
+        {/* QUẢN LÝ SẢN PHẨM */}
         <Route
           path="/admin/products"
           element={
@@ -272,10 +241,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            ACCOUNT MANAGEMENT
-        ================================================== */}
-
+        {/* QUẢN LÝ TÀI KHOẢN */}
         <Route
           path="/admin/users"
           element={
@@ -285,10 +251,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            BLOG MANAGEMENT
-        ================================================== */}
-
+        {/* QUẢN LÝ BÀI VIẾT */}
         <Route
           path="/admin/blog"
           element={
@@ -298,10 +261,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            IMAGE MANAGEMENT
-        ================================================== */}
-
+        {/* QUẢN LÝ HÌNH ẢNH */}
         <Route
           path="/admin/images"
           element={
@@ -311,10 +271,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ==================================================
-            APPEARANCE
-        ================================================== */}
-
+        {/* TÙY CHỈNH GIAO DIỆN */}
         <Route
           path="/admin/appearance"
           element={

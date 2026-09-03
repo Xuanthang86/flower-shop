@@ -41,11 +41,16 @@ const AdminBlogManagementPage = () => {
 
   const [editingPost, setEditingPost] = useState(null);
 
-  const [form, setForm] = useState(EMPTY_POST);
+  const [form, setForm] = useState(() => ({
+    ...EMPTY_POST,
+    date: new Date().toISOString().slice(0, 10),
+  }));
 
   const [message, setMessage] = useState("");
 
   const [error, setError] = useState("");
+
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const editorRef = useRef(null);
 
@@ -74,7 +79,12 @@ const AdminBlogManagementPage = () => {
     clearMessages();
 
     setEditingPost(null);
-    setForm(EMPTY_POST);
+
+    setForm({
+      ...EMPTY_POST,
+      date: new Date().toISOString().slice(0, 10),
+    });
+
     setEditorOpen(true);
   };
 
@@ -95,8 +105,13 @@ const AdminBlogManagementPage = () => {
 
   const closeEditor = () => {
     setEditorOpen(false);
+
     setEditingPost(null);
-    setForm(EMPTY_POST);
+
+    setForm({
+      ...EMPTY_POST,
+      date: new Date().toISOString().slice(0, 10),
+    });
   };
 
   const executeFormat = (command, value = null) => {
@@ -157,6 +172,10 @@ const AdminBlogManagementPage = () => {
       }));
     };
 
+    reader.onerror = () => {
+      setError("Không thể đọc hình ảnh.");
+    };
+
     reader.readAsDataURL(file);
   };
 
@@ -186,6 +205,10 @@ const AdminBlogManagementPage = () => {
         ...current,
         image: String(reader.result || ""),
       }));
+    };
+
+    reader.onerror = () => {
+      setError("Không thể đọc hình ảnh.");
     };
 
     reader.readAsDataURL(file);
@@ -246,8 +269,16 @@ const AdminBlogManagementPage = () => {
     }
   };
 
-  const deletePost = (post) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa bài viết "${post.title}"?`)) {
+  const requestDeletePost = (post) => {
+    setConfirmDelete({
+      type: "post",
+      id: post.id,
+      title: post.title || "bài viết này",
+    });
+  };
+
+  const confirmDeletePost = () => {
+    if (!confirmDelete || confirmDelete.type !== "post") {
       return;
     }
 
@@ -255,15 +286,21 @@ const AdminBlogManagementPage = () => {
       const saved = saveSiteSettings({
         ...settings,
         blogPosts: (settings.blogPosts || []).filter(
-          (item) => String(item.id) !== String(post.id)
+          (item) => String(item.id) !== String(confirmDelete.id)
         ),
       });
 
       setSettings(saved);
 
+      setConfirmDelete(null);
+
       setMessage("Đã xóa bài viết.");
+
+      setError("");
     } catch (saveError) {
       console.error(saveError);
+
+      setConfirmDelete(null);
 
       setError("Không thể xóa bài viết.");
     }
@@ -288,7 +325,7 @@ const AdminBlogManagementPage = () => {
           <button
             type="button"
             onClick={openCreate}
-            className="flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700"
+            className="flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white transition hover:bg-pink-700"
           >
             <FiPlus />
             Thêm bài viết
@@ -344,7 +381,7 @@ const AdminBlogManagementPage = () => {
                     <button
                       type="button"
                       onClick={() => openEdit(post)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
                     >
                       <FiEdit2 />
                       Sửa
@@ -352,8 +389,8 @@ const AdminBlogManagementPage = () => {
 
                     <button
                       type="button"
-                      onClick={() => deletePost(post)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-100 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                      onClick={() => requestDeletePost(post)}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-100 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
                     >
                       <FiTrash2 />
                       Xóa
@@ -365,20 +402,20 @@ const AdminBlogManagementPage = () => {
           </div>
         )}
 
+        {/* EDITOR MODAL */}
         {editorOpen && (
           <div className="fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
             <div className="my-8 w-full max-w-5xl rounded-2xl bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-gray-100 p-5">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">
-                    {editingPost ? "Chỉnh sửa bài viết" : "Thêm bài viết"}
-                  </h2>
-                </div>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {editingPost ? "Chỉnh sửa bài viết" : "Thêm bài viết"}
+                </h2>
 
                 <button
                   type="button"
                   onClick={closeEditor}
-                  className="text-gray-500 hover:text-gray-800"
+                  className="text-gray-500 transition hover:text-gray-800"
+                  aria-label="Đóng"
                 >
                   <FiX size={22} />
                 </button>
@@ -471,13 +508,9 @@ const AdminBlogManagementPage = () => {
                       className="rounded border border-gray-200 bg-white px-2 py-1.5 text-sm"
                     >
                       <option value="Arial">Arial</option>
-
                       <option value="Georgia">Georgia</option>
-
                       <option value="Verdana">Verdana</option>
-
                       <option value="Tahoma">Tahoma</option>
-
                       <option value="Times New Roman">Times New Roman</option>
                     </select>
 
@@ -489,15 +522,10 @@ const AdminBlogManagementPage = () => {
                       className="rounded border border-gray-200 bg-white px-2 py-1.5 text-sm"
                     >
                       <option value="1">Rất nhỏ</option>
-
                       <option value="2">Nhỏ</option>
-
                       <option value="3">Bình thường</option>
-
                       <option value="4">Lớn</option>
-
                       <option value="5">Rất lớn</option>
-
                       <option value="6">Tiêu đề</option>
                     </select>
 
@@ -542,6 +570,7 @@ const AdminBlogManagementPage = () => {
                       title="Chèn hình ảnh"
                     >
                       <FiImage />
+
                       <span>Chèn ảnh</span>
 
                       <input
@@ -569,18 +598,70 @@ const AdminBlogManagementPage = () => {
                   <button
                     type="button"
                     onClick={savePost}
-                    className="flex items-center gap-2 rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700"
+                    className="flex items-center gap-2 rounded-lg bg-pink-600 px-5 py-3 font-semibold text-white transition hover:bg-pink-700"
                   >
                     <FiSave />
+
                     {editingPost ? "Lưu thay đổi" : "Thêm bài viết"}
                   </button>
 
                   <button
                     type="button"
                     onClick={closeEditor}
-                    className="rounded-lg border border-gray-200 px-5 py-3 font-semibold text-gray-700"
+                    className="rounded-lg border border-gray-200 px-5 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
                   >
                     Hủy
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DELETE CONFIRMATION MODAL */}
+        {confirmDelete && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-post-title"
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+                  <FiTrash2 size={24} />
+                </div>
+
+                <h3
+                  id="delete-post-title"
+                  className="mt-4 text-xl font-bold text-gray-900"
+                >
+                  Xác nhận xóa bài viết
+                </h3>
+
+                <p className="mt-3 text-sm leading-6 text-gray-500">
+                  Bạn có chắc muốn xóa bài viết{" "}
+                  <span className="font-semibold text-gray-800">
+                    “{confirmDelete.title}”
+                  </span>
+                  ?
+                </p>
+
+                <div className="mt-6 flex justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(null)}
+                    className="rounded-lg border border-gray-200 px-5 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Hủy
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={confirmDeletePost}
+                    className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-700"
+                  >
+                    Xóa bài viết
                   </button>
                 </div>
               </div>

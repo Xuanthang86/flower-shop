@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+
 import { Link, useNavigate } from "react-router-dom";
 
 import {
-  FiBox,
   FiHeart,
-  FiImage,
   FiKey,
   FiLogOut,
   FiPackage,
-  FiPenTool,
   FiSettings,
   FiUser,
 } from "react-icons/fi";
@@ -28,39 +26,30 @@ const UserMenu = () => {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const handleOutsideClick = (event) => {
+    const handleOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("mousedown", handleOutside);
 
     return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("mousedown", handleOutside);
     };
   }, []);
-
-  /*
-   * ==========================================================
-   * CHƯA ĐĂNG NHẬP
-   * Hiển thị icon + chữ "Đăng nhập"
-   * ==========================================================
-   */
 
   if (!user) {
     return (
       <Link
         to="/login"
-        className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
+        className="flex items-center gap-2 rounded-lg px-2 py-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
         title="Đăng nhập"
         aria-label="Đăng nhập"
       >
         <FiUser size={22} />
 
-        <span className="hidden text-sm font-semibold lg:inline">
-          Đăng nhập
-        </span>
+        <span className="hidden text-sm font-medium sm:inline">Đăng nhập</span>
       </Link>
     );
   }
@@ -72,23 +61,24 @@ const UserMenu = () => {
   const avatar = user.avatar || user.photoURL || "";
 
   const isAdmin = user.role === ROLES.ADMIN;
-
-  const isManager = user.role === ROLES.MANAGER;
-
-  const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
-
   const isCustomer = user.role === ROLES.CUSTOMER;
 
-  /*
-   * ==========================================================
-   * QUYỀN QUẢN LÝ
-   * ==========================================================
-   */
+  const canManage =
+    user.role === ROLES.ADMIN ||
+    user.role === ROLES.MANAGER ||
+    user.role === ROLES.PRODUCT_MANAGER;
 
-  const canManage = isAdmin || isManager || isProductManager;
+  const closeMenu = () => {
+    setOpen(false);
+  };
+
+  const goToManagement = () => {
+    closeMenu();
+    navigate("/admin");
+  };
 
   const handleLogout = () => {
-    setOpen(false);
+    closeMenu();
 
     logout();
 
@@ -96,24 +86,6 @@ const UserMenu = () => {
       replace: true,
     });
   };
-
-  /*
-   * ==========================================================
-   * ĐI TỚI TRANG QUẢN LÝ TRUNG TÂM
-   * ==========================================================
-   */
-
-  const openManagement = () => {
-    setOpen(false);
-
-    navigate("/admin");
-  };
-
-  /*
-   * ==========================================================
-   * RENDER
-   * ==========================================================
-   */
 
   return (
     <div ref={menuRef} className="relative">
@@ -123,6 +95,7 @@ const UserMenu = () => {
         className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
         aria-expanded={open}
         aria-haspopup="menu"
+        title="Thông tin tài khoản"
       >
         <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-pink-100 font-semibold text-pink-600">
           {avatar ? (
@@ -147,8 +120,7 @@ const UserMenu = () => {
 
       {open && (
         <div className="absolute right-0 top-full z-[120] mt-3 w-[330px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          {/* USER INFORMATION */}
-
+          {/* ACCOUNT HEADER */}
           <div className="bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
@@ -178,30 +150,18 @@ const UserMenu = () => {
           </div>
 
           {/* MENU */}
-
           <div className="p-2">
-            <Link
-              to="/profile"
-              onClick={() => setOpen(false)}
-              className={menuItemClass}
-            >
+            <Link to="/profile" onClick={closeMenu} className={menuItemClass}>
               <FiUser size={18} />
-
               <span>Thông tin tài khoản</span>
             </Link>
 
-            {/* QUAN TRỌNG:
-                Đổi mật khẩu đi thẳng tới
-                ChangePasswordPage
-            */}
-
             <Link
               to="/change-password"
-              onClick={() => setOpen(false)}
+              onClick={closeMenu}
               className={menuItemClass}
             >
               <FiKey size={18} />
-
               <span>Đổi mật khẩu</span>
             </Link>
 
@@ -209,40 +169,31 @@ const UserMenu = () => {
               <>
                 <Link
                   to="/orders"
-                  onClick={() => setOpen(false)}
+                  onClick={closeMenu}
                   className={menuItemClass}
                 >
                   <FiPackage size={18} />
-
                   <span>Đơn hàng của tôi</span>
                 </Link>
 
                 <Link
                   to="/wishlist"
-                  onClick={() => setOpen(false)}
+                  onClick={closeMenu}
                   className={menuItemClass}
                 >
                   <FiHeart size={18} />
-
                   <span>Sản phẩm yêu thích</span>
                 </Link>
               </>
             )}
 
-            {/* =================================================
-                QUẢN LÝ
-                Không mở submenu.
-                Đi thẳng tới dashboard giữa màn hình.
-            ================================================= */}
-
             {canManage && (
               <button
                 type="button"
-                onClick={openManagement}
+                onClick={goToManagement}
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-
                 <span>Quản lý</span>
               </button>
             )}
@@ -250,18 +201,16 @@ const UserMenu = () => {
             {isAdmin && (
               <Link
                 to="/admin/appearance"
-                onClick={() => setOpen(false)}
+                onClick={closeMenu}
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-
                 <span>Tùy chỉnh giao diện</span>
               </Link>
             )}
           </div>
 
           {/* LOGOUT */}
-
           <div className="border-t border-gray-100">
             <button
               type="button"
@@ -269,7 +218,6 @@ const UserMenu = () => {
               className="flex w-full items-center gap-3 rounded-b-2xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
             >
               <FiLogOut size={18} />
-
               <span>Đăng xuất</span>
             </button>
           </div>
