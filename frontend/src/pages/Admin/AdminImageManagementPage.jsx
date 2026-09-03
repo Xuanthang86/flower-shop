@@ -58,6 +58,7 @@ const AdminImageManagementPage = () => {
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
     window.addEventListener("storage", refreshSettings);
+
     window.addEventListener("storage", refreshProducts);
 
     return () => {
@@ -193,7 +194,6 @@ const AdminImageManagementPage = () => {
           </button>
         </div>
 
-        {/* BANNER */}
         {activeTab === "banners" && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 border-b border-gray-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -228,7 +228,7 @@ const AdminImageManagementPage = () => {
                     key={banner.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="aspect-[16/7] w-full overflow-hidden bg-gray-100">
+                    <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
                       <img
                         src={banner.image}
                         alt={banner.alt || `Banner ${index + 1}`}
@@ -259,7 +259,6 @@ const AdminImageManagementPage = () => {
           </section>
         )}
 
-        {/* PRODUCT IMAGES */}
         {activeTab === "products" && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="border-b border-gray-100 pb-5">
@@ -275,17 +274,17 @@ const AdminImageManagementPage = () => {
                 Chưa có hình ảnh sản phẩm.
               </div>
             ) : (
-              <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
                 {productImages.map((product) => (
                   <div
                     key={product.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="flex h-[150px] w-full items-center justify-center overflow-hidden bg-white">
+                    <div className="aspect-[4/3] w-full overflow-hidden bg-gray-50">
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="block h-full w-full object-cover"
+                        className="h-full w-full object-cover"
                       />
                     </div>
 
