@@ -42,7 +42,6 @@ const AdminImageManagementPage = () => {
   const [products, setProducts] = useState(() => readProducts());
 
   const [message, setMessage] = useState("");
-
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -59,7 +58,6 @@ const AdminImageManagementPage = () => {
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
     window.addEventListener("storage", refreshSettings);
-
     window.addEventListener("storage", refreshProducts);
 
     return () => {
@@ -73,7 +71,9 @@ const AdminImageManagementPage = () => {
     };
   }, []);
 
-  const banners = settings.hero?.banners || [];
+  const banners = Array.isArray(settings.hero?.banners)
+    ? settings.hero.banners
+    : [];
 
   const productImages = products.filter((product) => product.image);
 
@@ -109,11 +109,9 @@ const AdminImageManagementPage = () => {
           });
 
           setSettings(saved);
-
           setMessage("Đã thêm banner thành công.");
         } catch (saveError) {
           console.error(saveError);
-
           setError("Không thể lưu banner.");
         }
       },
@@ -142,7 +140,6 @@ const AdminImageManagementPage = () => {
       setError("");
     } catch (saveError) {
       console.error(saveError);
-
       setError("Không thể xóa banner.");
     }
   };
@@ -196,6 +193,7 @@ const AdminImageManagementPage = () => {
           </button>
         </div>
 
+        {/* BANNER */}
         {activeTab === "banners" && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 border-b border-gray-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -230,11 +228,11 @@ const AdminImageManagementPage = () => {
                     key={banner.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="aspect-[16/7] w-full bg-gray-100">
+                    <div className="aspect-[16/7] w-full overflow-hidden bg-gray-100">
                       <img
                         src={banner.image}
                         alt={banner.alt || `Banner ${index + 1}`}
-                        className="block h-full w-full object-cover"
+                        className="h-full w-full object-cover"
                       />
                     </div>
 
@@ -249,6 +247,7 @@ const AdminImageManagementPage = () => {
                         type="button"
                         onClick={() => handleDeleteBanner(banner)}
                         className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50"
+                        title="Xóa banner"
                       >
                         <FiTrash2 />
                       </button>
@@ -260,6 +259,7 @@ const AdminImageManagementPage = () => {
           </section>
         )}
 
+        {/* PRODUCT IMAGES */}
         {activeTab === "products" && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="border-b border-gray-100 pb-5">
@@ -281,11 +281,11 @@ const AdminImageManagementPage = () => {
                     key={product.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="aspect-square w-full bg-gray-50">
+                    <div className="flex h-[150px] w-full items-center justify-center overflow-hidden bg-white">
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="block h-full w-full object-contain"
+                        className="block h-full w-full object-cover"
                       />
                     </div>
 

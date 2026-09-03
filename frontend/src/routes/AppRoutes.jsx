@@ -254,19 +254,19 @@ const AppRoutes = () => (
       />
 
       <Route
-        path="/admin/appearance"
+        path="/admin/images"
         element={
           <AdminOnlyRoute>
-            <AdminAppearancePage />
+            <AdminImageManagementPage />
           </AdminOnlyRoute>
         }
       />
 
       <Route
-        path="/admin/images"
+        path="/admin/appearance"
         element={
           <AdminOnlyRoute>
-            <AdminImageManagementPage />
+            <AdminAppearancePage />
           </AdminOnlyRoute>
         }
       />

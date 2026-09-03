@@ -123,6 +123,18 @@ const AdminAppearancePage = () => {
   };
 
   const removeAnnouncement = (index) => {
+    const currentMessages = settings.announcementMessages || [];
+
+    const message = currentMessages[index] || "thông báo này";
+
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa "${message}" không?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     updateSettings((current) => ({
       ...current,
       announcementMessages: (current.announcementMessages || []).filter(

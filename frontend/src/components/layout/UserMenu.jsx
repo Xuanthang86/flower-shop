@@ -3,9 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
+  FiArrowLeft,
   FiBox,
-  FiChevronDown,
-  FiChevronRight,
   FiHeart,
   FiImage,
   FiKey,
@@ -18,7 +17,10 @@ import {
 import { ROLE_LABELS, ROLES, useAuth } from "@/context/AuthContext";
 
 const menuItemClass =
-  "flex w-full items-center gap-3 px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
+  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
+
+const managementCardClass =
+  "flex min-h-[110px] flex-col items-center justify-center gap-3 rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600";
 
 const UserMenu = () => {
   const { user, logout } = useAuth();
@@ -26,8 +28,7 @@ const UserMenu = () => {
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
-
-  const [managementOpen, setManagementOpen] = useState(false);
+  const [managementView, setManagementView] = useState(false);
 
   const menuRef = useRef(null);
 
@@ -35,7 +36,7 @@ const UserMenu = () => {
     const handleOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setOpen(false);
-        setManagementOpen(false);
+        setManagementView(false);
       }
     };
 
@@ -50,7 +51,7 @@ const UserMenu = () => {
     return (
       <Link
         to="/login"
-        className="flex h-10 items-center justify-center rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
+        className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
         title="Đăng nhập"
         aria-label="Đăng nhập"
       >
@@ -66,11 +67,8 @@ const UserMenu = () => {
   const avatar = user.avatar || user.photoURL || "";
 
   const isAdmin = user.role === ROLES.ADMIN;
-
   const isManager = user.role === ROLES.MANAGER;
-
   const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
-
   const isCustomer = user.role === ROLES.CUSTOMER;
 
   const canManageOrders = isAdmin || isManager;
@@ -78,21 +76,44 @@ const UserMenu = () => {
   const canManageProducts = isAdmin || isProductManager;
 
   const canManageBlog = isAdmin;
-
   const canManageImages = isAdmin;
-
   const canManageUsers = isAdmin;
 
-  const hasManagementAccess =
-    canManageOrders ||
-    canManageProducts ||
-    canManageBlog ||
-    canManageImages ||
-    canManageUsers;
+  const managementItems = [
+    canManageOrders && {
+      to: "/admin/orders",
+      label: "Quản lý đơn hàng",
+      icon: FiPackage,
+    },
+
+    canManageProducts && {
+      to: "/admin/products",
+      label: "Quản lý sản phẩm",
+      icon: FiBox,
+    },
+
+    canManageBlog && {
+      to: "/admin/blog",
+      label: "Quản lý bài viết",
+      icon: FiEditIcon,
+    },
+
+    canManageImages && {
+      to: "/admin/images",
+      label: "Quản lý hình ảnh",
+      icon: FiImage,
+    },
+
+    canManageUsers && {
+      to: "/admin/users",
+      label: "Quản lý tài khoản",
+      icon: FiUser,
+    },
+  ].filter(Boolean);
 
   const closeMenu = () => {
     setOpen(false);
-    setManagementOpen(false);
+    setManagementView(false);
   };
 
   const handleLogout = () => {
@@ -109,8 +130,11 @@ const UserMenu = () => {
     <div ref={menuRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
+        onClick={() => {
+          setOpen((value) => !value);
+          setManagementView(false);
+        }}
+        className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
         aria-expanded={open}
         aria-haspopup="menu"
       >
@@ -133,16 +157,12 @@ const UserMenu = () => {
 
           <p className="truncate text-xs text-gray-500">{roleLabel}</p>
         </div>
-
-        <FiChevronDown
-          size={16}
-          className={open ? "rotate-180 transition" : "transition"}
-        />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[100] mt-3 w-80 overflow-visible rounded-xl border border-gray-200 bg-white shadow-xl">
-          <div className="overflow-hidden rounded-t-xl bg-pink-50 px-4 py-4">
+        <div className="absolute right-0 top-full z-[120] mt-3 w-[360px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          {/* HEADER */}
+          <div className="bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
                 {avatar ? (
@@ -170,151 +190,132 @@ const UserMenu = () => {
             </div>
           </div>
 
-          <div className="py-2">
-            <Link
-              to="/profile"
-              state={{ tab: "info" }}
-              onClick={closeMenu}
-              className={menuItemClass}
-            >
-              <FiUser size={18} />
-              <span>Thông tin tài khoản</span>
-            </Link>
-
-            <Link
-              to="/profile"
-              state={{ tab: "password" }}
-              onClick={closeMenu}
-              className={menuItemClass}
-            >
-              <FiKey size={18} />
-              <span>Đổi mật khẩu</span>
-            </Link>
-
-            {isCustomer && (
-              <>
+          {!managementView ? (
+            <>
+              <div className="p-2">
                 <Link
-                  to="/orders"
+                  to="/profile"
+                  state={{ tab: "info" }}
                   onClick={closeMenu}
                   className={menuItemClass}
                 >
-                  <FiPackage size={18} />
-                  <span>Đơn hàng của tôi</span>
+                  <FiUser size={18} />
+                  <span>Thông tin tài khoản</span>
                 </Link>
 
                 <Link
-                  to="/wishlist"
+                  to="/profile"
+                  state={{ tab: "password" }}
                   onClick={closeMenu}
                   className={menuItemClass}
                 >
-                  <FiHeart size={18} />
-                  <span>Sản phẩm yêu thích</span>
+                  <FiKey size={18} />
+                  <span>Đổi mật khẩu</span>
                 </Link>
-              </>
-            )}
 
-            {hasManagementAccess && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setManagementOpen((value) => !value)}
-                  className={menuItemClass}
-                >
-                  <FiSettings size={18} />
+                {isCustomer && (
+                  <>
+                    <Link
+                      to="/orders"
+                      onClick={closeMenu}
+                      className={menuItemClass}
+                    >
+                      <FiPackage size={18} />
+                      <span>Đơn hàng của tôi</span>
+                    </Link>
 
-                  <span className="flex-1">Quản lý</span>
+                    <Link
+                      to="/wishlist"
+                      onClick={closeMenu}
+                      className={menuItemClass}
+                    >
+                      <FiHeart size={18} />
+                      <span>Sản phẩm yêu thích</span>
+                    </Link>
+                  </>
+                )}
 
-                  <FiChevronRight
-                    size={17}
-                    className={
-                      managementOpen ? "rotate-90 transition" : "transition"
-                    }
-                  />
-                </button>
+                {managementItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManagementView(true)}
+                    className={menuItemClass}
+                  >
+                    <FiSettings size={18} />
+                    <span>Quản lý</span>
+                  </button>
+                )}
 
-                {managementOpen && (
-                  <div className="ml-4 border-l border-pink-100 py-1">
-                    {canManageOrders && (
-                      <Link
-                        to="/admin/orders"
-                        onClick={closeMenu}
-                        className={menuItemClass}
-                      >
-                        <FiPackage size={17} />
-                        <span>Quản lý đơn hàng</span>
-                      </Link>
-                    )}
-
-                    {canManageProducts && (
-                      <Link
-                        to="/admin/products"
-                        onClick={closeMenu}
-                        className={menuItemClass}
-                      >
-                        <FiBox size={17} />
-                        <span>Quản lý sản phẩm</span>
-                      </Link>
-                    )}
-
-                    {canManageBlog && (
-                      <Link
-                        to="/admin/blog"
-                        onClick={closeMenu}
-                        className={menuItemClass}
-                      >
-                        <FiEditIcon />
-                        <span>Quản lý bài viết</span>
-                      </Link>
-                    )}
-
-                    {canManageImages && (
-                      <Link
-                        to="/admin/images"
-                        onClick={closeMenu}
-                        className={menuItemClass}
-                      >
-                        <FiImage size={17} />
-                        <span>Quản lý hình ảnh</span>
-                      </Link>
-                    )}
-
-                    {canManageUsers && (
-                      <Link
-                        to="/admin/users"
-                        onClick={closeMenu}
-                        className={menuItemClass}
-                      >
-                        <FiUser size={17} />
-                        <span>Quản lý tài khoản</span>
-                      </Link>
-                    )}
-                  </div>
+                {isAdmin && (
+                  <Link
+                    to="/admin/appearance"
+                    onClick={closeMenu}
+                    className={menuItemClass}
+                  >
+                    <FiSettings size={18} />
+                    <span>Tùy chỉnh giao diện</span>
+                  </Link>
                 )}
               </div>
-            )}
 
-            {isAdmin && (
-              <Link
-                to="/admin/appearance"
-                onClick={closeMenu}
-                className={menuItemClass}
-              >
-                <FiSettings size={18} />
-                <span>Tùy chỉnh giao diện</span>
-              </Link>
-            )}
-          </div>
+              <div className="border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-b-2xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
+                >
+                  <FiLogOut size={18} />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* MANAGEMENT VIEW */}
+              <div className="p-4">
+                <button
+                  type="button"
+                  onClick={() => setManagementView(false)}
+                  className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-pink-600"
+                >
+                  <FiArrowLeft size={17} />
+                  Quay lại
+                </button>
 
-          <div className="border-t border-gray-100">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-b-xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
-            >
-              <FiLogOut size={18} />
-              <span>Đăng xuất</span>
-            </button>
-          </div>
+                <h3 className="mb-4 text-lg font-bold text-gray-900">
+                  Quản lý
+                </h3>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {managementItems.map(({ to, label, icon: Icon }) => (
+                    <Link
+                      key={to}
+                      to={to}
+                      onClick={closeMenu}
+                      className={managementCardClass}
+                    >
+                      <Icon size={25} className="text-pink-600" />
+
+                      <span className="text-sm font-semibold leading-5">
+                        {label}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-b-2xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
+                >
+                  <FiLogOut size={18} />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

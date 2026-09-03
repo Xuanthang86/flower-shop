@@ -760,7 +760,7 @@ const AdminProductsPage = () => {
 
                 {productForm.image && (
                   <div className="md:col-span-2">
-                    <div className="mx-auto flex h-52 w-full max-w-md items-center justify-center overflow-hidden rounded-xl bg-gray-50 p-4">
+                    <div className="mx-auto flex h-44 w-full max-w-sm items-center justify-center overflow-hidden rounded-xl bg-gray-50">
                       <img
                         src={productForm.image}
                         alt="Xem trước sản phẩm"
@@ -806,8 +806,8 @@ const AdminProductsPage = () => {
             </p>
           </div>
 
-          <div className="border-b border-gray-100 p-5">
-            <div className="relative max-w-md">
+          <div className="flex justify-end border-b border-gray-100 p-5">
+            <div className="relative w-full max-w-md">
               <FiSearch
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 size={18}
