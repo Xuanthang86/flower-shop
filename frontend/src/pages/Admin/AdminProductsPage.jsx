@@ -612,7 +612,7 @@ const AdminProductsPage = () => {
                         </div>
 
                         <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
                             category.active !== false
                               ? "bg-green-50 text-green-700"
                               : "bg-gray-100 text-gray-500"

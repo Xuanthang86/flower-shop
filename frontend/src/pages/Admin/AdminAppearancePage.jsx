@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { FiRotateCcw, FiSave } from "react-icons/fi";
+import { FiRotateCcw, FiSave, FiTrash2 } from "react-icons/fi";
 
 import { useTheme } from "@/context/ThemeProvider";
 
@@ -44,6 +44,8 @@ const AdminAppearancePage = () => {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     setDraftTheme(theme);
@@ -122,25 +124,37 @@ const AdminAppearancePage = () => {
     }));
   };
 
-  const removeAnnouncement = (index) => {
+  const requestRemoveAnnouncement = (index) => {
     const currentMessages = settings.announcementMessages || [];
 
-    const message = currentMessages[index] || "thông báo này";
+    setConfirmDelete({
+      type: "announcement",
+      index,
+      message: currentMessages[index] || "thông báo này",
+    });
+  };
 
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa "${message}" không?`
-    );
+  const confirmRemoveAnnouncement = () => {
+    if (!confirmDelete) {
+      return;
+    }
 
-    if (!confirmed) {
+    if (confirmDelete.type !== "announcement") {
       return;
     }
 
     updateSettings((current) => ({
       ...current,
       announcementMessages: (current.announcementMessages || []).filter(
-        (_, itemIndex) => itemIndex !== index
+        (_, itemIndex) => itemIndex !== confirmDelete.index
       ),
     }));
+
+    setConfirmDelete(null);
+
+    setMessage("Đã xóa thông báo.");
+
+    setError("");
   };
 
   const handleSave = () => {
@@ -480,7 +494,7 @@ const AdminAppearancePage = () => {
 
                     <button
                       type="button"
-                      onClick={() => removeAnnouncement(index)}
+                      onClick={() => requestRemoveAnnouncement(index)}
                       className="rounded-lg border border-red-100 px-4 text-red-500 hover:bg-red-50"
                     >
                       Xóa
@@ -679,6 +693,55 @@ const AdminAppearancePage = () => {
           </section>
         </div>
       </div>
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <FiTrash2 size={24} />
+              </div>
+
+              <h3
+                id="confirm-delete-title"
+                className="mt-4 text-xl font-bold text-gray-900"
+              >
+                Xác nhận xóa
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-gray-500">
+                Bạn có chắc muốn xóa{" "}
+                <span className="font-semibold text-gray-800">
+                  “{confirmDelete.message}”
+                </span>{" "}
+                không?
+              </p>
+
+              <div className="mt-6 flex justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(null)}
+                  className="rounded-lg border border-gray-200 px-5 py-2.5 font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={confirmRemoveAnnouncement}
+                  className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white hover:bg-red-700"
+                >
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
