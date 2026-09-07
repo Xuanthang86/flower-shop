@@ -62,11 +62,10 @@ const UserMenu = () => {
 
   const isAdmin = user.role === ROLES.ADMIN;
   const isCustomer = user.role === ROLES.CUSTOMER;
+  const isManager = user.role === ROLES.MANAGER;
+  const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
 
-  const canManage =
-    user.role === ROLES.ADMIN ||
-    user.role === ROLES.MANAGER ||
-    user.role === ROLES.PRODUCT_MANAGER;
+  const canManage = isAdmin || isManager || isProductManager;
 
   const closeMenu = () => {
     setOpen(false);
@@ -74,7 +73,32 @@ const UserMenu = () => {
 
   const goToManagement = () => {
     closeMenu();
-    navigate("/admin");
+
+    if (isAdmin) {
+      navigate("/admin");
+      return;
+    }
+
+    if (isManager) {
+      navigate("/admin/orders");
+      return;
+    }
+
+    if (isProductManager) {
+      navigate("/admin/products");
+    }
+  };
+
+  const getManagementLabel = () => {
+    if (isManager) {
+      return "Quản lý đơn hàng";
+    }
+
+    if (isProductManager) {
+      return "Quản lý sản phẩm";
+    }
+
+    return "Quản lý";
   };
 
   const handleLogout = () => {
@@ -120,7 +144,6 @@ const UserMenu = () => {
 
       {open && (
         <div className="absolute right-0 top-full z-[120] mt-3 w-[330px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          {/* ACCOUNT HEADER */}
           <div className="bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
@@ -149,7 +172,6 @@ const UserMenu = () => {
             </div>
           </div>
 
-          {/* MENU */}
           <div className="p-2">
             <Link to="/profile" onClick={closeMenu} className={menuItemClass}>
               <FiUser size={18} />
@@ -194,7 +216,7 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-                <span>Quản lý</span>
+                <span>{getManagementLabel()}</span>
               </button>
             )}
 
@@ -210,7 +232,6 @@ const UserMenu = () => {
             )}
           </div>
 
-          {/* LOGOUT */}
           <div className="border-t border-gray-100">
             <button
               type="button"

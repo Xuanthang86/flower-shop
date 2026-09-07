@@ -26,6 +26,7 @@ import CustomerOrderDetailPage from "@/pages/Orders/CustomerOrderDetailPage";
 import WishlistPage from "@/pages/Wishlist/WishlistPage";
 
 import AdminManagementPage from "@/pages/Admin/AdminManagementPage";
+import AdminManagementBackButton from "@/pages/Admin/AdminManagementBackButton";
 import AdminPage from "@/pages/Admin/AdminPage";
 import AdminOrderDetailPage from "@/pages/Admin/AdminOrderDetailPage";
 import AdminUsersPage from "@/pages/Admin/AdminUsersPage";
@@ -119,6 +120,16 @@ const AdminEntry = () => {
   return <AdminManagementPage />;
 };
 
+const AdminSubPage = ({ children }) => (
+  <>
+    <div className="mx-auto max-w-7xl px-4 pt-6">
+      <AdminManagementBackButton />
+    </div>
+
+    {children}
+  </>
+);
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -209,15 +220,15 @@ const AppRoutes = () => {
           }
         />
 
-        {/* DASHBOARD QUẢN LÝ */}
         <Route path="/admin" element={<AdminEntry />} />
 
-        {/* QUẢN LÝ ĐƠN HÀNG */}
         <Route
           path="/admin/orders"
           element={
             <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
-              <AdminPage />
+              <AdminSubPage>
+                <AdminPage />
+              </AdminSubPage>
             </PermissionRoute>
           }
         />
@@ -226,57 +237,64 @@ const AppRoutes = () => {
           path="/admin/orders/:orderId"
           element={
             <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
-              <AdminOrderDetailPage />
+              <AdminSubPage>
+                <AdminOrderDetailPage />
+              </AdminSubPage>
             </PermissionRoute>
           }
         />
 
-        {/* QUẢN LÝ SẢN PHẨM */}
         <Route
           path="/admin/products"
           element={
             <PermissionRoute permission={PERMISSIONS.MANAGE_PRODUCTS}>
-              <AdminProductsPage />
+              <AdminSubPage>
+                <AdminProductsPage />
+              </AdminSubPage>
             </PermissionRoute>
           }
         />
 
-        {/* QUẢN LÝ TÀI KHOẢN */}
         <Route
           path="/admin/users"
           element={
             <AdminOnlyRoute>
-              <AdminUsersPage />
+              <AdminSubPage>
+                <AdminUsersPage />
+              </AdminSubPage>
             </AdminOnlyRoute>
           }
         />
 
-        {/* QUẢN LÝ BÀI VIẾT */}
         <Route
           path="/admin/blog"
           element={
             <AdminOnlyRoute>
-              <AdminBlogManagementPage />
+              <AdminSubPage>
+                <AdminBlogManagementPage />
+              </AdminSubPage>
             </AdminOnlyRoute>
           }
         />
 
-        {/* QUẢN LÝ HÌNH ẢNH */}
         <Route
           path="/admin/images"
           element={
             <AdminOnlyRoute>
-              <AdminImageManagementPage />
+              <AdminSubPage>
+                <AdminImageManagementPage />
+              </AdminSubPage>
             </AdminOnlyRoute>
           }
         />
 
-        {/* TÙY CHỈNH GIAO DIỆN */}
         <Route
           path="/admin/appearance"
           element={
             <AdminOnlyRoute>
-              <AdminAppearancePage />
+              <AdminSubPage>
+                <AdminAppearancePage />
+              </AdminSubPage>
             </AdminOnlyRoute>
           }
         />

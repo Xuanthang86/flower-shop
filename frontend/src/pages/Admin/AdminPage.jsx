@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 
-import { FiCheckCircle, FiClock, FiPackage, FiSettings } from "react-icons/fi";
+import {
+  FiCheckCircle,
+  FiClock,
+  FiDollarSign,
+  FiPackage,
+} from "react-icons/fi";
 
 import { useOrder } from "@/context/OrderContext";
 
@@ -113,7 +118,7 @@ const AdminPage = () => {
               {formatCurrency(totalRevenue)}
             </p>
 
-            <FiSettings className="mt-4 text-pink-600" size={21} />
+            <FiDollarSign className="mt-4 text-pink-600" size={21} />
           </div>
         </div>
 
