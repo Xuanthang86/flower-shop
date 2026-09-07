@@ -19,7 +19,9 @@ const SearchBox = ({ className = "" }) => {
 
     const value = keyword.trim();
 
-    if (!value) return;
+    if (!value) {
+      return;
+    }
 
     const params = new URLSearchParams();
     params.set("search", value);
@@ -36,7 +38,9 @@ const SearchBox = ({ className = "" }) => {
   const handleClear = () => {
     setKeyword("");
 
-    if (location.pathname !== "/products") return;
+    if (location.pathname !== "/products") {
+      return;
+    }
 
     const params = new URLSearchParams(searchParams);
     params.delete("search");
@@ -52,7 +56,7 @@ const SearchBox = ({ className = "" }) => {
       role="search"
       className={`w-full max-w-[340px] ${className}`}
     >
-      <div className="flex h-10 w-full items-center overflow-hidden rounded-full border-2 border-pink-500 bg-white shadow-sm">
+      <div className="flex h-10 w-full items-center overflow-hidden rounded-full border border-pink-200 bg-white shadow-sm transition focus-within:border-pink-300 focus-within:ring-2 focus-within:ring-pink-50">
         <span className="ml-3 shrink-0 text-gray-400">
           <FiSearch size={16} />
         </span>

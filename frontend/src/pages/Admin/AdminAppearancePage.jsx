@@ -30,6 +30,17 @@ const FONT_OPTIONS = [
   },
 ];
 
+const DEFAULT_THEME = {
+  primaryColor: "#db2777",
+  secondaryColor: "#fce7f3",
+  textColor: "#1f2937",
+  fontFamily:
+    "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  baseFontSize: 16,
+  headerFontSize: 15,
+  borderRadius: 12,
+};
+
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -40,7 +51,10 @@ const AdminAppearancePage = () => {
 
   const [settings, setSettings] = useState(() => readSiteSettings());
 
-  const [draftTheme, setDraftTheme] = useState(theme);
+  const [draftTheme, setDraftTheme] = useState(() => ({
+    ...DEFAULT_THEME,
+    ...theme,
+  }));
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -48,8 +62,16 @@ const AdminAppearancePage = () => {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
-    setDraftTheme(theme);
-  }, [theme]);
+    const refresh = () => {
+      setSettings(readSiteSettings());
+    };
+
+    window.addEventListener("storage", refresh);
+
+    return () => {
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
   const clearMessages = () => {
     setMessage("");
@@ -68,7 +90,7 @@ const AdminAppearancePage = () => {
     updateSettings((current) => ({
       ...current,
       hero: {
-        ...current.hero,
+        ...(current.hero || {}),
         [field]: value,
       },
     }));
@@ -78,7 +100,7 @@ const AdminAppearancePage = () => {
     updateSettings((current) => ({
       ...current,
       sections: {
-        ...current.sections,
+        ...(current.sections || {}),
         [field]: value,
       },
     }));
@@ -88,7 +110,7 @@ const AdminAppearancePage = () => {
     updateSettings((current) => ({
       ...current,
       contact: {
-        ...current.contact,
+        ...(current.contact || {}),
         [field]: value,
       },
     }));
@@ -98,7 +120,7 @@ const AdminAppearancePage = () => {
     updateSettings((current) => ({
       ...current,
       footer: {
-        ...current.footer,
+        ...(current.footer || {}),
         copyright: value,
       },
     }));
@@ -135,25 +157,21 @@ const AdminAppearancePage = () => {
   };
 
   const confirmRemoveAnnouncement = () => {
-    if (!confirmDelete) {
+    if (!confirmDelete || confirmDelete.type !== "announcement") {
       return;
     }
 
-    if (confirmDelete.type !== "announcement") {
-      return;
-    }
+    const deletedIndex = confirmDelete.index;
 
-    updateSettings((current) => ({
+    setSettings((current) => ({
       ...current,
       announcementMessages: (current.announcementMessages || []).filter(
-        (_, itemIndex) => itemIndex !== confirmDelete.index
+        (_, itemIndex) => itemIndex !== deletedIndex
       ),
     }));
 
     setConfirmDelete(null);
-
     setMessage("Đã xóa thông báo.");
-
     setError("");
   };
 
@@ -170,9 +188,7 @@ const AdminAppearancePage = () => {
     }
 
     const baseFontSize = Number(draftTheme.baseFontSize);
-
     const headerFontSize = Number(draftTheme.headerFontSize);
-
     const borderRadius = Number(draftTheme.borderRadius);
 
     if (baseFontSize < 12 || baseFontSize > 24) {
@@ -204,11 +220,9 @@ const AdminAppearancePage = () => {
       const saved = saveSiteSettings(settings);
 
       setSettings(saved);
-
       setMessage("Đã lưu giao diện website.");
     } catch (saveError) {
       console.error(saveError);
-
       setError("Không thể lưu cấu hình website.");
     }
   };
@@ -221,25 +235,15 @@ const AdminAppearancePage = () => {
 
       setSettings(restored);
 
-      setDraftTheme(
-        restored.theme || {
-          primaryColor: "#db2777",
-          secondaryColor: "#fce7f3",
-          textColor: "#1f2937",
-          fontFamily:
-            "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          baseFontSize: 16,
-          headerFontSize: 15,
-          borderRadius: 12,
-        }
-      );
+      setDraftTheme({
+        ...DEFAULT_THEME,
+        ...(restored.theme || {}),
+      });
 
       setMessage("Đã khôi phục cấu hình mặc định.");
-
       setError("");
     } catch (resetError) {
       console.error(resetError);
-
       setError("Không thể khôi phục cấu hình.");
     }
   };
@@ -271,7 +275,6 @@ const AdminAppearancePage = () => {
         )}
 
         <div className="space-y-6">
-          {/* 1 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">
               1. Giao diện cơ bản
@@ -403,7 +406,6 @@ const AdminAppearancePage = () => {
             </div>
           </section>
 
-          {/* 2 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">
               2. Banner trang chủ
@@ -435,8 +437,7 @@ const AdminAppearancePage = () => {
                 />
 
                 <p className="mt-1 text-xs text-gray-500">
-                  {settings.hero?.bannerHeightDesktop || 360}
-                  px
+                  {settings.hero?.bannerHeightDesktop || 360}px
                 </p>
               </div>
 
@@ -457,14 +458,12 @@ const AdminAppearancePage = () => {
                 />
 
                 <p className="mt-1 text-xs text-gray-500">
-                  {settings.hero?.bannerRadius ?? 16}
-                  px
+                  {settings.hero?.bannerRadius ?? 16}px
                 </p>
               </div>
             </div>
           </section>
 
-          {/* 3 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-gray-900">
@@ -483,7 +482,7 @@ const AdminAppearancePage = () => {
             <div className="mt-5 space-y-3">
               {(settings.announcementMessages || []).map(
                 (announcement, index) => (
-                  <div key={index} className="flex gap-2">
+                  <div key={`${index}-${announcement}`} className="flex gap-2">
                     <input
                       value={announcement}
                       onChange={(event) =>
@@ -505,7 +504,6 @@ const AdminAppearancePage = () => {
             </div>
           </section>
 
-          {/* 4 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">
               4. Nội dung trang chủ
@@ -559,7 +557,6 @@ const AdminAppearancePage = () => {
             </div>
           </section>
 
-          {/* 5 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">5. Footer</h2>
 
@@ -571,7 +568,6 @@ const AdminAppearancePage = () => {
             />
           </section>
 
-          {/* 6 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">6. Liên hệ</h2>
 
@@ -610,7 +606,6 @@ const AdminAppearancePage = () => {
             </div>
           </section>
 
-          {/* 7 */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">7. Bài viết</h2>
 
@@ -669,7 +664,6 @@ const AdminAppearancePage = () => {
             </div>
           </section>
 
-          {/* SAVE */}
           <section className="sticky bottom-4 z-30 rounded-2xl border border-pink-100 bg-white/95 p-4 shadow-xl backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
@@ -693,6 +687,7 @@ const AdminAppearancePage = () => {
           </section>
         </div>
       </div>
+
       {confirmDelete && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
