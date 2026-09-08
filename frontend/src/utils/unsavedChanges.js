@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { createElement, useCallback, useEffect, useState } from "react";
 
 export const UNSAVED_CHANGES_KEY = "flower-shop-unsaved-changes";
 
@@ -7,7 +7,9 @@ export const UNSAVED_CHANGES_EVENT = "flower-shop-unsaved-changes-updated";
 export const markUnsavedChanges = () => {
   try {
     localStorage.setItem(UNSAVED_CHANGES_KEY, "1");
-  } catch {}
+  } catch (error) {
+    console.error("Không thể đánh dấu nội dung chưa lưu:", error);
+  }
 
   window.dispatchEvent(new Event(UNSAVED_CHANGES_EVENT));
 };
@@ -15,7 +17,9 @@ export const markUnsavedChanges = () => {
 export const clearUnsavedChanges = () => {
   try {
     localStorage.removeItem(UNSAVED_CHANGES_KEY);
-  } catch {}
+  } catch (error) {
+    console.error("Không thể xóa trạng thái nội dung chưa lưu:", error);
+  }
 
   window.dispatchEvent(new Event(UNSAVED_CHANGES_EVENT));
 };
@@ -23,7 +27,9 @@ export const clearUnsavedChanges = () => {
 export const hasUnsavedChanges = () => {
   try {
     return Boolean(localStorage.getItem(UNSAVED_CHANGES_KEY));
-  } catch {
+  } catch (error) {
+    console.error("Không thể kiểm tra trạng thái chưa lưu:", error);
+
     return false;
   }
 };
@@ -58,8 +64,24 @@ export const useUnsavedChanges = (enabled = false) => {
   };
 };
 
+const modalOverlayStyle =
+  "fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 p-4";
+
+const modalStyle = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl";
+
+const iconStyle =
+  "mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-pink-600 text-lg font-bold";
+
+const buttonRowStyle = "mt-6 flex justify-center gap-3";
+
+const stayButtonStyle =
+  "rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200";
+
+const leaveButtonStyle =
+  "rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700";
+
 const UnsavedChangesGuard = () => {
-  const [dirty, setDirty] = useState(hasUnsavedChanges());
+  const [dirty, setDirty] = useState(hasUnsavedChanges);
 
   const [pendingHref, setPendingHref] = useState(null);
 
@@ -117,7 +139,15 @@ const UnsavedChangesGuard = () => {
         return;
       }
 
-      const url = new URL(href, window.location.origin);
+      let url;
+
+      try {
+        url = new URL(href, window.location.origin);
+      } catch (error) {
+        console.error("Không thể phân tích đường dẫn:", error);
+
+        return;
+      }
 
       if (url.origin !== window.location.origin) {
         return;
@@ -166,43 +196,76 @@ const UnsavedChangesGuard = () => {
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-pink-600">
-            !
-          </div>
+  return createElement(
+    "div",
+    {
+      className: modalOverlayStyle,
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "unsaved-changes-title",
+    },
+    createElement(
+      "div",
+      {
+        className: modalStyle,
+      },
+      createElement(
+        "div",
+        {
+          className: "text-center",
+        },
+        createElement(
+          "div",
+          {
+            className: iconStyle,
+          },
+          "!"
+        ),
 
-          <h2 className="mt-4 text-lg font-bold text-gray-900">
-            Nội dung chưa được lưu
-          </h2>
+        createElement(
+          "h2",
+          {
+            id: "unsaved-changes-title",
+            className: "mt-4 text-lg font-bold text-gray-900",
+          },
+          "Nội dung chưa được lưu"
+        ),
 
-          <p className="mt-3 text-sm leading-6 text-gray-600">
-            Nội dung đang chỉnh sửa chưa được lưu. Bạn có muốn chuyển trang hay
-            không?
-          </p>
+        createElement(
+          "p",
+          {
+            className: "mt-3 text-sm leading-6 text-gray-600",
+          },
+          "Nội dung đang chỉnh sửa chưa được lưu. Bạn có muốn chuyển trang không?"
+        ),
 
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={cancel}
-              className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-            >
-              Ở lại
-            </button>
+        createElement(
+          "div",
+          {
+            className: buttonRowStyle,
+          },
+          createElement(
+            "button",
+            {
+              type: "button",
+              onClick: cancel,
+              className: stayButtonStyle,
+            },
+            "Ở lại"
+          ),
 
-            <button
-              type="button"
-              onClick={leave}
-              className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
-            >
-              Chuyển trang
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+          createElement(
+            "button",
+            {
+              type: "button",
+              onClick: leave,
+              className: leaveButtonStyle,
+            },
+            "Chuyển trang"
+          )
+        )
+      )
+    )
   );
 };
 

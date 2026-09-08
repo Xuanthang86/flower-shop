@@ -1,175 +1,3 @@
-// export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
-
-// export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
-
-// const DEFAULT_SETTINGS = {
-//   announcementMessages: [
-//     "🌸 Miễn phí giao hàng cho đơn từ 500.000đ",
-//     "🚚 Đặt trước 14h — giao hoa trong ngày",
-//     "💐 Hoa tươi được tuyển chọn mỗi ngày",
-//     "🎁 Tặng thiệp miễn phí cho mọi đơn hàng",
-//   ],
-
-//   hero: {
-//     eyebrow: "",
-//     titleBefore: "",
-//     titleHighlight: "",
-//     description: "",
-//     primaryButtonText: "",
-//     secondaryButtonText: "",
-//     primaryButtonLink: "/products",
-//     secondaryButtonLink: "/products",
-
-//     banners: [],
-//   },
-
-//   sections: {
-//     categoriesTitle: "Danh mục nổi bật",
-//     categoriesSubtitle: "Lựa chọn hoa phù hợp với từng dịp đặc biệt",
-//     featuredTitle: "Sản phẩm nổi bật",
-//     featuredSubtitle: "Những sản phẩm mới và được yêu thích nhất.",
-//     customerTitle: "KHÁCH HÀNG TIÊU BIỂU",
-//   },
-
-//   customerLogos: [],
-
-//   footer: {
-//     copyright: "© 2026 Flower Shop. All Rights Reserved.",
-//   },
-
-//   contact: {
-//     title: "Liên hệ",
-//     description:
-//       "Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp.",
-//     phone: "",
-//     email: "",
-//     address: "",
-//     workingHours: "",
-//   },
-
-//   blogPosts: [],
-// };
-
-// const clone = (value) => JSON.parse(JSON.stringify(value));
-
-// const normalizeBanners = (stored) => {
-//   if (Array.isArray(stored?.hero?.banners)) {
-//     return stored.hero.banners.filter((banner) => banner && banner.image);
-//   }
-
-//   if (stored?.hero?.bannerImage) {
-//     return [
-//       {
-//         id: `banner-migrated-${Date.now()}`,
-//         image: stored.hero.bannerImage,
-//         alt: "Banner Flower Shop",
-//         createdAt: new Date().toISOString(),
-//       },
-//     ];
-//   }
-
-//   return [];
-// };
-
-// const mergeSettings = (stored) => {
-//   const banners = normalizeBanners(stored);
-
-//   return {
-//     ...clone(DEFAULT_SETTINGS),
-//     ...(stored || {}),
-
-//     hero: {
-//       ...clone(DEFAULT_SETTINGS.hero),
-//       ...(stored?.hero || {}),
-//       banners,
-//     },
-
-//     sections: {
-//       ...clone(DEFAULT_SETTINGS.sections),
-//       ...(stored?.sections || {}),
-//     },
-
-//     footer: {
-//       ...clone(DEFAULT_SETTINGS.footer),
-//       ...(stored?.footer || {}),
-//     },
-
-//     contact: {
-//       ...clone(DEFAULT_SETTINGS.contact),
-//       ...(stored?.contact || {}),
-//     },
-
-//     announcementMessages: Array.isArray(stored?.announcementMessages)
-//       ? stored.announcementMessages
-//       : clone(DEFAULT_SETTINGS.announcementMessages),
-
-//     customerLogos: Array.isArray(stored?.customerLogos)
-//       ? stored.customerLogos
-//       : [],
-
-//     blogPosts: Array.isArray(stored?.blogPosts) ? stored.blogPosts : [],
-//   };
-// };
-
-// const safeRead = () => {
-//   try {
-//     const raw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
-
-//     if (!raw) {
-//       return clone(DEFAULT_SETTINGS);
-//     }
-
-//     return mergeSettings(JSON.parse(raw));
-//   } catch (error) {
-//     console.error("Không thể đọc cấu hình website:", error);
-
-//     return clone(DEFAULT_SETTINGS);
-//   }
-// };
-
-// export const readSiteSettings = () => {
-//   const settings = safeRead();
-
-//   try {
-//     localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-//   } catch (error) {
-//     console.error("Không thể đồng bộ cấu hình website:", error);
-//   }
-
-//   return settings;
-// };
-
-// export const saveSiteSettings = (settings) => {
-//   const normalized = mergeSettings(settings);
-
-//   try {
-//     localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
-
-//     window.dispatchEvent(new Event(SITE_SETTINGS_UPDATED_EVENT));
-
-//     return normalized;
-//   } catch (error) {
-//     console.error("Không thể lưu cấu hình website:", error);
-
-//     throw error;
-//   }
-// };
-
-// export const updateSiteSettings = (updates) => {
-//   const current = readSiteSettings();
-
-//   return saveSiteSettings({
-//     ...current,
-//     ...updates,
-//   });
-// };
-
-// export const resetSiteSettings = () => {
-//   return saveSiteSettings(clone(DEFAULT_SETTINGS));
-// };
-
-// export const DEFAULT_SITE_SETTINGS = clone(DEFAULT_SETTINGS);
-
 /*
 ============================================================
 FLOWER SHOP — SITE SETTINGS
@@ -203,19 +31,10 @@ const DEFAULT_SITE_SETTINGS = {
     primaryButtonLink: "/products",
     secondaryButtonLink: "/products",
 
-    /*
-    Kích thước hiển thị:
-    Desktop: 240px
-    Mobile: 125px
-    */
     bannerHeightDesktop: 240,
     bannerHeightMobile: 125,
-
     bannerRadius: 14,
 
-    /*
-    Thời gian mặc định 8 giây.
-    */
     bannerInterval: 8,
 
     banners: [],
@@ -268,26 +87,32 @@ const DEFAULT_SITE_SETTINGS = {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-const normalizeBanner = (banner, index, defaultInterval = 8) => ({
-  ...banner,
+const normalizeBanner = (banner, index, defaultInterval = 8) => {
+  const duration = Number(banner?.duration || defaultInterval || 8);
 
-  id: banner?.id || `banner-${Date.now()}-${index}`,
+  const priority = Number(banner?.priority || index + 1);
 
-  image: String(banner?.image || ""),
+  return {
+    ...banner,
 
-  mobileImage: String(banner?.mobileImage || ""),
+    id: banner?.id || `banner-${Date.now()}-${index}`,
 
-  alt: banner?.alt || `Banner ${index + 1}`,
+    image: String(banner?.image || ""),
 
-  priority: Math.max(1, Number(banner?.priority) || index + 1),
+    mobileImage: String(banner?.mobileImage || ""),
 
-  duration: Math.min(
-    15,
-    Math.max(5, Number(banner?.duration || defaultInterval || 8))
-  ),
+    alt: String(banner?.alt || `Banner ${index + 1}`),
 
-  createdAt: banner?.createdAt || new Date().toISOString(),
-});
+    priority: Math.max(1, Number.isFinite(priority) ? priority : index + 1),
+
+    duration: Math.min(
+      15,
+      Math.max(5, Number.isFinite(duration) ? duration : defaultInterval)
+    ),
+
+    createdAt: banner?.createdAt || new Date().toISOString(),
+  };
+};
 
 const normalizeBanners = (banners, defaultInterval = 8) => {
   if (!Array.isArray(banners)) {
@@ -296,7 +121,8 @@ const normalizeBanners = (banners, defaultInterval = 8) => {
 
   return banners
     .filter(
-      (banner) => banner && typeof banner.image === "string" && banner.image
+      (banner) =>
+        banner && typeof banner.image === "string" && banner.image.trim()
     )
     .map((banner, index) => normalizeBanner(banner, index, defaultInterval))
     .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0));
@@ -305,23 +131,28 @@ const normalizeBanners = (banners, defaultInterval = 8) => {
 const mergeSettings = (input = {}) => {
   const source = input && typeof input === "object" ? input : {};
 
-  const defaultSettings = clone(DEFAULT_SITE_SETTINGS);
+  const defaults = clone(DEFAULT_SITE_SETTINGS);
 
-  const bannerInterval = Number(
-    source.hero?.bannerInterval || defaultSettings.hero.bannerInterval
+  const rawInterval = Number(
+    source.hero?.bannerInterval ?? defaults.hero.bannerInterval
+  );
+
+  const bannerInterval = Math.min(
+    15,
+    Math.max(5, Number.isFinite(rawInterval) ? rawInterval : 8)
   );
 
   return {
-    ...defaultSettings,
+    ...defaults,
     ...source,
 
     branding: {
-      ...defaultSettings.branding,
+      ...defaults.branding,
       ...(source.branding || {}),
     },
 
     hero: {
-      ...defaultSettings.hero,
+      ...defaults.hero,
       ...(source.hero || {}),
 
       bannerHeightDesktop: Math.min(
@@ -329,8 +160,8 @@ const mergeSettings = (input = {}) => {
         Math.max(
           160,
           Number(
-            source.hero?.bannerHeightDesktop ||
-              defaultSettings.hero.bannerHeightDesktop
+            source.hero?.bannerHeightDesktop ??
+              defaults.hero.bannerHeightDesktop
           )
         )
       ),
@@ -340,8 +171,7 @@ const mergeSettings = (input = {}) => {
         Math.max(
           90,
           Number(
-            source.hero?.bannerHeightMobile ||
-              defaultSettings.hero.bannerHeightMobile
+            source.hero?.bannerHeightMobile ?? defaults.hero.bannerHeightMobile
           )
         )
       ),
@@ -350,43 +180,43 @@ const mergeSettings = (input = {}) => {
         32,
         Math.max(
           0,
-          Number(source.hero?.bannerRadius ?? defaultSettings.hero.bannerRadius)
+          Number(source.hero?.bannerRadius ?? defaults.hero.bannerRadius)
         )
       ),
 
-      bannerInterval: Math.min(15, Math.max(5, bannerInterval)),
+      bannerInterval,
 
       banners: normalizeBanners(source.hero?.banners, bannerInterval),
     },
 
     sections: {
-      ...defaultSettings.sections,
+      ...defaults.sections,
       ...(source.sections || {}),
     },
 
     footer: {
-      ...defaultSettings.footer,
+      ...defaults.footer,
       ...(source.footer || {}),
     },
 
     contact: {
-      ...defaultSettings.contact,
+      ...defaults.contact,
       ...(source.contact || {}),
     },
 
     blog: {
-      ...defaultSettings.blog,
+      ...defaults.blog,
       ...(source.blog || {}),
     },
 
     theme: {
-      ...defaultSettings.theme,
+      ...defaults.theme,
       ...(source.theme || {}),
     },
 
     announcementMessages: Array.isArray(source.announcementMessages)
       ? source.announcementMessages
-      : clone(defaultSettings.announcementMessages),
+      : clone(defaults.announcementMessages),
 
     customerLogos: Array.isArray(source.customerLogos)
       ? source.customerLogos
@@ -406,21 +236,7 @@ export const readSiteSettings = () => {
 
     const parsed = JSON.parse(raw);
 
-    const normalized = mergeSettings(parsed);
-
-    /*
-    Cố gắng migrate dữ liệu cũ.
-    */
-    try {
-      localStorage.setItem(
-        SITE_SETTINGS_STORAGE_KEY,
-        JSON.stringify(normalized)
-      );
-    } catch {
-      // Không làm hỏng giao diện nếu quota đã đầy.
-    }
-
-    return normalized;
+    return mergeSettings(parsed);
   } catch (error) {
     console.error("Không thể đọc site settings:", error);
 
@@ -432,13 +248,18 @@ export const saveSiteSettings = (settings) => {
   const normalized = mergeSettings(settings);
 
   try {
-    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+    const serialized = JSON.stringify(normalized);
+
+    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, serialized);
   } catch (error) {
     console.error("Không thể lưu site settings:", error);
 
-    throw new Error(
-      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy. Hãy giảm dung lượng ảnh hoặc xóa dữ liệu banner cũ."
-    );
+    const message =
+      "Không thể lưu cấu hình website. " +
+      "Bộ nhớ trình duyệt có thể đã đầy. " +
+      "Hãy giảm dung lượng ảnh hoặc xóa dữ liệu banner cũ.";
+
+    throw new Error(message);
   }
 
   window.dispatchEvent(new Event(SITE_SETTINGS_UPDATED_EVENT));
