@@ -14,7 +14,7 @@ import {
 import { ROLE_LABELS, ROLES, useAuth } from "@/context/AuthContext";
 
 const menuItemClass =
-  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
+  "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
 
 const UserMenu = () => {
   const { user, logout } = useAuth();
@@ -26,17 +26,15 @@ const UserMenu = () => {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const handleOutside = (event) => {
+    const outside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("mousedown", outside);
 
-    return () => {
-      document.removeEventListener("mousedown", handleOutside);
-    };
+    return () => document.removeEventListener("mousedown", outside);
   }, []);
 
   if (!user) {
@@ -61,15 +59,14 @@ const UserMenu = () => {
   const avatar = user.avatar || user.photoURL || "";
 
   const isAdmin = user.role === ROLES.ADMIN;
+
   const isCustomer = user.role === ROLES.CUSTOMER;
+
   const isManager = user.role === ROLES.MANAGER;
+
   const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
 
-  const canManage = isAdmin || isManager || isProductManager;
-
-  const closeMenu = () => {
-    setOpen(false);
-  };
+  const closeMenu = () => setOpen(false);
 
   const goToManagement = () => {
     closeMenu();
@@ -89,17 +86,11 @@ const UserMenu = () => {
     }
   };
 
-  const getManagementLabel = () => {
-    if (isManager) {
-      return "Quản lý đơn hàng";
-    }
-
-    if (isProductManager) {
-      return "Quản lý sản phẩm";
-    }
-
-    return "Quản lý";
-  };
+  const managementLabel = isManager
+    ? "Quản lý đơn hàng"
+    : isProductManager
+      ? "Quản lý sản phẩm"
+      : "Quản lý";
 
   const handleLogout = () => {
     closeMenu();
@@ -143,7 +134,7 @@ const UserMenu = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[120] mt-3 w-[330px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+        <div className="absolute right-0 top-full z-[120] mt-3 w-[320px] overflow-hidden rounded-2xl bg-white shadow-2xl">
           <div className="bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
@@ -209,14 +200,14 @@ const UserMenu = () => {
               </>
             )}
 
-            {canManage && (
+            {!isCustomer && (
               <button
                 type="button"
                 onClick={goToManagement}
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-                <span>{getManagementLabel()}</span>
+                <span>{managementLabel}</span>
               </button>
             )}
 
@@ -232,11 +223,11 @@ const UserMenu = () => {
             )}
           </div>
 
-          <div className="border-t border-gray-100">
+          <div className="p-2">
             <button
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-b-2xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
+              className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
             >
               <FiLogOut size={18} />
               <span>Đăng xuất</span>

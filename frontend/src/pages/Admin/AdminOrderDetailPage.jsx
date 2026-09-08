@@ -1,7 +1,8 @@
 import { useMemo } from "react";
+
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { FiPackage } from "react-icons/fi";
+import { FiArrowLeft, FiPackage } from "react-icons/fi";
 
 import { useOrder } from "@/context/OrderContext";
 
@@ -42,8 +43,8 @@ const AdminOrderDetailPage = () => {
 
   if (!order) {
     return (
-      <section className="p-8 bg-gray-50 min-h-screen">
-        <div className="max-w-5xl mx-auto bg-white rounded-2xl p-8 text-center shadow-sm">
+      <section className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-gray-800">
             Không tìm thấy đơn hàng
           </h1>
@@ -51,9 +52,10 @@ const AdminOrderDetailPage = () => {
           <button
             type="button"
             onClick={() => navigate("/admin/orders")}
-            className="mt-6 px-5 py-3 rounded-lg bg-pink-600 text-white"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-pink-50 hover:text-pink-600"
           >
-            Quay lại quản trị
+            <FiArrowLeft />
+            Quay lại Quản lý đơn hàng
           </button>
         </div>
       </section>
@@ -82,65 +84,64 @@ const AdminOrderDetailPage = () => {
 
   const status = normalizeOrderStatus(order.status);
 
-  const handleStatusChange = (event) => {
-    updateOrderStatus(order.id, event.target.value);
-  };
-
   return (
-    <section className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <Link
-              to="/admin/orders"
-              className="text-sm text-gray-500 hover:text-pink-600"
-            >
-              ← Quay lại Quản lý đơn hàng
-            </Link>
+    <section className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6">
+          <Link
+            to="/admin/orders"
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-pink-50 hover:text-pink-600"
+          >
+            <FiArrowLeft size={17} />
+            Quay lại Quản lý đơn hàng
+          </Link>
 
-            <h1 className="text-3xl font-bold text-gray-900 mt-3">
+          <div className="mt-5">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
               Chi tiết đơn hàng #{order.id}
             </h1>
 
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="mt-2 text-sm text-gray-500">
               Đặt ngày: {formatDate(order.createdAt)}
             </p>
           </div>
-
-          <div>
-            <label
-              htmlFor="orderStatus"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Trạng thái đơn hàng
-            </label>
-
-            <select
-              id="orderStatus"
-              value={status}
-              onChange={handleStatusChange}
-              className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
-            >
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-5">
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-500">Trạng thái đơn hàng</p>
+
+            <p className="mt-1 font-semibold text-gray-800">
+              {getStatusLabel(status)}
+            </p>
+          </div>
+
+          <select
+            value={status}
+            onChange={(event) =>
+              updateOrderStatus(order.id, event.target.value)
+            }
+            className="rounded-xl bg-white px-4 py-3 text-sm shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-pink-200"
+          >
+            {STATUS_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-800">
               Thông tin người nhận
             </h2>
 
-            <div className="space-y-4">
+            <div className="mt-5 space-y-4">
               <div>
                 <p className="text-sm text-gray-500">Họ và tên</p>
 
-                <p className="font-medium mt-1">
+                <p className="mt-1 font-medium">
                   {customer.fullName || customer.name || "—"}
                 </p>
               </div>
@@ -148,13 +149,13 @@ const AdminOrderDetailPage = () => {
               <div>
                 <p className="text-sm text-gray-500">Số điện thoại</p>
 
-                <p className="font-medium mt-1">{customer.phone || "—"}</p>
+                <p className="mt-1 font-medium">{customer.phone || "—"}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-500">Email</p>
 
-                <p className="font-medium mt-1 break-all">
+                <p className="mt-1 break-all font-medium">
                   {customer.email || "—"}
                 </p>
               </div>
@@ -163,25 +164,27 @@ const AdminOrderDetailPage = () => {
                 <div>
                   <p className="text-sm text-gray-500">Ghi chú</p>
 
-                  <p className="font-medium mt-1">{customer.note}</p>
+                  <p className="mt-1 font-medium">{customer.note}</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-5">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-800">
               Địa chỉ giao hàng
             </h2>
 
-            <OrderAddress address={address} />
+            <div className="mt-5">
+              <OrderAddress address={address} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-5">Sản phẩm</h2>
+        <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-800">Sản phẩm</h2>
 
-          <div className="space-y-4">
+          <div className="mt-5 space-y-4">
             {items.length === 0 ? (
               <p className="text-gray-500">Không có sản phẩm.</p>
             ) : (
@@ -193,30 +196,32 @@ const AdminOrderDetailPage = () => {
                 return (
                   <div
                     key={item?.id || item?.productId || index}
-                    className="flex gap-4 border-b border-gray-100 pb-4 last:border-b-0 last:pb-0"
+                    className="flex gap-4 pb-4 last:pb-0"
                   >
-                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-50">
                       {item?.image ? (
                         <img
                           src={item.image}
                           alt={item.name || "Sản phẩm"}
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="flex h-full items-center justify-center text-gray-400">
                           <FiPackage />
                         </div>
                       )}
                     </div>
 
-                    <div className="flex-1">
-                      <p className="font-semibold">{item.name || "Sản phẩm"}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-800">
+                        {item.name || "Sản phẩm"}
+                      </p>
 
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="mt-1 text-sm text-gray-500">
                         Số lượng: {quantity}
                       </p>
 
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="mt-1 text-sm text-gray-500">
                         Đơn giá: {formatCurrency(price)}
                       </p>
                     </div>
@@ -231,12 +236,12 @@ const AdminOrderDetailPage = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-500">Phương thức thanh toán</p>
 
-              <p className="font-medium mt-1">
+              <p className="mt-1 font-medium">
                 {order.paymentMethod === "cod"
                   ? "Thanh toán khi nhận hàng (COD)"
                   : order.paymentMethod || "—"}
@@ -244,21 +249,17 @@ const AdminOrderDetailPage = () => {
             </div>
 
             <div className="sm:text-right">
-              <p className="text-sm text-gray-500">Trạng thái</p>
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                  status
+                )}`}
+              >
+                {getStatusLabel(status)}
+              </span>
 
-              <p className={`font-semibold mt-1`}>
-                <span
-                  className={`inline-flex px-3 py-1 rounded-full text-xs ${getStatusClass(
-                    status
-                  )}`}
-                >
-                  {getStatusLabel(status)}
-                </span>
-              </p>
+              <p className="mt-3 text-sm text-gray-500">Tổng cộng</p>
 
-              <p className="text-sm text-gray-500 mt-3">Tổng cộng</p>
-
-              <p className="text-2xl font-bold text-pink-600 mt-1">
+              <p className="mt-1 text-2xl font-bold text-pink-600">
                 {formatCurrency(total)}
               </p>
             </div>

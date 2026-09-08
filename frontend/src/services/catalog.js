@@ -3,33 +3,12 @@
 FLOWER SHOP — CATALOG SERVICE
 ============================================================
 
-Mục đích:
-- Quản lý Products + Categories tập trung.
-- Không để UI đọc localStorage trực tiếp.
-- Đồng bộ dữ liệu giữa:
-    Home
-    Products
-    Product Detail
-    Admin
-
-- Bảo vệ dữ liệu seed.
-- Tự phục hồi các field bị thiếu trong localStorage.
-- Đặc biệt bảo vệ đường dẫn hình ảnh sản phẩm.
-
-Kiến trúc:
-
-products.js
-     │
-     ▼
-catalog.js
-     │
-     ├── Home
-     ├── Products
-     ├── Product Detail
-     └── Admin
-
-Sau này có thể thay localStorage bằng API/database
-mà không phải viết lại toàn bộ UI.
+Quản lý tập trung:
+- Products
+- Categories
+- Đồng bộ Home / Products / Product Detail / Admin
+- Bảo vệ dữ liệu seed
+- Tự phục hồi image + description bị thiếu
 ============================================================
 */
 
@@ -42,45 +21,34 @@ import {
   normalizeCategories,
 } from "@/constants/productCategories";
 
-/*
-============================================================
-STORAGE KEYS
-============================================================
-*/
-
 export const PRODUCT_STORAGE_KEY = "flower-shop-products";
-
-/*
-============================================================
-EVENT NAMES
-============================================================
-*/
 
 export const PRODUCT_UPDATED_EVENT = "flower-shop-products-updated";
 
-/*
-QUAN TRỌNG:
-CATEGORY_UPDATED_EVENT được định nghĩa tại
-productCategories.js.
-
-Tại đây export lại để các component chỉ cần import
-từ catalog.js thay vì phải biết cấu trúc bên trong
-productCategories.js.
-*/
-
 export { CATEGORY_UPDATED_EVENT };
 
-/*
-============================================================
-PRODUCT NORMALIZER
-============================================================
-*/
+const safeNumber = (value, fallback = 0) => {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : fallback;
+};
 
 const normalizeProduct = (product = {}, fallback = {}) => {
   const merged = {
     ...fallback,
     ...product,
   };
+
+  const image =
+    merged.image ||
+    merged.images?.[0] ||
+    merged.imageUrl ||
+    merged.thumbnail ||
+    fallback.image ||
+    fallback.images?.[0] ||
+    fallback.imageUrl ||
+    fallback.thumbnail ||
+    "";
 
   return {
     ...merged,
@@ -91,63 +59,67 @@ const normalizeProduct = (product = {}, fallback = {}) => {
 
     category: String(merged.category || fallback.category || "").trim(),
 
-    price: Number(merged.price ?? fallback.price ?? 0),
+    price: safeNumber(merged.price ?? fallback.price, 0),
 
     oldPrice:
       merged.oldPrice === null ||
       merged.oldPrice === undefined ||
       merged.oldPrice === ""
         ? null
-        : Number(merged.oldPrice),
+        : safeNumber(merged.oldPrice, 0),
 
     badge: String(merged.badge || fallback.badge || "").trim(),
 
-    /*
-    --------------------------------------------------------
-    QUAN TRỌNG:
-    Nếu dữ liệu localStorage không có image,
-    sử dụng image từ products.js.
-    --------------------------------------------------------
-    */
-
-    image: merged.image || fallback.image || "",
+    image,
 
     description: String(
       merged.description || fallback.description || ""
     ).trim(),
 
-    salesCount: Number(
-      merged.salesCount ??
-        merged.sold ??
-        fallback.salesCount ??
-        fallback.sold ??
-        0
+    salesCount: safeNumber(
+      merged.salesCount ?? merged.sold ?? fallback.salesCount ?? fallback.sold,
+      0
     ),
 
     isNew: Boolean(merged.isNew ?? fallback.isNew ?? false),
   };
 };
 
-/*
-============================================================
-NORMALIZE PRODUCTS
-============================================================
-*/
-
 const normalizeProducts = (items, seedProducts = defaultProducts) => {
   if (!Array.isArray(items)) {
     return [];
   }
 
-  const seedMap = new Map(
+  const seedById = new Map(
     seedProducts.map((product) => [String(product.id), product])
+  );
+
+  const seedByName = new Map(
+    seedProducts.map((product) => [
+      String(product.name || "")
+        .trim()
+        .toLowerCase(),
+      product,
+    ])
   );
 
   const seen = new Set();
 
   return items
     .map((product) => {
-      const fallback = seedMap.get(String(product?.id)) || {};
+      const idFallback = seedById.get(String(product?.id)) || {};
+
+      const nameFallback =
+        seedByName.get(
+          String(product?.name || "")
+            .trim()
+            .toLowerCase()
+        ) || {};
+
+      const fallback = {
+        ...nameFallback,
+        ...idFallback,
+      };
 
       return normalizeProduct(product, fallback);
     })
@@ -163,12 +135,6 @@ const normalizeProducts = (items, seedProducts = defaultProducts) => {
       return true;
     });
 };
-
-/*
-============================================================
-SAFE JSON READ
-============================================================
-*/
 
 const readJson = (key) => {
   try {
@@ -186,12 +152,6 @@ const readJson = (key) => {
   }
 };
 
-/*
-============================================================
-SAFE JSON WRITE
-============================================================
-*/
-
 const writeJson = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -204,21 +164,8 @@ const writeJson = (key, value) => {
   }
 };
 
-/*
-============================================================
-READ PRODUCTS
-============================================================
-*/
-
 export const readProducts = () => {
   const stored = readJson(PRODUCT_STORAGE_KEY);
-
-  /*
-  ----------------------------------------------------------
-  Chưa có dữ liệu localStorage
-  → tạo từ products.js
-  ----------------------------------------------------------
-  */
 
   if (!Array.isArray(stored)) {
     const seeded = normalizeProducts(defaultProducts);
@@ -228,56 +175,32 @@ export const readProducts = () => {
     return seeded;
   }
 
-  /*
-  ----------------------------------------------------------
-  Đã có dữ liệu localStorage
-  → merge với seed để phục hồi field bị thiếu.
-  ----------------------------------------------------------
-  */
-
   const normalized = normalizeProducts(stored, defaultProducts);
 
   /*
-  ----------------------------------------------------------
-  Lưu lại phiên bản đã normalize.
-  ----------------------------------------------------------
+  Chỉ ghi lại khi normalize thành công.
   */
-
   writeJson(PRODUCT_STORAGE_KEY, normalized);
 
   return normalized;
 };
 
-/*
-============================================================
-SAVE PRODUCTS
-============================================================
-*/
-
 export const saveProducts = (products) => {
   const normalized = normalizeProducts(products, defaultProducts);
 
-  writeJson(PRODUCT_STORAGE_KEY, normalized);
+  const saved = writeJson(PRODUCT_STORAGE_KEY, normalized);
+
+  if (!saved) {
+    throw new Error("Không thể lưu danh sách sản phẩm.");
+  }
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
   return normalized;
 };
 
-/*
-============================================================
-GET PRODUCT BY ID
-============================================================
-*/
-
 export const getProductById = (productId, products = readProducts()) =>
   products.find((product) => String(product.id) === String(productId)) || null;
-
-/*
-============================================================
-GET PRODUCTS BY CATEGORY
-============================================================
-*/
 
 export const getProductsByCategory = (
   categorySlug,
@@ -286,12 +209,6 @@ export const getProductsByCategory = (
   products.filter(
     (product) => String(product.category) === String(categorySlug)
   );
-
-/*
-============================================================
-SEARCH PRODUCTS
-============================================================
-*/
 
 export const searchProducts = (keyword, products = readProducts()) => {
   const query = String(keyword || "")
@@ -311,15 +228,9 @@ export const searchProducts = (keyword, products = readProducts()) => {
   );
 };
 
-/*
-============================================================
-FEATURED PRODUCTS
-============================================================
-*/
-
 export const getFeaturedProducts = (
   categorySlug,
-  limit = 4,
+  limit = 5,
   products = readProducts()
 ) =>
   getProductsByCategory(categorySlug, products)
@@ -333,12 +244,6 @@ export const getFeaturedProducts = (
       return Number(b.salesCount || 0) - Number(a.salesCount || 0);
     })
     .slice(0, limit);
-
-/*
-============================================================
-READ CATEGORIES
-============================================================
-*/
 
 export const readCategories = () => {
   const stored = readJson(PRODUCT_CATEGORIES_STORAGE_KEY);
@@ -354,47 +259,27 @@ export const readCategories = () => {
   return seeded;
 };
 
-/*
-============================================================
-SAVE CATEGORIES
-============================================================
-*/
-
 export const saveCategories = (categories) => {
   const normalized = normalizeCategories(categories);
 
-  writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, normalized);
+  const saved = writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, normalized);
+
+  if (!saved) {
+    throw new Error("Không thể lưu danh mục.");
+  }
 
   window.dispatchEvent(new Event(CATEGORY_UPDATED_EVENT));
 
   return normalized;
 };
 
-/*
-============================================================
-GET CATEGORY BY SLUG
-============================================================
-*/
-
 export const getCategoryBySlug = (slug, categories = readCategories()) =>
   categories.find((category) => String(category.slug) === String(slug)) || null;
-
-/*
-============================================================
-ACTIVE CATEGORIES
-============================================================
-*/
 
 export const getActiveCategories = (categories = readCategories()) =>
   categories
     .filter((category) => category.active !== false)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-/*
-============================================================
-CATALOG SNAPSHOT
-============================================================
-*/
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
 export const getCatalogSnapshot = () => ({
   products: readProducts(),
