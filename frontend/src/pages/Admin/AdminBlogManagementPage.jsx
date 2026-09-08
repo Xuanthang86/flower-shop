@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-
 import {
   FiAlignCenter,
   FiAlignLeft,
@@ -25,112 +24,16 @@ const EMPTY_POST = {
   title: "",
   date: new Date().toISOString().slice(0, 10),
   image: "",
-  content: "<p><br></p>",
+  content: "",
 };
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
-const EDITOR_STYLE = `
-.admin-blog-editor {
-  color: #374151;
-  font-size: 16px;
-  line-height: 1.85;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-.admin-blog-editor p {
-  display: block;
-  min-height: 1.5em;
-  margin: 0 0 1rem;
-}
-.admin-blog-editor p:last-child {
-  margin-bottom: 0;
-}
-.admin-blog-editor h1,
-.admin-blog-editor h2,
-.admin-blog-editor h3,
-.admin-blog-editor h4 {
-  color: #111827;
-  font-weight: 700;
-}
-.admin-blog-editor h1 {
-  margin: 1.5rem 0 .9rem;
-  font-size: 2rem;
-}
-.admin-blog-editor h2 {
-  margin: 1.5rem 0 .8rem;
-  font-size: 1.6rem;
-}
-.admin-blog-editor h3 {
-  margin: 1.25rem 0 .7rem;
-  font-size: 1.3rem;
-}
-.admin-blog-editor ul,
-.admin-blog-editor ol {
-  margin: 1rem 0;
-  padding-left: 1.5rem;
-}
-.admin-blog-editor ul {
-  list-style: disc;
-}
-.admin-blog-editor ol {
-  list-style: decimal;
-}
-.admin-blog-editor li {
-  margin-bottom: .4rem;
-}
-.admin-blog-editor blockquote {
-  margin: 1rem 0;
-  padding: .9rem 1rem;
-  border-left: 4px solid #db2777;
-  border-radius: .75rem;
-  background: #fdf2f8;
-}
-.admin-blog-editor img {
-  display: block;
-  max-width: 100%;
-  max-height: 500px;
-  width: auto;
-  margin: 1.25rem auto;
-  border-radius: .9rem;
-  object-fit: contain;
-}
-`;
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
-const stripHtml = (html = "") =>
-  String(html)
-    .replace(/<img[^>]*>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const normalizeContent = (html = "") => {
-  const value = String(html).trim();
-
-  if (!value) {
-    return "<p><br></p>";
-  }
-
-  if (value === "<br>" || value === "<div><br></div>") {
-    return "<p><br></p>";
-  }
-
-  return value;
-};
-
 const compressImage = (file) =>
   new Promise((resolve, reject) => {
-    if (!file || !file.type.startsWith("image/")) {
+    if (!file?.type.startsWith("image/")) {
       reject(new Error("Vui lòng chọn đúng file hình ảnh."));
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE) {
-      reject(new Error("Hình ảnh không được vượt quá 5MB."));
       return;
     }
 
@@ -140,18 +43,13 @@ const compressImage = (file) =>
       const image = new Image();
 
       image.onload = () => {
-        const maxWidth = 1600;
-
-        const ratio = Math.min(1, maxWidth / image.naturalWidth);
-
-        const width = Math.round(image.naturalWidth * ratio);
-
-        const height = Math.round(image.naturalHeight * ratio);
+        const ratio = Math.min(1, 1200 / image.width, 900 / image.height);
 
         const canvas = document.createElement("canvas");
 
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = Math.max(1, Math.round(image.width * ratio));
+
+        canvas.height = Math.max(1, Math.round(image.height * ratio));
 
         const context = canvas.getContext("2d");
 
@@ -160,9 +58,9 @@ const compressImage = (file) =>
           return;
         }
 
-        context.drawImage(image, 0, 0, width, height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-        resolve(canvas.toDataURL("image/webp", 0.8));
+        resolve(canvas.toDataURL("image/webp", 0.78));
       };
 
       image.onerror = () => reject(new Error("Không thể đọc hình ảnh."));
@@ -175,22 +73,42 @@ const compressImage = (file) =>
     reader.readAsDataURL(file);
   });
 
+const stripHtml = (html = "") =>
+  String(html)
+    .replace(/<img[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [editorOpen, setEditorOpen] = useState(false);
-
   const [editingPost, setEditingPost] = useState(null);
 
   const [form, setForm] = useState(EMPTY_POST);
 
   const [message, setMessage] = useState("");
-
   const [error, setError] = useState("");
 
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const editorRef = useRef(null);
+
+  useEffect(() => {
+    document.title = "Quản lý bài viết | Flower Shop";
+
+    let robots = document.querySelector('meta[name="robots"]');
+
+    if (!robots) {
+      robots = document.createElement("meta");
+      robots.name = "robots";
+      document.head.appendChild(robots);
+    }
+
+    robots.content = "noindex,nofollow";
+  }, []);
 
   useEffect(() => {
     const refresh = () => setSettings(readSiteSettings());
@@ -207,12 +125,11 @@ const AdminBlogManagementPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!editorOpen || !editorRef.current) {
-      return;
-    }
+    if (!editorOpen) return;
+    if (!editorRef.current) return;
 
-    editorRef.current.innerHTML = normalizeContent(form.content);
-  }, [editorOpen, editingPost?.id]);
+    editorRef.current.innerHTML = form.content || "";
+  }, [editorOpen, editingPost]);
 
   const clearMessages = () => {
     setMessage("");
@@ -241,7 +158,7 @@ const AdminBlogManagementPage = () => {
       title: post.title || "",
       date: post.date || new Date().toISOString().slice(0, 10),
       image: post.image || "",
-      content: normalizeContent(post.content),
+      content: post.content || "",
     });
 
     setEditorOpen(true);
@@ -249,70 +166,33 @@ const AdminBlogManagementPage = () => {
 
   const closeEditor = () => {
     setEditorOpen(false);
-
     setEditingPost(null);
-
-    setForm(EMPTY_POST);
+    setForm({
+      ...EMPTY_POST,
+      date: new Date().toISOString().slice(0, 10),
+    });
   };
 
   const executeFormat = (command, value = null) => {
-    const editor = editorRef.current;
+    if (!editorRef.current) return;
 
-    if (!editor) {
-      return;
-    }
-
-    editor.focus();
+    editorRef.current.focus();
 
     document.execCommand(command, false, value);
 
     setForm((current) => ({
       ...current,
-      content: normalizeContent(editor.innerHTML),
+      content: editorRef.current?.innerHTML || "",
     }));
   };
 
   const handleEditorInput = (event) => {
+    const html = event.currentTarget?.innerHTML || "";
+
     setForm((current) => ({
       ...current,
-      content: normalizeContent(event.currentTarget.innerHTML),
+      content: html,
     }));
-  };
-
-  const insertImage = async (event) => {
-    const file = event.target.files?.[0];
-
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    clearMessages();
-
-    try {
-      const image = await compressImage(file);
-
-      const editor = editorRef.current;
-
-      if (!editor) {
-        setError("Trình soạn thảo chưa sẵn sàng.");
-        return;
-      }
-
-      editor.focus();
-
-      document.execCommand("insertImage", false, image);
-
-      setForm((current) => ({
-        ...current,
-        content: normalizeContent(editor.innerHTML),
-      }));
-    } catch (imageError) {
-      console.error(imageError);
-
-      setError(imageError.message || "Không thể chèn hình ảnh.");
-    }
   };
 
   const handleCoverImage = async (event) => {
@@ -320,9 +200,7 @@ const AdminBlogManagementPage = () => {
 
     event.target.value = "";
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     clearMessages();
 
@@ -335,8 +213,38 @@ const AdminBlogManagementPage = () => {
       }));
     } catch (imageError) {
       console.error(imageError);
+      setError(imageError.message || "Không thể xử lý hình ảnh.");
+    }
+  };
 
-      setError(imageError.message || "Không thể xử lý ảnh đại diện.");
+  const insertImage = async (event) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) return;
+
+    clearMessages();
+
+    try {
+      const image = await compressImage(file);
+
+      if (!editorRef.current) {
+        setError("Trình soạn thảo chưa sẵn sàng.");
+        return;
+      }
+
+      editorRef.current.focus();
+
+      document.execCommand("insertImage", false, image);
+
+      setForm((current) => ({
+        ...current,
+        content: editorRef.current?.innerHTML || "",
+      }));
+    } catch (imageError) {
+      console.error(imageError);
+      setError(imageError.message || "Không thể chèn hình ảnh.");
     }
   };
 
@@ -345,16 +253,14 @@ const AdminBlogManagementPage = () => {
 
     const title = form.title.trim();
 
-    const editor = editorRef.current;
-
-    const content = normalizeContent(editor ? editor.innerHTML : form.content);
+    const content = editorRef.current?.innerHTML?.trim() || form.content.trim();
 
     if (!title) {
       setError("Vui lòng nhập tiêu đề bài viết.");
       return;
     }
 
-    if (!stripHtml(content)) {
+    if (!content || content === "<br>" || content === "<div><br></div>") {
       setError("Vui lòng nhập nội dung bài viết.");
       return;
     }
@@ -364,7 +270,7 @@ const AdminBlogManagementPage = () => {
         editingPost?.id ||
         `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      date: form.date || new Date().toISOString().slice(0, 10),
+      date: form.date,
       image: form.image || "",
       content,
     };
@@ -384,40 +290,37 @@ const AdminBlogManagementPage = () => {
       });
 
       setSettings(saved);
+      setMessage(editingPost ? "Đã cập nhật bài viết." : "Đã thêm bài viết.");
 
       closeEditor();
-
-      setMessage(editingPost ? "Đã cập nhật bài viết." : "Đã thêm bài viết.");
     } catch (saveError) {
       console.error(saveError);
-
-      setError(saveError.message || "Không thể lưu bài viết.");
+      setError("Không thể lưu bài viết. Hãy giảm dung lượng ảnh.");
     }
   };
 
-  const confirmDelete = () => {
-    if (!deleteTarget) {
-      return;
-    }
+  const requestDelete = (post) => {
+    setConfirmDelete(post);
+  };
+
+  const executeDelete = () => {
+    if (!confirmDelete) return;
 
     try {
       const saved = saveSiteSettings({
         ...settings,
         blogPosts: (settings.blogPosts || []).filter(
-          (post) => String(post.id) !== String(deleteTarget.id)
+          (item) => String(item.id) !== String(confirmDelete.id)
         ),
       });
 
       setSettings(saved);
-
-      setDeleteTarget(null);
-
+      setConfirmDelete(null);
       setMessage("Đã xóa bài viết.");
+      setError("");
     } catch (deleteError) {
       console.error(deleteError);
-
-      setDeleteTarget(null);
-
+      setConfirmDelete(null);
       setError("Không thể xóa bài viết.");
     }
   };
@@ -425,324 +328,307 @@ const AdminBlogManagementPage = () => {
   const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
 
   return (
-    <section className="min-h-screen bg-gray-50 py-8">
-      <style>{EDITOR_STYLE}</style>
-
+    <main className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">
+            <h1 className="text-3xl font-bold text-gray-900">
               Quản lý bài viết
             </h1>
 
             <p className="mt-2 text-sm text-gray-500">
-              Tạo, chỉnh sửa và quản lý nội dung bài viết.
+              Tạo, chỉnh sửa và xóa bài viết.
             </p>
           </div>
 
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-5 py-3 text-sm font-semibold text-white hover:bg-pink-700"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700"
           >
             <FiEdit2 />
             Thêm bài viết
           </button>
-        </div>
+        </header>
 
-        {message && (
-          <div className="mb-5 rounded-xl border border-green-100 bg-green-50 p-4 text-sm text-green-700">
-            {message}
+        {(message || error) && (
+          <div className="mb-5 rounded-xl border bg-white p-4 text-sm shadow-sm">
+            <span className={error ? "text-red-600" : "text-green-600"}>
+              {error || message}
+            </span>
           </div>
         )}
 
-        {error && (
-          <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {posts.length === 0 ? (
-          <div className="rounded-2xl bg-white p-12 text-center text-gray-500 shadow-sm">
-            Chưa có bài viết.
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
-              <article
-                key={post.id}
-                className="overflow-hidden rounded-2xl bg-white shadow-sm"
-              >
-                <div className="flex h-48 items-center justify-center overflow-hidden bg-gray-50">
-                  {post.image ? (
-                    <img
-                      src={post.image}
-                      alt={post.title}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm text-gray-400">Chưa có ảnh</span>
-                  )}
-                </div>
-
-                <div className="p-5">
-                  <h2 className="line-clamp-2 text-lg font-bold text-gray-800">
-                    {post.title}
-                  </h2>
-
-                  <p className="mt-1 text-xs text-gray-400">{post.date}</p>
-
-                  <p className="mt-4 line-clamp-3 text-sm leading-6 text-gray-600">
-                    {stripHtml(post.content)}
-                  </p>
-
-                  <div className="mt-5 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(post)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100"
-                    >
-                      <FiEdit2 />
-                      Sửa
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(post)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-50 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100"
-                    >
-                      <FiTrash2 />
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-
-        {editorOpen && (
-          <div className="fixed inset-0 z-[900] flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-            <div className="my-6 flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-5">
-                <h2 className="text-xl font-bold">
-                  {editingPost ? "Chỉnh sửa bài viết" : "Thêm bài viết"}
-                </h2>
-
-                <button
-                  type="button"
-                  onClick={closeEditor}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
-                >
-                  <FiX />
-                </button>
+        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {posts.map((post) => (
+            <article
+              key={post.id}
+              className="overflow-hidden rounded-2xl bg-white shadow-sm"
+            >
+              <div className="flex h-48 items-center justify-center overflow-hidden bg-gray-50 p-3">
+                {post.image ? (
+                  <img
+                    src={post.image}
+                    alt={post.title}
+                    className="max-h-full max-w-full rounded-xl object-contain"
+                  />
+                ) : (
+                  <FiImage size={34} className="text-gray-300" />
+                )}
               </div>
 
-              <div className="overflow-y-auto p-6">
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-semibold">
-                      Tiêu đề bài viết
-                    </label>
+              <div className="p-5">
+                <h2 className="line-clamp-2 text-lg font-bold text-gray-800">
+                  {post.title}
+                </h2>
 
-                    <input
-                      value={form.title}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          title: event.target.value,
-                        }))
-                      }
-                      className={inputClass}
-                    />
-                  </div>
+                <p className="mt-1 text-xs text-gray-400">{post.date}</p>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Ngày đăng
-                    </label>
+                <p className="mt-4 line-clamp-3 text-sm leading-6 text-gray-600">
+                  {stripHtml(post.content) || "Nội dung đang được cập nhật."}
+                </p>
 
-                    <input
-                      type="date"
-                      value={form.date}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          date: event.target.value,
-                        }))
-                      }
-                      className={inputClass}
-                    />
-                  </div>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(post)}
+                    className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                  >
+                    Sửa
+                  </button>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Ảnh đại diện
-                    </label>
+                  <button
+                    type="button"
+                    onClick={() => requestDelete(post)}
+                    className="flex-1 rounded-xl border border-red-100 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Xóa
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      </div>
 
+      {editorOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+              <h2 className="text-xl font-bold">
+                {editingPost ? "Chỉnh sửa bài viết" : "Thêm bài viết"}
+              </h2>
+
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="rounded-full p-2 hover:bg-gray-100"
+              >
+                <FiX />
+              </button>
+            </header>
+
+            <div className="overflow-y-auto p-6">
+              <div className="space-y-5">
+                <input
+                  value={form.title}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  placeholder="Tiêu đề bài viết"
+                  className={inputClass}
+                />
+
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      date: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                />
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Ảnh đại diện
+                  </label>
+
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700">
+                    <FiImage />
+                    Chọn tệp
                     <input
                       type="file"
                       accept="image/*"
+                      className="hidden"
                       onChange={handleCoverImage}
-                      className="block w-full rounded-xl border border-gray-200 p-3 text-sm"
                     />
-                  </div>
+                  </label>
+
+                  <span className="ml-3 text-sm text-gray-500">
+                    {form.image
+                      ? "Đã chọn hình ảnh"
+                      : "Không có tệp nào được chọn"}
+                  </span>
 
                   {form.image && (
-                    <div className="md:col-span-2">
-                      <div className="flex h-48 items-center justify-center overflow-hidden rounded-xl bg-gray-50 p-3">
-                        <img
-                          src={form.image}
-                          alt="Xem trước ảnh đại diện"
-                          className="max-h-full max-w-full object-contain"
-                        />
-                      </div>
+                    <div className="mt-4 flex h-36 w-52 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
+                      <img
+                        src={form.image}
+                        alt="Xem trước ảnh đại diện"
+                        className="max-h-full max-w-full rounded-lg object-contain"
+                      />
                     </div>
                   )}
+                </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-semibold">
-                      Nội dung bài viết
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2">
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("bold")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiBold />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("italic")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiItalic />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("underline")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiUnderline />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("justifyLeft")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiAlignLeft />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("justifyCenter")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiAlignCenter />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("justifyRight")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiAlignRight />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => executeFormat("insertUnorderedList")}
+                      className="rounded-lg p-2 hover:bg-white"
+                    >
+                      <FiList />
+                    </button>
+
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-white">
+                      <FiImage />
+                      Chèn ảnh
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={insertImage}
+                      />
                     </label>
-
-                    <div className="mb-2 flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-gray-50 p-2">
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("bold")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiBold />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("italic")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiItalic />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("underline")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiUnderline />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("justifyLeft")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiAlignLeft />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("justifyCenter")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiAlignCenter />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("justifyRight")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiAlignRight />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => executeFormat("insertUnorderedList")}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white"
-                      >
-                        <FiList />
-                      </button>
-
-                      <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-white">
-                        <FiImage />
-                        Ảnh
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={insertImage}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-
-                    <div
-                      ref={editorRef}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={handleEditorInput}
-                      className="admin-blog-editor min-h-[320px] rounded-xl border border-gray-200 bg-white p-5 outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
-                      role="textbox"
-                      aria-multiline="true"
-                      data-placeholder="Nhập nội dung bài viết..."
-                    />
                   </div>
-                </div>
 
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={closeEditor}
-                    className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-                  >
-                    Hủy
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={savePost}
-                    className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
-                  >
-                    <FiSave />
-                    Lưu bài viết
-                  </button>
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleEditorInput}
+                    className="admin-blog-editor min-h-[360px] whitespace-pre-wrap p-5 outline-none"
+                    style={{
+                      whiteSpace: "pre-wrap",
+                    }}
+                  />
                 </div>
               </div>
             </div>
+
+            <footer className="flex justify-end gap-3 border-t border-gray-100 px-6 py-5">
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={savePost}
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu bài viết
+              </button>
+            </footer>
           </div>
-        )}
+        </div>
+      )}
 
-        {deleteTarget && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
-              <h2 className="text-lg font-bold">Xác nhận xóa bài viết</h2>
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <FiTrash2 />
+            </div>
 
-              <p className="mt-3 text-sm leading-6 text-gray-600">
-                Bạn có chắc muốn xóa bài viết{" "}
-                <strong>"{deleteTarget.title}"</strong>?
-              </p>
+            <h2 className="mt-4 text-center text-lg font-bold">
+              Xác nhận xóa bài viết
+            </h2>
 
-              <div className="mt-6 flex justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700"
-                >
-                  Hủy
-                </button>
+            <p className="mt-3 text-center text-sm leading-6 text-gray-600">
+              Bạn có chắc muốn xóa <strong>{confirmDelete.title}</strong>?
+            </p>
 
-                <button
-                  type="button"
-                  onClick={confirmDelete}
-                  className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white"
-                >
-                  Xóa
-                </button>
-              </div>
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={executeDelete}
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white"
+              >
+                Xóa
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </section>
+        </div>
+      )}
+    </main>
   );
 };
 
