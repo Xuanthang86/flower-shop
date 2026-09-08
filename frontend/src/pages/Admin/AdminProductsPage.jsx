@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   FiChevronDown,
   FiChevronLeft,
@@ -43,14 +44,20 @@ const EMPTY_CATEGORY = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
+  "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
 const getDiscountPercent = (price, oldPrice) => {
   const current = Number(price);
   const old = Number(oldPrice);
 
-  if (!Number.isFinite(current) || !Number.isFinite(old)) return 0;
-  if (old <= current || old <= 0) return 0;
+  if (
+    !Number.isFinite(current) ||
+    !Number.isFinite(old) ||
+    old <= current ||
+    old <= 0
+  ) {
+    return 0;
+  }
 
   return Math.round(((old - current) / old) * 100);
 };
@@ -62,7 +69,7 @@ const compressImage = (
   { maxWidth = 1400, maxHeight = 1000, quality = 0.8 } = {}
 ) =>
   new Promise((resolve, reject) => {
-    if (!file || !file.type.startsWith("image/")) {
+    if (!file || !file.type?.startsWith("image/")) {
       reject(new Error("Vui lòng chọn đúng file hình ảnh."));
       return;
     }
@@ -97,7 +104,9 @@ const compressImage = (
 
         context.drawImage(image, 0, 0, width, height);
 
-        resolve(canvas.toDataURL("image/webp", quality));
+        const result = canvas.toDataURL("image/webp", quality);
+
+        resolve(result);
       };
 
       image.onerror = () => {
@@ -114,18 +123,64 @@ const compressImage = (
     reader.readAsDataURL(file);
   });
 
+const FilePicker = ({ id, onChange, selected, accept = "image/*" }) => (
+  <div className="mt-2">
+    <div className="flex flex-wrap items-center gap-3">
+      <label
+        htmlFor={id}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
+      >
+        <FiUpload size={16} />
+        Chọn tệp
+      </label>
+
+      <span className="text-sm text-gray-500">
+        {selected ? "Đã chọn hình ảnh" : "Không có tệp nào được chọn"}
+      </span>
+    </div>
+
+    <input
+      id={id}
+      type="file"
+      accept={accept}
+      onChange={onChange}
+      className="sr-only"
+    />
+  </div>
+);
+
+const ImagePreview = ({ src, alt, className = "h-32 w-48" }) => {
+  if (!src) return null;
+
+  return (
+    <div
+      className={`mt-4 flex items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2 ${className}`}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="block max-h-full max-w-full rounded-lg object-contain"
+      />
+    </div>
+  );
+};
+
 const AdminProductsPage = () => {
   const [products, setProducts] = useState(() => readProducts());
+
   const [categories, setCategories] = useState(() => readCategories());
 
   const [keyword, setKeyword] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showCategories, setShowCategories] = useState(false);
+
   const [showProductModal, setShowProductModal] = useState(false);
+
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [editingProduct, setEditingProduct] = useState(null);
+
   const [editingCategory, setEditingCategory] = useState(null);
 
   const [productForm, setProductForm] = useState(EMPTY_PRODUCT);
@@ -144,23 +199,28 @@ const AdminProductsPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-      robots.name = "robots";
+      robots.setAttribute("name", "robots");
       document.head.appendChild(robots);
     }
 
-    robots.content = "noindex,nofollow";
+    robots.setAttribute("content", "noindex,nofollow");
   }, []);
 
   useEffect(() => {
-    const refreshProducts = () => setProducts(readProducts());
+    const refreshProducts = () => {
+      setProducts(readProducts());
+    };
 
-    const refreshCategories = () => setCategories(readCategories());
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
 
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
     window.addEventListener("storage", refreshProducts);
+
     window.addEventListener("storage", refreshCategories);
 
     return () => {
@@ -173,6 +233,19 @@ const AdminProductsPage = () => {
       window.removeEventListener("storage", refreshCategories);
     };
   }, []);
+
+  const clearMessages = () => {
+    setMessage("");
+    setError("");
+  };
+
+  const categoriesSorted = useMemo(
+    () =>
+      [...categories].sort(
+        (a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
+      ),
+    [categories]
+  );
 
   const filteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -194,27 +267,29 @@ const AdminProductsPage = () => {
 
   const safePage = Math.min(currentPage, totalPages);
 
-  const visibleProducts = filteredProducts.slice(
-    (safePage - 1) * PRODUCTS_PER_PAGE,
-    safePage * PRODUCTS_PER_PAGE
-  );
+  const startIndex =
+    totalProducts === 0 ? 0 : (safePage - 1) * PRODUCTS_PER_PAGE;
 
-  const categoriesSorted = [...categories].sort(
-    (a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
-  );
+  const endIndex = Math.min(startIndex + PRODUCTS_PER_PAGE, totalProducts);
 
-  const clearMessages = () => {
-    setMessage("");
-    setError("");
-  };
+  const visibleProducts = filteredProducts.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const openCreateProduct = () => {
     clearMessages();
+
     setEditingProduct(null);
+
     setProductForm({
       ...EMPTY_PRODUCT,
       category: categoriesSorted[0]?.slug || "",
     });
+
     setShowProductModal(true);
   };
 
@@ -243,8 +318,13 @@ const AdminProductsPage = () => {
 
   const openCreateCategory = () => {
     clearMessages();
+
     setEditingCategory(null);
-    setCategoryForm(EMPTY_CATEGORY);
+
+    setCategoryForm({
+      ...EMPTY_CATEGORY,
+    });
+
     setShowCategoryModal(true);
   };
 
@@ -284,6 +364,7 @@ const AdminProductsPage = () => {
       setter(image);
     } catch (imageError) {
       console.error(imageError);
+
       setError(imageError.message || "Không thể xử lý hình ảnh.");
     }
   };
@@ -342,12 +423,14 @@ const AdminProductsPage = () => {
 
       setCategories(saved);
       closeCategoryModal();
+
       setMessage(
         editingCategory ? "Đã cập nhật danh mục." : "Đã thêm danh mục."
       );
     } catch (saveError) {
       console.error(saveError);
-      setError("Không thể lưu danh mục. Hãy kiểm tra dung lượng hình ảnh.");
+
+      setError("Không thể lưu danh mục. Hãy giảm dung lượng hình ảnh.");
     }
   };
 
@@ -390,6 +473,15 @@ const AdminProductsPage = () => {
         );
 
         setProducts(saved);
+
+        const nextTotal = saved.length;
+
+        const nextPages = Math.max(1, Math.ceil(nextTotal / PRODUCTS_PER_PAGE));
+
+        if (currentPage > nextPages) {
+          setCurrentPage(nextPages);
+        }
+
         setMessage("Đã xóa sản phẩm.");
       }
 
@@ -406,21 +498,26 @@ const AdminProductsPage = () => {
         );
 
         setCategories(saved);
+
         setMessage("Đã xóa danh mục.");
       }
 
-      setError("");
       setConfirmDelete(null);
+      setError("");
     } catch (deleteError) {
       console.error(deleteError);
+
       setConfirmDelete(null);
+
       setError("Không thể xóa dữ liệu.");
     }
   };
 
   const validateProduct = () => {
     const name = productForm.name.trim();
+
     const price = Number(productForm.price);
+
     const oldPrice =
       productForm.oldPrice === "" ? null : Number(productForm.oldPrice);
 
@@ -454,7 +551,9 @@ const AdminProductsPage = () => {
     event.preventDefault();
     clearMessages();
 
-    if (!validateProduct()) return;
+    if (!validateProduct()) {
+      return;
+    }
 
     try {
       const data = {
@@ -480,6 +579,7 @@ const AdminProductsPage = () => {
         );
 
         setProducts(saved);
+
         setMessage("Đã cập nhật sản phẩm thành công.");
       } else {
         const saved = saveProducts([
@@ -496,12 +596,14 @@ const AdminProductsPage = () => {
         ]);
 
         setProducts(saved);
+
         setMessage("Đã thêm sản phẩm thành công.");
       }
 
       closeProductModal();
     } catch (saveError) {
       console.error(saveError);
+
       setError("Không thể lưu sản phẩm. Hãy giảm dung lượng ảnh.");
     }
   };
@@ -509,7 +611,9 @@ const AdminProductsPage = () => {
   const discount = getDiscountPercent(productForm.price, productForm.oldPrice);
 
   const goToPage = (page) => {
-    if (page < 1 || page > totalPages) return;
+    if (page < 1 || page > totalPages) {
+      return;
+    }
 
     setCurrentPage(page);
 
@@ -531,7 +635,7 @@ const AdminProductsPage = () => {
         </header>
 
         {(message || error) && (
-          <div className="mb-5 rounded-xl border bg-white p-4 text-sm shadow-sm">
+          <div className="mb-5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">
             <span className={error ? "text-red-600" : "text-green-600"}>
               {error || message}
             </span>
@@ -550,9 +654,9 @@ const AdminProductsPage = () => {
               </span>
 
               <span>
-                <h2 className="text-xl font-bold text-gray-900">
+                <span className="block text-xl font-bold text-gray-900">
                   Danh mục sản phẩm
-                </h2>
+                </span>
 
                 <span className="mt-1 block text-sm text-gray-500">
                   {categories.length} danh mục
@@ -571,7 +675,7 @@ const AdminProductsPage = () => {
                 <button
                   type="button"
                   onClick={openCreateCategory}
-                  className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                  className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
                 >
                   <FiPlus />
                   Thêm danh mục
@@ -584,13 +688,13 @@ const AdminProductsPage = () => {
                     key={category.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="flex h-32 items-center justify-center bg-gray-50 p-3">
+                    <div className="flex h-32 items-center justify-center overflow-hidden bg-gray-50 p-3">
                       {category.image ? (
                         <img
                           src={category.image}
                           alt={category.name}
                           loading="lazy"
-                          className="h-full max-w-full rounded-lg object-contain"
+                          className="block max-h-full max-w-full rounded-lg object-contain"
                         />
                       ) : (
                         <FiImage size={32} className="text-gray-300" />
@@ -610,7 +714,7 @@ const AdminProductsPage = () => {
                         <button
                           type="button"
                           onClick={() => openEditCategory(category)}
-                          className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                          className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
                         >
                           Sửa
                         </button>
@@ -618,7 +722,7 @@ const AdminProductsPage = () => {
                         <button
                           type="button"
                           onClick={() => requestDeleteCategory(category)}
-                          className="flex-1 rounded-lg border border-red-100 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          className="flex-1 rounded-lg border border-red-100 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
                         >
                           Xóa
                         </button>
@@ -639,7 +743,9 @@ const AdminProductsPage = () => {
               </h2>
 
               <p className="mt-1 text-sm text-gray-500">
-                {totalProducts} sản phẩm
+                {totalProducts === 0
+                  ? "0/0 sản phẩm"
+                  : `${startIndex + 1}–${endIndex}/${totalProducts} sản phẩm`}
               </p>
             </div>
 
@@ -657,14 +763,15 @@ const AdminProductsPage = () => {
                     setCurrentPage(1);
                   }}
                   placeholder="Tìm sản phẩm..."
-                  className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pink-400 sm:w-64"
+                  className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-pink-400 sm:w-64"
+                  aria-label="Tìm sản phẩm trong quản lý sản phẩm"
                 />
               </label>
 
               <button
                 type="button"
                 onClick={openCreateProduct}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
               >
                 <FiPlus />
                 Thêm sản phẩm
@@ -684,20 +791,21 @@ const AdminProductsPage = () => {
                   key={product.id}
                   className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"
                 >
-                  <div className="relative flex h-44 items-center justify-center overflow-hidden bg-gray-50 p-2">
+                  <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-gray-50 p-3 sm:h-44">
                     {product.image ? (
                       <img
                         src={product.image}
                         alt={product.name}
                         loading="lazy"
-                        className="max-h-full max-w-full rounded-lg object-contain"
+                        decoding="async"
+                        className="block max-h-full max-w-full rounded-lg object-contain"
                       />
                     ) : (
                       <FiImage size={34} className="text-gray-300" />
                     )}
 
                     {productDiscount > 0 && (
-                      <span className="absolute left-2 top-2 rounded-md bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
+                      <span className="absolute left-2 top-2 rounded-md bg-pink-600 px-2 py-1 text-[10px] font-bold text-white">
                         GIẢM {productDiscount}%
                       </span>
                     )}
@@ -728,7 +836,7 @@ const AdminProductsPage = () => {
                       <button
                         type="button"
                         onClick={() => openEditProduct(product)}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
                       >
                         <FiEdit2 size={13} />
                         Sửa
@@ -737,7 +845,7 @@ const AdminProductsPage = () => {
                       <button
                         type="button"
                         onClick={() => requestDeleteProduct(product)}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-red-100 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-red-100 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
                       >
                         <FiTrash2 size={13} />
                         Xóa
@@ -755,29 +863,55 @@ const AdminProductsPage = () => {
             </div>
           )}
 
-          {totalPages > 1 && (
-            <div className="mt-7 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                disabled={safePage === 1}
-                onClick={() => goToPage(safePage - 1)}
-                className="rounded-lg border border-gray-200 p-2 disabled:opacity-40"
-              >
-                <FiChevronLeft />
-              </button>
+          {totalProducts > 0 && (
+            <div className="mt-8 flex flex-col items-center gap-3 border-t border-gray-100 pt-6">
+              {totalPages > 1 && (
+                <nav
+                  className="flex items-center justify-center gap-2"
+                  aria-label="Phân trang quản lý sản phẩm"
+                >
+                  <button
+                    type="button"
+                    disabled={safePage === 1}
+                    onClick={() => goToPage(safePage - 1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Trang trước"
+                  >
+                    <FiChevronLeft />
+                  </button>
 
-              <span className="px-3 text-sm text-gray-600">
-                Trang {safePage} / {totalPages}
-              </span>
+                  {Array.from(
+                    {
+                      length: totalPages,
+                    },
+                    (_, index) => index + 1
+                  ).map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => goToPage(page)}
+                      aria-current={page === safePage ? "page" : undefined}
+                      className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition ${
+                        page === safePage
+                          ? "border-pink-600 bg-pink-600 text-white"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
 
-              <button
-                type="button"
-                disabled={safePage === totalPages}
-                onClick={() => goToPage(safePage + 1)}
-                className="rounded-lg border border-gray-200 p-2 disabled:opacity-40"
-              >
-                <FiChevronRight />
-              </button>
+                  <button
+                    type="button"
+                    disabled={safePage === totalPages}
+                    onClick={() => goToPage(safePage + 1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Trang sau"
+                  >
+                    <FiChevronRight />
+                  </button>
+                </nav>
+              )}
             </div>
           )}
         </section>
@@ -789,7 +923,7 @@ const AdminProductsPage = () => {
             onSubmit={saveProduct}
             className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
           >
-            <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5">
               <h2 className="text-xl font-bold text-gray-900">
                 {editingProduct ? "Sửa sản phẩm" : "Thêm sản phẩm"}
               </h2>
@@ -797,7 +931,8 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={closeProductModal}
-                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+                className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
@@ -805,12 +940,11 @@ const AdminProductsPage = () => {
 
             <div className="space-y-5 p-6">
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tên sản phẩm
                 </label>
 
                 <input
-                  name="name"
                   value={productForm.name}
                   onChange={(event) =>
                     setProductForm((current) => ({
@@ -825,7 +959,7 @@ const AdminProductsPage = () => {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold">
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
                     Giá
                   </label>
 
@@ -845,7 +979,7 @@ const AdminProductsPage = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold">
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
                     Giá cũ
                   </label>
 
@@ -865,7 +999,7 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Giảm {discount}%
                 </label>
 
@@ -877,7 +1011,7 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Danh mục
                 </label>
 
@@ -905,7 +1039,7 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tóm tắt
                 </label>
 
@@ -924,50 +1058,35 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="block text-sm font-semibold text-gray-700">
                   Hình ảnh
                 </label>
 
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700">
-                  <FiUpload />
-                  Chọn tệp
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) =>
-                      handleImage(
-                        event,
-                        (image) =>
-                          setProductForm((current) => ({
-                            ...current,
-                            image,
-                          })),
-                        {
-                          maxWidth: 1400,
-                          maxHeight: 1000,
-                          quality: 0.8,
-                        }
-                      )
-                    }
-                  />
-                </label>
+                <FilePicker
+                  id="product-image"
+                  selected={Boolean(productForm.image)}
+                  onChange={(event) =>
+                    handleImage(
+                      event,
+                      (image) =>
+                        setProductForm((current) => ({
+                          ...current,
+                          image,
+                        })),
+                      {
+                        maxWidth: 1400,
+                        maxHeight: 1000,
+                        quality: 0.8,
+                      }
+                    )
+                  }
+                />
 
-                <span className="ml-3 text-sm text-gray-500">
-                  {productForm.image
-                    ? "Đã chọn hình ảnh"
-                    : "Không có tệp nào được chọn"}
-                </span>
-
-                {productForm.image && (
-                  <div className="mt-4 flex h-36 w-48 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
-                    <img
-                      src={productForm.image}
-                      alt="Xem trước sản phẩm"
-                      className="max-h-full max-w-full rounded-lg object-contain"
-                    />
-                  </div>
-                )}
+                <ImagePreview
+                  src={productForm.image}
+                  alt="Xem trước sản phẩm"
+                  className="h-32 w-48"
+                />
               </div>
             </div>
 
@@ -975,14 +1094,14 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={closeProductModal}
-                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700"
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
               >
                 Hủy
               </button>
 
               <button
                 type="submit"
-                className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
               >
                 {editingProduct ? "Lưu thay đổi" : "Thêm sản phẩm"}
               </button>
@@ -998,14 +1117,15 @@ const AdminProductsPage = () => {
             className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-              <h2 className="text-xl font-bold">
+              <h2 className="text-xl font-bold text-gray-900">
                 {editingCategory ? "Sửa danh mục" : "Thêm danh mục"}
               </h2>
 
               <button
                 type="button"
                 onClick={closeCategoryModal}
-                className="rounded-full p-2 hover:bg-gray-100"
+                className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
@@ -1013,7 +1133,7 @@ const AdminProductsPage = () => {
 
             <div className="space-y-5 p-6">
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tên danh mục
                 </label>
 
@@ -1031,7 +1151,7 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tóm tắt
                 </label>
 
@@ -1049,53 +1169,38 @@ const AdminProductsPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="block text-sm font-semibold text-gray-700">
                   Hình ảnh danh mục
                 </label>
 
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700">
-                  <FiUpload />
-                  Chọn tệp
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) =>
-                      handleImage(
-                        event,
-                        (image) =>
-                          setCategoryForm((current) => ({
-                            ...current,
-                            image,
-                          })),
-                        {
-                          maxWidth: 1000,
-                          maxHeight: 700,
-                          quality: 0.78,
-                        }
-                      )
-                    }
-                  />
-                </label>
+                <FilePicker
+                  id="category-image"
+                  selected={Boolean(categoryForm.image)}
+                  onChange={(event) =>
+                    handleImage(
+                      event,
+                      (image) =>
+                        setCategoryForm((current) => ({
+                          ...current,
+                          image,
+                        })),
+                      {
+                        maxWidth: 1000,
+                        maxHeight: 700,
+                        quality: 0.78,
+                      }
+                    )
+                  }
+                />
 
-                <span className="ml-3 text-sm text-gray-500">
-                  {categoryForm.image
-                    ? "Đã chọn hình ảnh"
-                    : "Không có tệp nào được chọn"}
-                </span>
-
-                {categoryForm.image && (
-                  <div className="mt-4 flex h-28 w-40 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
-                    <img
-                      src={categoryForm.image}
-                      alt="Xem trước danh mục"
-                      className="max-h-full max-w-full rounded-lg object-contain"
-                    />
-                  </div>
-                )}
+                <ImagePreview
+                  src={categoryForm.image}
+                  alt="Xem trước danh mục"
+                  className="h-28 w-40"
+                />
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
                   checked={categoryForm.active}
@@ -1114,14 +1219,14 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={closeCategoryModal}
-                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold"
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700"
               >
                 Hủy
               </button>
 
               <button
                 type="submit"
-                className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white"
+                className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
               >
                 Lưu danh mục
               </button>
@@ -1131,22 +1236,27 @@ const AdminProductsPage = () => {
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="delete-product-title"
             className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
           >
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
               <FiTrash2 />
             </div>
 
-            <h2 className="mt-4 text-center text-lg font-bold text-gray-900">
+            <h2
+              id="delete-product-title"
+              className="mt-4 text-center text-lg font-bold text-gray-900"
+            >
               Xác nhận xóa
             </h2>
 
             <p className="mt-3 text-center text-sm leading-6 text-gray-600">
-              Bạn có chắc muốn xóa <strong>{confirmDelete.name}</strong>?
+              Bạn có chắc muốn xóa <strong>{confirmDelete.name}</strong>
+              ?
               <br />
               Thao tác này không thể hoàn tác.
             </p>
@@ -1155,7 +1265,7 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700"
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
               >
                 Hủy
               </button>
@@ -1163,7 +1273,7 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={executeDelete}
-                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
               >
                 Xóa
               </button>
