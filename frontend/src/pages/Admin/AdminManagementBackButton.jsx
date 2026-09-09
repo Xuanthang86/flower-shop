@@ -1,5 +1,4 @@
 import { FiArrowLeft } from "react-icons/fi";
-
 import { useNavigate } from "react-router-dom";
 
 const AdminManagementBackButton = () => {
@@ -9,10 +8,34 @@ const AdminManagementBackButton = () => {
     <button
       type="button"
       onClick={() => navigate("/admin")}
-      className="mb-6 inline-flex items-center gap-2 rounded-xl bg-transparent px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-none transition hover:bg-pink-50 hover:text-pink-600"
+      className="
+        mb-3
+        inline-flex
+        items-center
+        gap-2
+        rounded-xl
+        border
+        border-gray-200
+        bg-transparent
+        px-4
+        py-2.5
+        text-sm
+        font-semibold
+        text-gray-700
+        shadow-none
+        transition-all
+        duration-200
+        hover:border-gray-300
+        hover:bg-gray-50
+        hover:text-gray-900
+        focus:outline-none
+        focus:ring-2
+        focus:ring-gray-200
+        focus:ring-offset-0
+      "
     >
       <FiArrowLeft size={17} />
-      Quay lại Khu vực quản lý
+      <span>Quay lại Khu vực quản lý</span>
     </button>
   );
 };
