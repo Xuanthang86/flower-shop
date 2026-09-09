@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-
 import { Link, NavLink } from "react-router-dom";
-
 import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
 
 import HeaderIcons from "./HeaderIcons";
@@ -83,7 +81,6 @@ const Header = () => {
 
   const closeAll = () => {
     setDesktopProductsOpen(false);
-
     closeMobile();
   };
 
@@ -93,7 +90,7 @@ const Header = () => {
         <div className="flex min-h-[72px] items-center gap-4">
           <Logo settings={settings} onClick={closeAll} />
 
-          <nav className="ml-4 hidden items-center gap-6 lg:flex">
+          <nav className="ml-[clamp(2rem,4vw,5rem)] hidden items-center gap-6 lg:flex">
             <NavLink
               to="/"
               className={navClass}
@@ -108,10 +105,7 @@ const Header = () => {
               <button
                 type="button"
                 onClick={() => setDesktopProductsOpen((value) => !value)}
-                className="flex items-center gap-1 py-2 font-semibold text-gray-700 transition-colors hover:text-pink-600"
-                style={{
-                  fontSize: "var(--fs-header-font-size)",
-                }}
+                className="flex items-center gap-1 py-2 font-semibold text-gray-700 hover:text-pink-600"
               >
                 Sản phẩm
                 <FiChevronDown
@@ -129,7 +123,7 @@ const Header = () => {
                   <Link
                     to="/products"
                     onClick={() => setDesktopProductsOpen(false)}
-                    className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-pink-50 hover:text-pink-600"
+                    className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-gray-800 hover:bg-pink-50 hover:text-pink-600"
                   >
                     Tất cả sản phẩm
                   </Link>
@@ -141,7 +135,7 @@ const Header = () => {
                         category.slug
                       )}`}
                       onClick={() => setDesktopProductsOpen(false)}
-                      className="block rounded-lg px-3 py-2.5 text-sm text-gray-600 transition hover:bg-pink-50 hover:text-pink-600"
+                      className="block rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-pink-50 hover:text-pink-600"
                     >
                       {category.name}
                     </Link>
@@ -150,23 +144,11 @@ const Header = () => {
               )}
             </div>
 
-            <NavLink
-              to="/blog"
-              className={navClass}
-              style={{
-                fontSize: "var(--fs-header-font-size)",
-              }}
-            >
+            <NavLink to="/blog" className={navClass}>
               Bài viết
             </NavLink>
 
-            <NavLink
-              to="/contact"
-              className={navClass}
-              style={{
-                fontSize: "var(--fs-header-font-size)",
-              }}
-            >
+            <NavLink to="/contact" className={navClass}>
               Liên hệ
             </NavLink>
           </nav>
@@ -184,7 +166,7 @@ const Header = () => {
           <button
             type="button"
             onClick={() => setMobileOpen((value) => !value)}
-            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 transition hover:bg-pink-50 hover:text-pink-600 lg:hidden"
+            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 hover:bg-pink-50 hover:text-pink-600 lg:hidden"
             aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
           >
             {mobileOpen ? <FiX size={23} /> : <FiMenu size={23} />}
@@ -208,14 +190,8 @@ const Header = () => {
                 className="flex w-full items-center justify-between py-2 font-semibold text-gray-700"
               >
                 <span>Sản phẩm</span>
-
                 <FiChevronDown
-                  size={16}
-                  className={
-                    mobileProductsOpen
-                      ? "rotate-180 transition-transform"
-                      : "transition-transform"
-                  }
+                  className={mobileProductsOpen ? "rotate-180" : ""}
                 />
               </button>
 
@@ -224,7 +200,7 @@ const Header = () => {
                   <Link
                     to="/products"
                     onClick={closeMobile}
-                    className="block py-2 font-semibold text-gray-700"
+                    className="block py-2 font-semibold"
                   >
                     Tất cả sản phẩm
                   </Link>

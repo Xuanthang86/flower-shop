@@ -1,32 +1,23 @@
-/*
-============================================================
-FLOWER SHOP — MAIN LAYOUT
-============================================================
-
-CẤU TRÚC HEADER:
-
-AnnouncementBar
-      ↓
-Header
-      ↓
-Page Content
-      ↓
-Footer
-
-AnnouncementBar được đặt ngoài Header để tránh việc
-Header tự quản lý nhiều nguồn dữ liệu giao diện.
-============================================================
-*/
-
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 
 import AnnouncementBar from "@/components/layout/AnnouncementBar";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
+import { startSharedDataSync } from "@/services/sharedDataSync";
+
 const MainLayout = () => {
+  useEffect(() => {
+    const stop = startSharedDataSync();
+
+    return () => {
+      stop?.();
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col">
       <AnnouncementBar />
 
       <Header />

@@ -43,7 +43,6 @@ const LoadingPage = ({ text }) => (
   <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
     <div className="text-center">
       <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-pink-200 border-t-pink-600" />
-
       <p className="text-sm text-gray-500">{text}</p>
     </div>
   </div>
@@ -52,9 +51,7 @@ const LoadingPage = ({ text }) => (
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return <LoadingPage text="Đang kiểm tra tài khoản..." />;
-  }
+  if (loading) return <LoadingPage text="Đang kiểm tra tài khoản..." />;
 
   if (!user || user.disabled) {
     return <Navigate to="/login" replace />;
@@ -123,14 +120,18 @@ const AdminEntry = () => {
   return <AdminManagementPage />;
 };
 
+/*
+ * Không đặt nền riêng cho vùng chứa nút quay lại.
+ * Các trang con tự quản lý nền của mình.
+ */
 const AdminSubPage = ({ children }) => (
-  <>
-    <div className="mx-auto max-w-7xl bg-gray-50 px-4 pt-6">
+  <div className="px-4 pt-3">
+    <div className="mx-auto max-w-7xl">
       <AdminManagementBackButton />
     </div>
 
     {children}
-  </>
+  </div>
 );
 
 const AppRoutes = () => (
@@ -236,8 +237,7 @@ const AppRoutes = () => (
           }
         />
 
-        {/* Không bọc AdminSubPage tại đây.
-            AdminOrderDetailPage đã có nút quay lại riêng. */}
+        {/* AdminOrderDetailPage đã có nút quay lại riêng. */}
         <Route
           path="/admin/orders/:orderId"
           element={

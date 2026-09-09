@@ -9,7 +9,7 @@ const AdminManagementBackButton = () => {
       type="button"
       onClick={() => navigate("/admin")}
       className="
-        mb-3
+        mb-2
         inline-flex
         items-center
         gap-2
@@ -31,7 +31,6 @@ const AdminManagementBackButton = () => {
         focus:outline-none
         focus:ring-2
         focus:ring-gray-200
-        focus:ring-offset-0
       "
     >
       <FiArrowLeft size={17} />
