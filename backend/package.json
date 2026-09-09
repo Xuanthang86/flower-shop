@@ -1,12 +1,18 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Flower Shop shared data and media backend",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "flower-shop",
+    "express",
+    "mongodb",
+    "cloudinary"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
