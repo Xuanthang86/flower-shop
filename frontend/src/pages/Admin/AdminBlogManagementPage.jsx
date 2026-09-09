@@ -10,7 +10,6 @@ import {
   FiItalic,
   FiLink,
   FiList,
-  FiRedo,
   FiSave,
   FiTrash2,
   FiUnderline,
@@ -486,7 +485,15 @@ const AdminBlogManagementPage = () => {
                         <span className="text-xs font-bold">1.</span>,
                       ],
                       ["undo", <FiUndo />],
-                      ["redo", <FiRedo />],
+                      [
+                        "redo",
+                        <span
+                          className="text-lg leading-none"
+                          aria-hidden="true"
+                        >
+                          ↷
+                        </span>,
+                      ],
                     ].map(([command, icon]) => (
                       <button
                         key={command}
