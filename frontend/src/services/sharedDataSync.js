@@ -2,6 +2,8 @@ import {
   PRODUCT_STORAGE_KEY,
   PRODUCT_UPDATED_EVENT,
   readProducts,
+  CATEGORY_UPDATED_EVENT,
+  readCategories,
 } from "@/services/catalog";
 
 import {
@@ -12,14 +14,13 @@ import {
 
 import { PRODUCT_CATEGORIES_STORAGE_KEY } from "@/constants/productCategories";
 
-import { CATEGORY_UPDATED_EVENT, readCategories } from "@/services/catalog";
-
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 let started = false;
 let applyingRemote = false;
-let timer = null;
+let pushTimer = null;
+let refreshTimer = null;
 
 const dispatch = (eventName) => {
   window.dispatchEvent(new Event(eventName));
@@ -55,7 +56,7 @@ const applySnapshot = (snapshot) => {
       dispatch(CATEGORY_UPDATED_EVENT);
     }
 
-    if (snapshot.settings) {
+    if (snapshot.settings && typeof snapshot.settings === "object") {
       localStorage.setItem(
         SITE_SETTINGS_STORAGE_KEY,
         JSON.stringify(snapshot.settings)
@@ -94,7 +95,11 @@ const pushSnapshot = async () => {
   });
 
   if (!response.ok) {
-    throw new Error("Không thể đồng bộ dữ liệu với máy chủ.");
+    const payload = await response.json().catch(() => ({}));
+
+    throw new Error(
+      payload.message || "Không thể đồng bộ dữ liệu với máy chủ."
+    );
   }
 };
 
@@ -104,7 +109,10 @@ const pullSnapshot = async () => {
 
     if (payload?.initialized && payload?.snapshot) {
       applySnapshot(payload.snapshot);
-    } else if (!payload?.initialized) {
+      return;
+    }
+
+    if (!payload?.initialized) {
       await pushSnapshot();
     }
   } catch (error) {
@@ -115,45 +123,46 @@ const pullSnapshot = async () => {
 const schedulePush = () => {
   if (applyingRemote) return;
 
-  window.clearTimeout(timer);
+  window.clearTimeout(pushTimer);
 
-  timer = window.setTimeout(() => {
+  pushTimer = window.setTimeout(() => {
     pushSnapshot().catch((error) =>
       console.warn("Shared data push:", error.message)
     );
-  }, 600);
+  }, 700);
 };
 
 export const startSharedDataSync = () => {
-  if (started) return () => {};
+  if (started) {
+    return () => {};
+  }
 
   started = true;
 
   pullSnapshot();
 
-  const refreshInterval = window.setInterval(pullSnapshot, 5000);
+  refreshTimer = window.setInterval(pullSnapshot, 5000);
 
-  const handleProducts = () => schedulePush();
+  const handleChange = () => {
+    schedulePush();
+  };
 
-  const handleCategories = () => schedulePush();
+  window.addEventListener(PRODUCT_UPDATED_EVENT, handleChange);
 
-  const handleSettings = () => schedulePush();
+  window.addEventListener(CATEGORY_UPDATED_EVENT, handleChange);
 
-  window.addEventListener(PRODUCT_UPDATED_EVENT, handleProducts);
-
-  window.addEventListener(CATEGORY_UPDATED_EVENT, handleCategories);
-
-  window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, handleSettings);
+  window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, handleChange);
 
   return () => {
-    window.clearInterval(refreshInterval);
-    window.clearTimeout(timer);
+    window.clearInterval(refreshTimer);
 
-    window.removeEventListener(PRODUCT_UPDATED_EVENT, handleProducts);
+    window.clearTimeout(pushTimer);
 
-    window.removeEventListener(CATEGORY_UPDATED_EVENT, handleCategories);
+    window.removeEventListener(PRODUCT_UPDATED_EVENT, handleChange);
 
-    window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, handleSettings);
+    window.removeEventListener(CATEGORY_UPDATED_EVENT, handleChange);
+
+    window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, handleChange);
 
     started = false;
   };

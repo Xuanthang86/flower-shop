@@ -1,3 +1,4 @@
+import { uploadImageFile } from "@/services/media";
 import { useEffect, useState } from "react";
 
 import {
@@ -320,9 +321,10 @@ const AdminAppearancePage = () => {
     clearMessages();
 
     try {
-      const logo = await compressImage(file, {
-        maxWidth: 900,
-        maxHeight: 300,
+      const logo = await uploadImageFile(file, {
+        folder: "flower-shop/branding",
+        maxWidth: 1200,
+        maxHeight: 500,
         quality: 0.84,
       });
 
@@ -335,7 +337,9 @@ const AdminAppearancePage = () => {
         },
       }));
 
-      setMessage("Đã tải Logo. Hãy bấm Lưu toàn bộ thay đổi để áp dụng.");
+      setMessage(
+        "Đã tải Logo lên kho ảnh dùng chung. Hãy bấm Lưu toàn bộ thay đổi để áp dụng."
+      );
     } catch (uploadError) {
       console.error(uploadError);
 

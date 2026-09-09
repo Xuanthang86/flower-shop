@@ -34,6 +34,7 @@ import AdminProductsPage from "@/pages/Admin/AdminProductsPage";
 import AdminAppearancePage from "@/pages/Admin/AdminAppearancePage";
 import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
 import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
+import AdminContactManagementPage from "@/pages/Admin/AdminContactManagementPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
@@ -51,7 +52,9 @@ const LoadingPage = ({ text }) => (
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
-  if (loading) return <LoadingPage text="Đang kiểm tra tài khoản..." />;
+  if (loading) {
+    return <LoadingPage text="Đang kiểm tra tài khoản..." />;
+  }
 
   if (!user || user.disabled) {
     return <Navigate to="/login" replace />;
@@ -120,12 +123,8 @@ const AdminEntry = () => {
   return <AdminManagementPage />;
 };
 
-/*
- * Không đặt nền riêng cho vùng chứa nút quay lại.
- * Các trang con tự quản lý nền của mình.
- */
 const AdminSubPage = ({ children }) => (
-  <div className="px-4 pt-3">
+  <div className="min-h-full bg-gray-50 px-4 pt-3">
     <div className="mx-auto max-w-7xl">
       <AdminManagementBackButton />
     </div>
@@ -237,7 +236,6 @@ const AppRoutes = () => (
           }
         />
 
-        {/* AdminOrderDetailPage đã có nút quay lại riêng. */}
         <Route
           path="/admin/orders/:orderId"
           element={
@@ -297,6 +295,17 @@ const AppRoutes = () => (
             <AdminOnlyRoute>
               <AdminSubPage>
                 <AdminAppearancePage />
+              </AdminSubPage>
+            </AdminOnlyRoute>
+          }
+        />
+
+        <Route
+          path="/admin/contact"
+          element={
+            <AdminOnlyRoute>
+              <AdminSubPage>
+                <AdminContactManagementPage />
               </AdminSubPage>
             </AdminOnlyRoute>
           }

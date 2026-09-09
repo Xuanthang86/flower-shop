@@ -13,7 +13,6 @@ import {
   FiSave,
   FiTrash2,
   FiUnderline,
-  FiUndo,
   FiX,
 } from "react-icons/fi";
 
@@ -130,6 +129,7 @@ const AdminBlogManagementPage = () => {
   const closeEditor = () => {
     setEditorOpen(false);
     setEditingPost(null);
+
     setForm({
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
@@ -179,6 +179,9 @@ const AdminBlogManagementPage = () => {
     try {
       const image = await uploadImageFile(file, {
         folder: "flower-shop/blog",
+        maxWidth: 1400,
+        maxHeight: 900,
+        quality: 0.82,
       });
 
       setForm((current) => ({
@@ -205,6 +208,9 @@ const AdminBlogManagementPage = () => {
     try {
       const image = await uploadImageFile(file, {
         folder: "flower-shop/blog/content",
+        maxWidth: 1400,
+        maxHeight: 1000,
+        quality: 0.82,
       });
 
       if (!editorRef.current) {
@@ -301,6 +307,24 @@ const AdminBlogManagementPage = () => {
 
   const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
 
+  const toolbar = [
+    ["bold", <FiBold />, "In đậm"],
+    ["italic", <FiItalic />, "In nghiêng"],
+    ["underline", <FiUnderline />, "Gạch chân"],
+    ["justifyLeft", <FiAlignLeft />, "Căn trái"],
+    ["justifyCenter", <FiAlignCenter />, "Căn giữa"],
+    ["justifyRight", <FiAlignRight />, "Căn phải"],
+    ["justifyFull", <FiAlignJustify />, "Căn đều"],
+    ["insertUnorderedList", <FiList />, "Danh sách"],
+    [
+      "insertOrderedList",
+      <span className="text-xs font-bold">1.</span>,
+      "Danh sách số",
+    ],
+    ["undo", <span className="text-lg leading-none">↶</span>, "Hoàn tác"],
+    ["redo", <span className="text-lg leading-none">↷</span>, "Làm lại"],
+  ];
+
   return (
     <main className="min-h-screen bg-gray-50 py-6">
       <div className="mx-auto max-w-7xl px-4">
@@ -325,10 +349,14 @@ const AdminBlogManagementPage = () => {
         </header>
 
         {(message || error) && (
-          <div className="mb-5 rounded-xl border bg-white p-4 text-sm shadow-sm">
-            <span className={error ? "text-red-600" : "text-green-600"}>
-              {error || message}
-            </span>
+          <div
+            className={`mb-5 rounded-xl border bg-white p-4 text-sm shadow-sm ${
+              error
+                ? "border-red-100 text-red-600"
+                : "border-green-100 text-green-600"
+            }`}
+          >
+            {error || message}
           </div>
         )}
 
@@ -338,12 +366,13 @@ const AdminBlogManagementPage = () => {
               key={post.id}
               className="overflow-hidden rounded-2xl bg-white shadow-sm"
             >
-              <div className="flex h-44 items-center justify-center overflow-hidden bg-gray-50 p-3">
+              <div className="flex h-36 items-center justify-center overflow-hidden bg-gray-50 p-3">
                 {post.image ? (
                   <img
                     src={post.image}
                     alt={post.title}
                     loading="lazy"
+                    decoding="async"
                     className="max-h-full max-w-full rounded-xl object-contain"
                   />
                 ) : (
@@ -459,7 +488,7 @@ const AdminBlogManagementPage = () => {
                   />
 
                   {form.image && (
-                    <div className="mt-4 flex h-36 w-52 items-center justify-center overflow-hidden rounded-xl border bg-gray-50 p-2">
+                    <div className="mt-4 flex h-28 w-44 items-center justify-center overflow-hidden rounded-xl border bg-gray-50 p-2">
                       <img
                         src={form.image}
                         alt="Xem trước ảnh đại diện"
@@ -470,37 +499,15 @@ const AdminBlogManagementPage = () => {
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-gray-200">
-                  <div className="flex flex-wrap gap-1 border-b bg-gray-50 p-2">
-                    {[
-                      ["bold", <FiBold />],
-                      ["italic", <FiItalic />],
-                      ["underline", <FiUnderline />],
-                      ["justifyLeft", <FiAlignLeft />],
-                      ["justifyCenter", <FiAlignCenter />],
-                      ["justifyRight", <FiAlignRight />],
-                      ["justifyFull", <FiAlignJustify />],
-                      ["insertUnorderedList", <FiList />],
-                      [
-                        "insertOrderedList",
-                        <span className="text-xs font-bold">1.</span>,
-                      ],
-                      ["undo", <FiUndo />],
-                      [
-                        "redo",
-                        <span
-                          className="text-lg leading-none"
-                          aria-hidden="true"
-                        >
-                          ↷
-                        </span>,
-                      ],
-                    ].map(([command, icon]) => (
+                  <div className="flex flex-wrap items-center gap-1 border-b bg-gray-50 p-2">
+                    {toolbar.map(([command, icon, title]) => (
                       <button
                         key={command}
                         type="button"
                         onClick={() => executeFormat(command)}
                         className="rounded-lg p-2.5 hover:bg-white"
-                        title={command}
+                        title={title}
+                        aria-label={title}
                       >
                         {icon}
                       </button>
@@ -559,7 +566,7 @@ const AdminBlogManagementPage = () => {
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
-                    className="min-h-[320px] p-5 text-sm leading-7 text-gray-700 outline-none"
+                    className="min-h-[320px] p-5 text-sm leading-7 text-gray-700 outline-none [&_img]:mx-auto [&_img]:my-4 [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-xl"
                     style={{
                       whiteSpace: "pre-wrap",
                     }}
@@ -578,7 +585,8 @@ const AdminBlogManagementPage = () => {
                   <button
                     type="button"
                     onClick={savePost}
-                    className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-5 py-2.5 font-semibold text-white hover:bg-pink-700"
+                    disabled={uploading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-5 py-2.5 font-semibold text-white hover:bg-pink-700 disabled:opacity-50"
                   >
                     <FiSave />
                     Lưu bài viết

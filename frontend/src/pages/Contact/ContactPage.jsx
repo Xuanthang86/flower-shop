@@ -11,6 +11,19 @@ const ContactPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   useEffect(() => {
+    document.title = "Liên hệ | Flower Shop";
+
+    let description = document.querySelector('meta[name="description"]');
+
+    if (!description) {
+      description = document.createElement("meta");
+      description.name = "description";
+      document.head.appendChild(description);
+    }
+
+    description.content =
+      "Liên hệ Flower Shop để được tư vấn hoa tươi, đặt hoa và hỗ trợ giao hoa.";
+
     const refresh = () => {
       setSettings(readSiteSettings());
     };
@@ -33,28 +46,32 @@ const ContactPage = () => {
       label: "Điện thoại",
       value: contact.phone,
       icon: FiPhone,
+      href: contact.phone ? `tel:${contact.phone.replace(/\s+/g, "")}` : "",
     },
     {
       label: "Email",
       value: contact.email,
       icon: FiMail,
+      href: contact.email ? `mailto:${contact.email}` : "",
     },
     {
       label: "Địa chỉ",
       value: contact.address,
       icon: FiMapPin,
+      href: "",
     },
     {
       label: "Thời gian làm việc",
       value: contact.workingHours,
       icon: FiClock,
+      href: "",
     },
   ].filter((item) => item.value);
 
   return (
-    <section className="min-h-screen bg-gray-50 py-10 md:py-14">
+    <main className="min-h-screen bg-gray-50 py-10 md:py-14">
       <div className="mx-auto max-w-5xl px-4">
-        <div className="mb-8 text-center">
+        <header className="mb-8 text-center">
           <span className="inline-flex rounded-full bg-pink-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-pink-600">
             Flower Shop
           </span>
@@ -67,12 +84,19 @@ const ContactPage = () => {
             {contact.description ||
               "Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp."}
           </p>
-        </div>
+        </header>
 
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
+        <section
+          aria-labelledby="contact-information"
+          className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7"
+        >
+          <h2 id="contact-information" className="sr-only">
+            Thông tin liên hệ Flower Shop
+          </h2>
+
           {items.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2">
-              {items.map(({ label, value, icon: Icon }) => (
+              {items.map(({ label, value, icon: Icon, href }) => (
                 <div
                   key={label}
                   className="flex items-start gap-4 rounded-xl border border-gray-100 bg-gray-50 p-5 transition hover:border-pink-100 hover:bg-white hover:shadow-sm"
@@ -86,9 +110,18 @@ const ContactPage = () => {
                       {label}
                     </p>
 
-                    <p className="mt-1 break-words font-semibold leading-6 text-gray-800">
-                      {value}
-                    </p>
+                    {href ? (
+                      <a
+                        href={href}
+                        className="mt-1 block break-words font-semibold leading-6 text-gray-800 hover:text-pink-600"
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      <p className="mt-1 break-words font-semibold leading-6 text-gray-800">
+                        {value}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -98,9 +131,9 @@ const ContactPage = () => {
               Thông tin liên hệ đang được cập nhật.
             </div>
           )}
-        </div>
+        </section>
       </div>
-    </section>
+    </main>
   );
 };
 
