@@ -27,6 +27,7 @@ import { uploadImageFile } from "@/services/media";
 const EMPTY_POST = {
   title: "",
   date: new Date().toISOString().slice(0, 10),
+  time: new Date().toTimeString().slice(0, 5),
   image: "",
   content: "",
 };
@@ -46,16 +47,13 @@ const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [editorOpen, setEditorOpen] = useState(false);
-
   const [editingPost, setEditingPost] = useState(null);
-
   const [form, setForm] = useState(EMPTY_POST);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const [confirmDelete, setConfirmDelete] = useState(null);
-
   const [uploading, setUploading] = useState(false);
 
   const editorRef = useRef(null);
@@ -89,8 +87,9 @@ const AdminBlogManagementPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!editorOpen) return;
-    if (!editorRef.current) return;
+    if (!editorOpen || !editorRef.current) {
+      return;
+    }
 
     editorRef.current.innerHTML = form.content || "";
   }, [editorOpen, editingPost]);
@@ -107,6 +106,7 @@ const AdminBlogManagementPage = () => {
     setForm({
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 5),
     });
 
     setEditorOpen(true);
@@ -119,6 +119,7 @@ const AdminBlogManagementPage = () => {
     setForm({
       title: post.title || "",
       date: post.date || new Date().toISOString().slice(0, 10),
+      time: post.time || "08:00",
       image: post.image || "",
       content: post.content || "",
     });
@@ -129,11 +130,7 @@ const AdminBlogManagementPage = () => {
   const closeEditor = () => {
     setEditorOpen(false);
     setEditingPost(null);
-
-    setForm({
-      ...EMPTY_POST,
-      date: new Date().toISOString().slice(0, 10),
-    });
+    setForm(EMPTY_POST);
   };
 
   const executeFormat = (command, value = null) => {
@@ -158,11 +155,9 @@ const AdminBlogManagementPage = () => {
   };
 
   const handleEditorInput = (event) => {
-    const html = event.currentTarget?.innerHTML || "";
-
     setForm((current) => ({
       ...current,
-      content: html,
+      content: event.currentTarget?.innerHTML || "",
     }));
   };
 
@@ -256,6 +251,7 @@ const AdminBlogManagementPage = () => {
         `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
       date: form.date,
+      time: form.time || "08:00",
       image: form.image || "",
       content,
       updatedAt: new Date().toISOString(),
@@ -342,7 +338,7 @@ const AdminBlogManagementPage = () => {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700"
+            className="inline-flex items-center justify-center rounded-xl bg-pink-600 px-5 py-3 font-semibold text-white hover:bg-pink-700"
           >
             Thêm bài viết
           </button>
@@ -373,7 +369,7 @@ const AdminBlogManagementPage = () => {
                     alt={post.title}
                     loading="lazy"
                     decoding="async"
-                    className="max-h-full max-w-full rounded-xl object-contain"
+                    className="max-h-full max-w-full rounded-lg object-contain"
                   />
                 ) : (
                   <FiImage size={34} className="text-gray-300" />
@@ -385,7 +381,9 @@ const AdminBlogManagementPage = () => {
                   {post.title}
                 </h2>
 
-                <p className="mt-1 text-xs text-gray-400">{post.date}</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {post.date || "—"} {post.time || "08:00"}
+                </p>
 
                 <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
                   {stripHtml(post.content) || "Nội dung đang được cập nhật."}
@@ -417,7 +415,7 @@ const AdminBlogManagementPage = () => {
       {editorOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
           <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <header className="flex items-center justify-between border-b px-6 py-5">
+            <header className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
               <h2 className="text-xl font-bold">
                 {editingPost ? "Chỉnh sửa bài viết" : "Thêm bài viết"}
               </h2>
@@ -445,17 +443,43 @@ const AdminBlogManagementPage = () => {
                   className={inputClass}
                 />
 
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      date: event.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Ngày đăng
+                    </label>
+
+                    <input
+                      type="date"
+                      value={form.date}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          date: event.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Giờ đăng
+                    </label>
+
+                    <input
+                      type="time"
+                      value={form.time}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          time: event.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-semibold">
@@ -488,18 +512,18 @@ const AdminBlogManagementPage = () => {
                   />
 
                   {form.image && (
-                    <div className="mt-4 flex h-28 w-44 items-center justify-center overflow-hidden rounded-xl border bg-gray-50 p-2">
+                    <div className="mt-4 flex h-24 w-36 items-center justify-center overflow-hidden rounded-lg bg-gray-50 p-2">
                       <img
                         src={form.image}
                         alt="Xem trước ảnh đại diện"
-                        className="max-h-full max-w-full rounded-lg object-contain"
+                        className="max-h-full max-w-full rounded-md object-contain"
                       />
                     </div>
                   )}
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-gray-200">
-                  <div className="flex flex-wrap items-center gap-1 border-b bg-gray-50 p-2">
+                <div className="overflow-hidden rounded-xl border border-gray-100">
+                  <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-gray-50 p-2">
                     {toolbar.map(([command, icon, title]) => (
                       <button
                         key={command}
@@ -566,7 +590,7 @@ const AdminBlogManagementPage = () => {
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
-                    className="min-h-[320px] p-5 text-sm leading-7 text-gray-700 outline-none [&_img]:mx-auto [&_img]:my-4 [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-xl"
+                    className="min-h-[320px] p-5 text-sm leading-7 text-gray-700 outline-none [&_img]:mx-auto [&_img]:my-4 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none"
                     style={{
                       whiteSpace: "pre-wrap",
                     }}

@@ -4,7 +4,10 @@ import {
   FiChevronDown,
   FiChevronLeft,
   FiChevronRight,
+  FiChevronUp,
   FiEdit2,
+  FiEye,
+  FiEyeOff,
   FiImage,
   FiPlus,
   FiSearch,
@@ -24,6 +27,8 @@ import {
 } from "@/services/catalog";
 
 import { slugifyCategory } from "@/constants/productCategories";
+
+import { uploadImageFile } from "@/services/media";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -65,64 +70,19 @@ const getDiscountPercent = (price, oldPrice) => {
   return Math.round(((old - current) / old) * 100);
 };
 
-const compressImage = (
-  file,
-  { maxWidth = 1400, maxHeight = 1000, quality = 0.8 } = {}
-) =>
-  new Promise((resolve, reject) => {
-    if (!file?.type?.startsWith("image/")) {
-      reject(new Error("Vui lòng chọn đúng file hình ảnh."));
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const image = new Image();
-
-      image.onload = () => {
-        const ratio = Math.min(
-          1,
-          maxWidth / image.width,
-          maxHeight / image.height
-        );
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = Math.max(1, Math.round(image.width * ratio));
-        canvas.height = Math.max(1, Math.round(image.height * ratio));
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-          reject(new Error("Không thể xử lý hình ảnh."));
-          return;
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        resolve(canvas.toDataURL("image/webp", quality));
-      };
-
-      image.onerror = () => reject(new Error("Không thể đọc hình ảnh."));
-
-      image.src = String(reader.result || "");
-    };
-
-    reader.onerror = () => reject(new Error("Không thể đọc file hình ảnh."));
-
-    reader.readAsDataURL(file);
-  });
-
-const FilePicker = ({ id, selected, onChange }) => (
+const FilePicker = ({ id, selected, disabled, onChange }) => (
   <div className="mt-2">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <label
         htmlFor={id}
-        className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
+        className={`inline-flex w-fit items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition ${
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : "cursor-pointer hover:bg-pink-700"
+        }`}
       >
         <FiUpload size={16} />
-        Chọn tệp
+        {disabled ? "Đang tải..." : "Chọn tệp"}
       </label>
 
       <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
@@ -135,6 +95,7 @@ const FilePicker = ({ id, selected, onChange }) => (
       type="file"
       accept="image/*"
       onChange={onChange}
+      disabled={disabled}
       className="sr-only"
     />
   </div>
@@ -161,6 +122,8 @@ const AdminProductsPage = () => {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     document.title = "Quản lý sản phẩm | Flower Shop";
@@ -302,20 +265,44 @@ const AdminProductsPage = () => {
     setCategoryForm(EMPTY_CATEGORY);
   };
 
-  const handleImage = async (event, setter, options) => {
+  const handleImageUpload = async (event, target) => {
     const file = event.target.files?.[0];
 
     event.target.value = "";
 
     if (!file) return;
 
+    setUploadingImage(true);
     clearMessages();
 
     try {
-      const image = await compressImage(file, options);
-      setter(image);
-    } catch (imageError) {
-      setError(imageError.message || "Không thể xử lý hình ảnh.");
+      const image = await uploadImageFile(file, {
+        folder:
+          target === "product"
+            ? "flower-shop/products"
+            : "flower-shop/categories",
+        maxWidth: target === "product" ? 1400 : 1100,
+        maxHeight: target === "product" ? 1000 : 800,
+        quality: 0.82,
+      });
+
+      if (target === "product") {
+        setProductForm((current) => ({
+          ...current,
+          image,
+        }));
+      } else {
+        setCategoryForm((current) => ({
+          ...current,
+          image,
+        }));
+      }
+
+      setMessage("Đã tải hình ảnh lên kho ảnh dùng chung.");
+    } catch (uploadError) {
+      setError(uploadError.message || "Không thể tải hình ảnh.");
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -379,6 +366,70 @@ const AdminProductsPage = () => {
       );
     } catch (saveError) {
       setError(saveError.message || "Không thể lưu danh mục.");
+    }
+  };
+
+  const moveCategory = (categoryId, direction) => {
+    const ordered = [...categoriesSorted];
+
+    const index = ordered.findIndex(
+      (category) => String(category.id) === String(categoryId)
+    );
+
+    if (index < 0) return;
+
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= ordered.length) {
+      return;
+    }
+
+    [ordered[index], ordered[targetIndex]] = [
+      ordered[targetIndex],
+      ordered[index],
+    ];
+
+    const normalized = ordered.map((category, itemIndex) => ({
+      ...category,
+      sortOrder: itemIndex + 1,
+    }));
+
+    try {
+      const saved = saveCategories(normalized);
+      setCategories(saved);
+      setMessage("Đã cập nhật thứ tự danh mục.");
+      setError("");
+    } catch (saveError) {
+      setError(saveError.message || "Không thể cập nhật thứ tự danh mục.");
+    }
+  };
+
+  const toggleCategory = (category) => {
+    try {
+      const saved = saveCategories(
+        categories.map((item) =>
+          String(item.id) === String(category.id)
+            ? {
+                ...item,
+                active: item.active === false,
+              }
+            : item
+        )
+      );
+
+      setCategories(saved);
+
+      setMessage(
+        category.active === false
+          ? `Đã hiển thị danh mục "${category.name}".`
+          : `Đã ẩn danh mục "${category.name}".`
+      );
+
+      setError("");
+    } catch (toggleError) {
+      setError(
+        toggleError.message || "Không thể cập nhật trạng thái danh mục."
+      );
     }
   };
 
@@ -510,7 +561,6 @@ const AdminProductsPage = () => {
         );
 
         setProducts(saved);
-
         setMessage("Đã xóa sản phẩm.");
       }
 
@@ -562,15 +612,15 @@ const AdminProductsPage = () => {
           </p>
         </header>
 
-        {message && (
-          <div className="mb-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {message}
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+        {(message || error) && (
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              error
+                ? "border-red-100 bg-red-50 text-red-700"
+                : "border-green-100 bg-green-50 text-green-700"
+            }`}
+          >
+            {error || message}
           </div>
         )}
 
@@ -613,33 +663,83 @@ const AdminProductsPage = () => {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {categoriesSorted.map((category) => (
+                {categoriesSorted.map((category, index) => (
                   <article
                     key={category.id}
-                    className="overflow-hidden rounded-xl border border-gray-200"
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="flex h-28 items-center justify-center bg-gray-50 p-3">
+                    <div className="flex h-36 items-center justify-center bg-gray-50 p-4">
                       {category.image ? (
                         <img
                           src={category.image}
                           alt={category.name}
+                          loading="lazy"
                           className="max-h-full max-w-full rounded-lg object-contain"
                         />
                       ) : (
-                        <FiImage size={30} className="text-gray-300" />
+                        <FiImage size={36} className="text-gray-300" />
                       )}
                     </div>
 
                     <div className="p-3">
-                      <h3 className="font-semibold text-gray-800">
-                        {category.name}
-                      </h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">
+                            {category.name}
+                          </h3>
+
+                          <p className="mt-1 text-[11px] font-medium text-gray-400">
+                            Thứ tự: {index + 1}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleCategory(category)}
+                          className={`rounded-lg border p-2 ${
+                            category.active !== false
+                              ? "border-green-100 text-green-600 hover:bg-green-50"
+                              : "border-gray-200 text-gray-400 hover:bg-gray-50"
+                          }`}
+                          title={
+                            category.active !== false
+                              ? "Ẩn danh mục"
+                              : "Hiện danh mục"
+                          }
+                        >
+                          {category.active !== false ? (
+                            <FiEye size={15} />
+                          ) : (
+                            <FiEyeOff size={15} />
+                          )}
+                        </button>
+                      </div>
 
                       <p className="mt-1 line-clamp-2 text-xs text-gray-500">
                         {category.summary || "Chưa có mô tả danh mục."}
                       </p>
 
                       <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => moveCategory(category.id, "up")}
+                          disabled={index === 0}
+                          className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
+                          title="Đưa lên"
+                        >
+                          <FiChevronUp size={15} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => moveCategory(category.id, "down")}
+                          disabled={index === categoriesSorted.length - 1}
+                          className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
+                          title="Đưa xuống"
+                        >
+                          <FiChevronDown size={15} />
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => openEditCategory(category)}
@@ -719,7 +819,7 @@ const AdminProductsPage = () => {
                   key={product.id}
                   className="group overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="relative flex h-36 items-center justify-center overflow-hidden bg-gray-50 p-3 sm:h-40">
+                  <div className="relative flex h-24 items-center justify-center overflow-hidden bg-gray-50 p-2 sm:h-28">
                     {product.image ? (
                       <img
                         src={product.image}
@@ -729,7 +829,7 @@ const AdminProductsPage = () => {
                         className="max-h-full max-w-full rounded-lg object-contain"
                       />
                     ) : (
-                      <FiImage size={32} className="text-gray-300" />
+                      <FiImage size={28} className="text-gray-300" />
                     )}
 
                     {discountPercent > 0 && (
@@ -866,6 +966,7 @@ const AdminProductsPage = () => {
                 <label className="mb-2 block text-sm font-semibold">
                   Tên sản phẩm
                 </label>
+
                 <input
                   value={productForm.name}
                   onChange={(event) =>
@@ -880,6 +981,7 @@ const AdminProductsPage = () => {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold">Giá</label>
+
                 <input
                   type="number"
                   min="0"
@@ -898,6 +1000,7 @@ const AdminProductsPage = () => {
                 <label className="mb-2 block text-sm font-semibold">
                   Giá cũ
                 </label>
+
                 <input
                   type="number"
                   min="0"
@@ -914,6 +1017,7 @@ const AdminProductsPage = () => {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold">Giảm</label>
+
                 <div className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-sm font-bold text-pink-600">
                   GIẢM {discount}%
                 </div>
@@ -923,6 +1027,7 @@ const AdminProductsPage = () => {
                 <label className="mb-2 block text-sm font-semibold">
                   Đã bán
                 </label>
+
                 <input
                   type="number"
                   min="0"
@@ -936,9 +1041,6 @@ const AdminProductsPage = () => {
                   }
                   className={inputClass}
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Đây là nơi Admin chỉnh sửa số lượng Đã bán.
-                </p>
               </div>
 
               <div className="sm:col-span-2">
@@ -992,25 +1094,12 @@ const AdminProductsPage = () => {
                 <FilePicker
                   id="product-image"
                   selected={Boolean(productForm.image)}
-                  onChange={(event) =>
-                    handleImage(
-                      event,
-                      (image) =>
-                        setProductForm((current) => ({
-                          ...current,
-                          image,
-                        })),
-                      {
-                        maxWidth: 1400,
-                        maxHeight: 1000,
-                        quality: 0.8,
-                      }
-                    )
-                  }
+                  disabled={uploadingImage}
+                  onChange={(event) => handleImageUpload(event, "product")}
                 />
 
                 {productForm.image && (
-                  <div className="mt-4 flex h-36 w-48 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
+                  <div className="mt-4 flex h-32 w-44 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
                     <img
                       src={productForm.image}
                       alt="Xem trước sản phẩm"
@@ -1032,7 +1121,8 @@ const AdminProductsPage = () => {
 
               <button
                 type="submit"
-                className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                disabled={uploadingImage}
+                className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-50"
               >
                 Lưu sản phẩm
               </button>
@@ -1090,21 +1180,8 @@ const AdminProductsPage = () => {
               <FilePicker
                 id="category-image"
                 selected={Boolean(categoryForm.image)}
-                onChange={(event) =>
-                  handleImage(
-                    event,
-                    (image) =>
-                      setCategoryForm((current) => ({
-                        ...current,
-                        image,
-                      })),
-                    {
-                      maxWidth: 1000,
-                      maxHeight: 700,
-                      quality: 0.8,
-                    }
-                  )
-                }
+                disabled={uploadingImage}
+                onChange={(event) => handleImageUpload(event, "category")}
               />
 
               {categoryForm.image && (
@@ -1116,6 +1193,21 @@ const AdminProductsPage = () => {
                   />
                 </div>
               )}
+
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={categoryForm.active !== false}
+                  onChange={(event) =>
+                    setCategoryForm((current) => ({
+                      ...current,
+                      active: event.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-pink-600"
+                />
+                Hiển thị danh mục
+              </label>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -1129,7 +1221,8 @@ const AdminProductsPage = () => {
 
               <button
                 type="submit"
-                className="rounded-lg bg-pink-600 px-5 py-2.5 font-semibold text-white"
+                disabled={uploadingImage}
+                className="rounded-lg bg-pink-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50"
               >
                 Lưu danh mục
               </button>

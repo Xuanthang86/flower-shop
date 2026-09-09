@@ -35,6 +35,7 @@ import AdminAppearancePage from "@/pages/Admin/AdminAppearancePage";
 import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
 import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
 import AdminContactManagementPage from "@/pages/Admin/AdminContactManagementPage";
+import AdminContentManagementPage from "@/pages/Admin/AdminContentManagementPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
@@ -124,12 +125,12 @@ const AdminEntry = () => {
 };
 
 const AdminSubPage = ({ children }) => (
-  <div className="min-h-full bg-gray-50 px-4 pt-3">
+  <div className="w-full bg-gray-50 px-4 pb-2 pt-2">
     <div className="mx-auto max-w-7xl">
       <AdminManagementBackButton />
     </div>
 
-    {children}
+    <div className="w-full">{children}</div>
   </div>
 );
 
@@ -306,6 +307,17 @@ const AppRoutes = () => (
             <AdminOnlyRoute>
               <AdminSubPage>
                 <AdminContactManagementPage />
+              </AdminSubPage>
+            </AdminOnlyRoute>
+          }
+        />
+
+        <Route
+          path="/admin/content"
+          element={
+            <AdminOnlyRoute>
+              <AdminSubPage>
+                <AdminContentManagementPage />
               </AdminSubPage>
             </AdminOnlyRoute>
           }

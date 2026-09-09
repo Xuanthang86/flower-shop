@@ -1,15 +1,3 @@
-/*
-============================================================
-FLOWER SHOP — HOME CATEGORIES
-============================================================
-
-- Dùng catalog.js.
-- Không dùng data danh mục thứ hai.
-- Nội dung tiêu đề lấy từ siteSettings.
-- Khoảng cách được thu gọn.
-============================================================
-*/
-
 import { useEffect, useState } from "react";
 
 import { Link } from "react-router-dom";
@@ -39,9 +27,7 @@ const Categories = () => {
       );
     };
 
-    const refreshSettings = () => {
-      setSettings(readSiteSettings());
-    };
+    const refreshSettings = () => setSettings(readSiteSettings());
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
@@ -67,7 +53,7 @@ const Categories = () => {
   }
 
   return (
-    <section className="home-section-tight bg-white">
+    <section className="home-section-tight bg-gray-50">
       <div className="mx-auto max-w-7xl px-4">
         <div className="mb-4 text-center">
           <h2 className="text-2xl font-bold text-gray-800 md:text-3xl">
@@ -93,6 +79,7 @@ const Categories = () => {
                       src={category.image}
                       alt={category.name}
                       loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (

@@ -1,6 +1,7 @@
 import {
   FiBox,
   FiImage,
+  FiLayout,
   FiMail,
   FiPackage,
   FiPenTool,
@@ -16,9 +17,7 @@ const AdminManagementPage = () => {
   const { user } = useAuth();
 
   const isAdmin = user?.role === ROLES.ADMIN;
-
   const isManager = user?.role === ROLES.MANAGER;
-
   const isProductManager = user?.role === ROLES.PRODUCT_MANAGER;
 
   const managementItems = [
@@ -34,6 +33,14 @@ const AdminManagementPage = () => {
       title: "Quản lý sản phẩm",
       description: "Thêm, sửa, xóa và quản lý danh mục sản phẩm.",
       icon: FiBox,
+    },
+
+    isAdmin && {
+      to: "/admin/content",
+      title: "Quản lý nội dung website",
+      description:
+        "Quản lý Logo, thanh thông báo và các nội dung hiển thị trên trang chủ.",
+      icon: FiLayout,
     },
 
     isAdmin && {
@@ -69,7 +76,7 @@ const AdminManagementPage = () => {
     <section className="min-h-[calc(100vh-76px)] bg-gray-50 py-10">
       <div className="mx-auto flex min-h-[calc(100vh-160px)] max-w-6xl items-center px-4">
         <div className="w-full">
-          <div className="mb-8 text-center">
+          <header className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-pink-100 text-pink-600">
               <FiPackage size={28} />
             </div>
@@ -81,7 +88,7 @@ const AdminManagementPage = () => {
             <p className="mx-auto mt-3 max-w-2xl text-gray-500">
               Chọn chức năng bạn muốn quản lý.
             </p>
-          </div>
+          </header>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {managementItems.map(({ to, title, description, icon: Icon }) => (

@@ -1,14 +1,6 @@
-import { uploadImageFile } from "@/services/media";
 import { useEffect, useState } from "react";
 
-import {
-  FiImage,
-  FiRotateCcw,
-  FiSave,
-  FiTrash2,
-  FiUpload,
-  FiX,
-} from "react-icons/fi";
+import { FiSave, FiRotateCcw } from "react-icons/fi";
 
 import { useTheme } from "@/context/ThemeProvider";
 
@@ -55,94 +47,6 @@ const inputClass =
 
 const isHex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value || ""));
 
-const compressImage = (
-  file,
-  { maxWidth = 900, maxHeight = 300, quality = 0.82 } = {}
-) =>
-  new Promise((resolve, reject) => {
-    if (!file?.type?.startsWith("image/")) {
-      reject(new Error("Vui lòng chọn đúng file hình ảnh."));
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const image = new Image();
-
-      image.onload = () => {
-        const ratio = Math.min(
-          1,
-          maxWidth / image.width,
-          maxHeight / image.height
-        );
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = Math.max(1, Math.round(image.width * ratio));
-
-        canvas.height = Math.max(1, Math.round(image.height * ratio));
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-          reject(new Error("Không thể xử lý hình ảnh."));
-          return;
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        resolve(canvas.toDataURL("image/webp", quality));
-      };
-
-      image.onerror = () => reject(new Error("Không thể đọc hình ảnh."));
-
-      image.src = String(reader.result || "");
-    };
-
-    reader.onerror = () => reject(new Error("Không thể đọc file."));
-
-    reader.readAsDataURL(file);
-  });
-
-const MessageModal = ({ message, error, onClose }) => {
-  if (!message && !error) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/25 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-        <div
-          className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full ${
-            error ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
-          }`}
-        >
-          {error ? <FiX /> : <FiSave />}
-        </div>
-
-        <p
-          className={`mt-4 text-center text-sm font-medium ${
-            error ? "text-red-700" : "text-gray-700"
-          }`}
-        >
-          {error || message}
-        </p>
-
-        <div className="mt-5 flex justify-center">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
-          >
-            Đóng
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AdminAppearancePage = () => {
   const { theme, updateTheme, resetTheme } = useTheme();
 
@@ -154,12 +58,7 @@ const AdminAppearancePage = () => {
   }));
 
   const [message, setMessage] = useState("");
-
   const [error, setError] = useState("");
-
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     document.title = "Tùy chỉnh giao diện | Flower Shop";
@@ -168,11 +67,11 @@ const AdminAppearancePage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-      robots.setAttribute("name", "robots");
+      robots.name = "robots";
       document.head.appendChild(robots);
     }
 
-    robots.setAttribute("content", "noindex,nofollow");
+    robots.content = "noindex,nofollow";
   }, []);
 
   useEffect(() => {
@@ -203,162 +102,43 @@ const AdminAppearancePage = () => {
     setError("");
   };
 
-  const updateSettings = (updater) => {
-    setSettings((current) =>
-      typeof updater === "function" ? updater(current) : updater
-    );
-
-    clearMessages();
-  };
-
   const updateHero = (field, value) => {
-    updateSettings((current) => ({
+    setSettings((current) => ({
       ...current,
       hero: {
         ...(current.hero || {}),
         [field]: value,
       },
     }));
-  };
 
-  const updateSections = (field, value) => {
-    updateSettings((current) => ({
-      ...current,
-      sections: {
-        ...(current.sections || {}),
-        [field]: value,
-      },
-    }));
-  };
-
-  const updateContact = (field, value) => {
-    updateSettings((current) => ({
-      ...current,
-      contact: {
-        ...(current.contact || {}),
-        [field]: value,
-      },
-    }));
-  };
-
-  const updateFooter = (field, value) => {
-    updateSettings((current) => ({
-      ...current,
-      footer: {
-        ...(current.footer || {}),
-        [field]: value,
-      },
-    }));
+    clearMessages();
   };
 
   const updateBlog = (field, value) => {
-    updateSettings((current) => ({
+    setSettings((current) => ({
       ...current,
       blog: {
         ...(current.blog || {}),
         [field]: value,
       },
     }));
-  };
 
-  const updateAnnouncement = (index, value) => {
-    updateSettings((current) => {
-      const messages = [...(current.announcementMessages || [])];
-
-      messages[index] = value;
-
-      return {
-        ...current,
-        announcementMessages: messages,
-      };
-    });
-  };
-
-  const addAnnouncement = () => {
-    updateSettings((current) => ({
-      ...current,
-      announcementMessages: [...(current.announcementMessages || []), ""],
-    }));
-  };
-
-  const requestRemoveAnnouncement = (index) => {
-    const messages = settings.announcementMessages || [];
-
-    setConfirmDelete({
-      type: "announcement",
-      index,
-      message: messages[index] || "thông báo này",
-    });
-  };
-
-  const removeAnnouncement = () => {
-    if (!confirmDelete || confirmDelete.type !== "announcement") {
-      return;
-    }
-
-    const index = confirmDelete.index;
-
-    setSettings((current) => ({
-      ...current,
-      announcementMessages: (current.announcementMessages || []).filter(
-        (_, itemIndex) => itemIndex !== index
-      ),
-    }));
-
-    setConfirmDelete(null);
-    setMessage("Đã xóa thông báo.");
-    setError("");
-  };
-
-  const handleLogoUpload = async (event) => {
-    const file = event.target.files?.[0];
-
-    event.target.value = "";
-
-    if (!file) return;
-
-    setUploadingLogo(true);
     clearMessages();
-
-    try {
-      const logo = await uploadImageFile(file, {
-        folder: "flower-shop/branding",
-        maxWidth: 1200,
-        maxHeight: 500,
-        quality: 0.84,
-      });
-
-      setSettings((current) => ({
-        ...current,
-        branding: {
-          ...(current.branding || {}),
-          logoImage: logo,
-          logoAlt: current.branding?.logoAlt || "Flower Shop",
-        },
-      }));
-
-      setMessage(
-        "Đã tải Logo lên kho ảnh dùng chung. Hãy bấm Lưu toàn bộ thay đổi để áp dụng."
-      );
-    } catch (uploadError) {
-      console.error(uploadError);
-
-      setError(uploadError.message || "Không thể tải Logo.");
-    } finally {
-      setUploadingLogo(false);
-    }
   };
 
-  const removeLogo = () => {
+  const updateContactStyle = (field, value) => {
     setSettings((current) => ({
       ...current,
-      branding: {
-        ...(current.branding || {}),
-        logoImage: "",
+      contact: {
+        ...(current.contact || {}),
+        style: {
+          ...(current.contact?.style || {}),
+          [field]: value,
+        },
       },
     }));
 
-    setMessage("Đã bỏ Logo. Hãy bấm Lưu toàn bộ thay đổi để áp dụng.");
+    clearMessages();
   };
 
   const handleSave = () => {
@@ -379,6 +159,26 @@ const AdminAppearancePage = () => {
 
     const borderRadius = Number(draftTheme.borderRadius);
 
+    const bannerHeightDesktop = Number(settings.hero?.bannerHeightDesktop);
+
+    const bannerHeightMobile = Number(settings.hero?.bannerHeightMobile);
+
+    const bannerRadius = Number(settings.hero?.bannerRadius);
+
+    const bannerInterval = Number(settings.hero?.bannerInterval);
+
+    const blogColumns = Number(settings.blog?.columns);
+
+    const blogRadius = Number(settings.blog?.borderRadius);
+
+    const contactColumns = Number(settings.contact?.style?.columns || 2);
+
+    const contactCardRadius = Number(settings.contact?.style?.cardRadius || 12);
+
+    const contactSectionRadius = Number(
+      settings.contact?.style?.sectionRadius || 16
+    );
+
     if (baseFontSize < 12 || baseFontSize > 24) {
       setError("Cỡ chữ cơ bản phải từ 12px đến 24px.");
       return;
@@ -394,8 +194,43 @@ const AdminAppearancePage = () => {
       return;
     }
 
+    if (
+      bannerHeightDesktop < 160 ||
+      bannerHeightDesktop > 420 ||
+      bannerHeightMobile < 90 ||
+      bannerHeightMobile > 220
+    ) {
+      setError("Chiều cao Banner nằm ngoài giới hạn cho phép.");
+      return;
+    }
+
+    if (bannerRadius < 0 || bannerRadius > 32) {
+      setError("Bo góc Banner phải từ 0px đến 32px.");
+      return;
+    }
+
+    if (bannerInterval < 5 || bannerInterval > 15) {
+      setError("Thời gian Banner phải từ 5 đến 15 giây.");
+      return;
+    }
+
+    if (blogColumns < 1 || blogColumns > 4) {
+      setError("Số cột bài viết phải từ 1 đến 4.");
+      return;
+    }
+
+    if (blogRadius < 0 || blogRadius > 32) {
+      setError("Bo góc bài viết phải từ 0px đến 32px.");
+      return;
+    }
+
+    if (contactColumns < 1 || contactColumns > 4) {
+      setError("Số cột Liên hệ phải từ 1 đến 4.");
+      return;
+    }
+
     try {
-      updateTheme({
+      const nextTheme = {
         primaryColor: draftTheme.primaryColor,
         secondaryColor: draftTheme.secondaryColor,
         textColor: draftTheme.textColor,
@@ -403,39 +238,52 @@ const AdminAppearancePage = () => {
         baseFontSize,
         headerFontSize,
         borderRadius,
-      });
+      };
+
+      updateTheme(nextTheme);
 
       const saved = saveSiteSettings({
         ...settings,
-        theme: {
-          ...settings.theme,
-          primaryColor: draftTheme.primaryColor,
-          secondaryColor: draftTheme.secondaryColor,
-          textColor: draftTheme.textColor,
-          fontFamily: draftTheme.fontFamily,
-          baseFontSize,
-          headerFontSize,
-          borderRadius,
+        theme: nextTheme,
+        hero: {
+          ...(settings.hero || {}),
+          bannerHeightDesktop,
+          bannerHeightMobile,
+          bannerRadius,
+          bannerInterval,
+        },
+        blog: {
+          ...(settings.blog || {}),
+          columns: blogColumns,
+          borderRadius: blogRadius,
+        },
+        contact: {
+          ...(settings.contact || {}),
+          style: {
+            ...(settings.contact?.style || {}),
+            columns: contactColumns,
+            cardRadius: contactCardRadius,
+            sectionRadius: contactSectionRadius,
+          },
         },
       });
 
       setSettings(saved);
-
-      setMessage("Đã lưu toàn bộ thay đổi giao diện website.");
+      setMessage("Đã lưu toàn bộ thiết lập kỹ thuật giao diện.");
     } catch (saveError) {
-      console.error(saveError);
-
-      setError(saveError.message || "Không thể lưu cấu hình website.");
+      setError(saveError.message || "Không thể lưu cấu hình giao diện.");
     }
   };
 
   const handleReset = () => {
-    setConfirmDelete({
-      type: "reset",
-    });
-  };
+    if (
+      !window.confirm(
+        "Khôi phục toàn bộ thiết lập giao diện kỹ thuật về mặc định?"
+      )
+    ) {
+      return;
+    }
 
-  const executeReset = () => {
     try {
       resetTheme();
 
@@ -448,19 +296,17 @@ const AdminAppearancePage = () => {
         ...(restored.theme || {}),
       });
 
-      setConfirmDelete(null);
-
       setMessage("Đã khôi phục cấu hình mặc định.");
 
       setError("");
     } catch (resetError) {
-      console.error(resetError);
-
-      setConfirmDelete(null);
-
-      setError("Không thể khôi phục cấu hình.");
+      setError(resetError.message || "Không thể khôi phục cấu hình.");
     }
   };
+
+  const hero = settings.hero || {};
+  const blog = settings.blog || {};
+  const contactStyle = settings.contact?.style || {};
 
   return (
     <main className="min-h-screen bg-gray-50 py-8">
@@ -471,16 +317,26 @@ const AdminAppearancePage = () => {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Quản lý giao diện, Logo, Banner, nội dung trang chủ, bài viết, thông
-            báo, liên hệ và Footer.
+            Quản lý các thông số kỹ thuật và bố cục của website. Nội dung
+            website được quản lý tại Khu vực quản lý.
           </p>
         </header>
 
+        {(message || error) && (
+          <div
+            className={`mb-5 rounded-xl border bg-white p-4 text-sm ${
+              error
+                ? "border-red-100 text-red-600"
+                : "border-green-100 text-green-600"
+            }`}
+          >
+            {error || message}
+          </div>
+        )}
+
         <div className="space-y-6">
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">
-              1. Giao diện cơ bản
-            </h2>
+            <h2 className="text-xl font-bold">1. Màu sắc & Font chữ</h2>
 
             <div className="mt-5 grid gap-5 md:grid-cols-2">
               {[
@@ -489,7 +345,7 @@ const AdminAppearancePage = () => {
                 ["textColor", "Màu chữ", "#1F2937"],
               ].map(([field, label, fallback]) => (
                 <div key={field}>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  <label className="mb-2 block text-sm font-semibold">
                     {label}
                   </label>
 
@@ -524,7 +380,7 @@ const AdminAppearancePage = () => {
               ))}
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                <label className="mb-2 block text-sm font-semibold">
                   Font chữ
                 </label>
 
@@ -538,501 +394,289 @@ const AdminAppearancePage = () => {
                   }
                   className={inputClass}
                 >
-                  {FONT_OPTIONS.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.label}
+                  {FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Cỡ chữ cơ bản: {draftTheme.baseFontSize}
-                  px
+                <label className="mb-2 block text-sm font-semibold">
+                  Cỡ chữ cơ bản
                 </label>
 
                 <input
-                  type="range"
+                  type="number"
                   min="12"
                   max="24"
                   value={draftTheme.baseFontSize}
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-                      baseFontSize: Number(event.target.value),
+                      baseFontSize: event.target.value,
                     }))
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Cỡ chữ Header: {draftTheme.headerFontSize}
-                  px
+                <label className="mb-2 block text-sm font-semibold">
+                  Cỡ chữ Header
                 </label>
 
                 <input
-                  type="range"
+                  type="number"
                   min="12"
                   max="24"
                   value={draftTheme.headerFontSize}
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-                      headerFontSize: Number(event.target.value),
+                      headerFontSize: event.target.value,
                     }))
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Bo góc: {draftTheme.borderRadius}
-                  px
+                <label className="mb-2 block text-sm font-semibold">
+                  Bo góc chung
                 </label>
 
                 <input
-                  type="range"
+                  type="number"
                   min="0"
                   max="32"
                   value={draftTheme.borderRadius}
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-                      borderRadius: Number(event.target.value),
+                      borderRadius: event.target.value,
                     }))
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
               </div>
             </div>
           </section>
 
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">2. Logo Header</h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Logo sẽ được lưu vào cấu hình thương hiệu và sử dụng bởi Header.
-            </p>
-
-            <div className="mt-5 flex flex-col gap-6 md:flex-row md:items-center">
-              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 p-3">
-                {settings.branding?.logoImage ? (
-                  <img
-                    src={settings.branding.logoImage}
-                    alt={settings.branding.logoAlt || "Flower Shop"}
-                    className="h-full w-full rounded-full object-contain"
-                  />
-                ) : (
-                  <FiImage size={34} className="text-gray-300" />
-                )}
-              </div>
-
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label
-                    htmlFor="header-logo"
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
-                  >
-                    <FiUpload />
-                    {uploadingLogo ? "Đang xử lý..." : "Chọn Logo"}
-                  </label>
-
-                  <input
-                    id="header-logo"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    className="sr-only"
-                    disabled={uploadingLogo}
-                    onChange={handleLogoUpload}
-                  />
-
-                  {settings.branding?.logoImage && (
-                    <button
-                      type="button"
-                      onClick={removeLogo}
-                      className="inline-flex items-center gap-2 rounded-xl border border-red-100 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
-                    >
-                      <FiTrash2 />
-                      Bỏ Logo
-                    </button>
-                  )}
-                </div>
-
-                <p className="mt-3 text-xs leading-5 text-gray-500">
-                  Khuyến nghị Logo PNG/WebP nền trong suốt, khoảng 600×180 hoặc
-                  800×240 px.
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Logo trong phần xem trước được hiển thị dạng hình tròn.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">
-              3. Banner trang chủ
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Banner được thêm, xóa, ẩn/hiện và thiết lập ưu tiên tại Quản lý
-              hình ảnh.
-            </p>
+            <h2 className="text-xl font-bold">2. Thông số kỹ thuật Banner</h2>
 
             <div className="mt-5 grid gap-5 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                <label className="mb-2 block text-sm font-semibold">
                   Chiều cao Banner Desktop
                 </label>
 
                 <input
-                  type="range"
-                  min="180"
-                  max="360"
-                  value={settings.hero?.bannerHeightDesktop || 240}
+                  type="number"
+                  min="160"
+                  max="420"
+                  value={hero.bannerHeightDesktop ?? 240}
                   onChange={(event) =>
                     updateHero(
                       "bannerHeightDesktop",
                       Number(event.target.value)
                     )
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
-
-                <p className="mt-1 text-xs text-gray-500">
-                  {settings.hero?.bannerHeightDesktop}
-                  px
-                </p>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                <label className="mb-2 block text-sm font-semibold">
+                  Chiều cao Banner Mobile
+                </label>
+
+                <input
+                  type="number"
+                  min="90"
+                  max="220"
+                  value={hero.bannerHeightMobile ?? 125}
+                  onChange={(event) =>
+                    updateHero("bannerHeightMobile", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
                   Bo góc Banner
                 </label>
 
                 <input
-                  type="range"
+                  type="number"
                   min="0"
                   max="32"
-                  value={settings.hero?.bannerRadius ?? 14}
+                  value={hero.bannerRadius ?? 14}
                   onChange={(event) =>
                     updateHero("bannerRadius", Number(event.target.value))
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
+              </div>
 
-                <p className="mt-1 text-xs text-gray-500">
-                  {settings.hero?.bannerRadius}
-                  px
-                </p>
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Thời gian chuyển Banner
+                </label>
+
+                <select
+                  value={hero.bannerInterval ?? 8}
+                  onChange={(event) =>
+                    updateHero("bannerInterval", Number(event.target.value))
+                  }
+                  className={inputClass}
+                >
+                  {Array.from({ length: 11 }, (_, index) => index + 5).map(
+                    (seconds) => (
+                      <option key={seconds} value={seconds}>
+                        {seconds} giây
+                      </option>
+                    )
+                  )}
+                </select>
               </div>
             </div>
           </section>
 
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                4. Thanh thông báo
-              </h2>
+            <h2 className="text-xl font-bold">3. Bố cục bài viết</h2>
 
-              <button
-                type="button"
-                onClick={addAnnouncement}
-                className="rounded-lg border border-pink-200 px-4 py-2 text-sm font-semibold text-pink-600 hover:bg-pink-50"
-              >
-                Thêm thông báo
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {(settings.announcementMessages || []).map(
-                (announcement, index) => (
-                  <div key={`${index}-${announcement}`} className="flex gap-2">
-                    <input
-                      value={announcement}
-                      onChange={(event) =>
-                        updateAnnouncement(index, event.target.value)
-                      }
-                      className={inputClass}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => requestRemoveAnnouncement(index)}
-                      className="rounded-xl border border-red-100 px-4 text-red-500 hover:bg-red-50"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">
-              5. Nội dung trang chủ
-            </h2>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Tiêu đề danh mục
-                </label>
-
-                <input
-                  className={inputClass}
-                  value={settings.sections?.categoriesTitle || ""}
-                  onChange={(event) =>
-                    updateSections("categoriesTitle", event.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Mô tả danh mục
-                </label>
-
-                <input
-                  className={inputClass}
-                  value={settings.sections?.categoriesSubtitle || ""}
-                  onChange={(event) =>
-                    updateSections("categoriesSubtitle", event.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Tiêu đề sản phẩm nổi bật
-                </label>
-
-                <input
-                  className={inputClass}
-                  value={settings.sections?.featuredTitle || ""}
-                  onChange={(event) =>
-                    updateSections("featuredTitle", event.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Mô tả sản phẩm nổi bật
-                </label>
-
-                <input
-                  className={inputClass}
-                  value={settings.sections?.featuredSubtitle || ""}
-                  onChange={(event) =>
-                    updateSections("featuredSubtitle", event.target.value)
-                  }
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Tiêu đề khách hàng
-                </label>
-
-                <input
-                  className={inputClass}
-                  value={settings.sections?.customerTitle || ""}
-                  onChange={(event) =>
-                    updateSections("customerTitle", event.target.value)
-                  }
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">6. Footer</h2>
-
-            <div className="mt-5">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Nội dung bản quyền
-              </label>
-
-              <input
-                className={inputClass}
-                value={settings.footer?.copyright || ""}
-                onChange={(event) =>
-                  updateFooter("copyright", event.target.value)
-                }
-              />
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">7. Bài viết</h2>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                <label className="mb-2 block text-sm font-semibold">
                   Số cột hiển thị
                 </label>
 
                 <select
-                  value={settings.blog?.columns || 3}
+                  value={blog.columns || 3}
                   onChange={(event) =>
                     updateBlog("columns", Number(event.target.value))
                   }
                   className={inputClass}
                 >
-                  <option value="1">1 cột</option>
-                  <option value="2">2 cột</option>
-                  <option value="3">3 cột</option>
+                  <option value={1}>1 cột</option>
+                  <option value={2}>2 cột</option>
+                  <option value={3}>3 cột</option>
+                  <option value={4}>4 cột</option>
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                <label className="mb-2 block text-sm font-semibold">
                   Bo góc bài viết
                 </label>
 
                 <input
-                  type="range"
+                  type="number"
                   min="0"
                   max="32"
-                  value={settings.blog?.borderRadius ?? 16}
+                  value={blog.borderRadius ?? 16}
                   onChange={(event) =>
                     updateBlog("borderRadius", Number(event.target.value))
                   }
-                  className="w-full"
+                  className={inputClass}
                 />
+              </div>
+            </div>
+          </section>
 
-                <p className="mt-1 text-xs text-gray-500">
-                  {settings.blog?.borderRadius}
-                  px
-                </p>
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold">4. Giao diện trang Liên hệ</h2>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Số cột
+                </label>
+
+                <select
+                  value={contactStyle.columns || 2}
+                  onChange={(event) =>
+                    updateContactStyle("columns", Number(event.target.value))
+                  }
+                  className={inputClass}
+                >
+                  <option value={1}>1 cột</option>
+                  <option value={2}>2 cột</option>
+                  <option value={3}>3 cột</option>
+                  <option value={4}>4 cột</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Bo góc ô thông tin
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="32"
+                  value={contactStyle.cardRadius || 12}
+                  onChange={(event) =>
+                    updateContactStyle("cardRadius", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Bo góc khung Liên hệ
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="32"
+                  value={contactStyle.sectionRadius || 16}
+                  onChange={(event) =>
+                    updateContactStyle(
+                      "sectionRadius",
+                      Number(event.target.value)
+                    )
+                  }
+                  className={inputClass}
+                />
               </div>
             </div>
 
             <p className="mt-4 text-sm text-gray-500">
-              Nội dung bài viết được tạo và chỉnh sửa tại mục Quản lý bài viết.
+              Nội dung điện thoại, Email, địa chỉ, giờ làm việc và thông tin bổ
+              sung được quản lý riêng tại
+              <strong> Quản lý thông tin liên hệ</strong>.
             </p>
           </section>
 
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">8. Liên hệ</h2>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {[
-                ["title", "Tiêu đề"],
-                ["phone", "Số điện thoại"],
-                ["email", "Email"],
-                ["address", "Địa chỉ"],
-                ["workingHours", "Giờ làm việc"],
-              ].map(([field, label]) => (
-                <div
-                  key={field}
-                  className={field === "address" ? "md:col-span-2" : ""}
-                >
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    {label}
-                  </label>
-
-                  <input
-                    className={inputClass}
-                    value={settings.contact?.[field] || ""}
-                    onChange={(event) =>
-                      updateContact(field, event.target.value)
-                    }
-                  />
-                </div>
-              ))}
-
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Mô tả liên hệ
-                </label>
-
-                <textarea
-                  rows={4}
-                  className={inputClass}
-                  value={settings.contact?.description || ""}
-                  onChange={(event) =>
-                    updateContact("description", event.target.value)
-                  }
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-2xl bg-white p-6 shadow-sm sm:flex-row sm:justify-end">
+          <div className="flex flex-col justify-end gap-3 sm:flex-row">
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             >
               <FiRotateCcw />
-              Khôi phục mặc định
+              Khôi phục
             </button>
 
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-pink-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-6 py-3 font-semibold text-white hover:bg-pink-700"
             >
               <FiSave />
-              Lưu toàn bộ thay đổi
+              Lưu thiết lập giao diện
             </button>
-          </section>
-        </div>
-      </div>
-
-      {confirmDelete && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
-              {confirmDelete.type === "reset" ? <FiRotateCcw /> : <FiTrash2 />}
-            </div>
-
-            <h2 className="mt-4 text-center text-lg font-bold text-gray-900">
-              {confirmDelete.type === "reset"
-                ? "Khôi phục mặc định?"
-                : "Xóa thông báo?"}
-            </h2>
-
-            <p className="mt-3 text-center text-sm leading-6 text-gray-600">
-              {confirmDelete.type === "reset"
-                ? "Toàn bộ cấu hình giao diện hiện tại sẽ được khôi phục về mặc định."
-                : `Bạn có chắc muốn xóa "${confirmDelete.message}"?`}
-            </p>
-
-            <div className="mt-6 flex justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(null)}
-                className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700"
-              >
-                Hủy
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  confirmDelete.type === "reset"
-                    ? executeReset
-                    : removeAnnouncement
-                }
-                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
-              >
-                Xác nhận
-              </button>
-            </div>
           </div>
         </div>
-      )}
-
-      <MessageModal message={message} error={error} onClose={clearMessages} />
+      </div>
     </main>
   );
 };

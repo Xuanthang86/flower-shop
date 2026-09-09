@@ -14,13 +14,24 @@ import {
 
 import { PRODUCT_CATEGORIES_STORAGE_KEY } from "@/constants/productCategories";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const normalizeApiBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  return String(configured).replace(/\/+$/, "").endsWith("/api")
+    ? String(configured).replace(/\/+$/, "")
+    : `${String(configured).replace(/\/+$/, "")}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl();
+
+const POLL_INTERVAL = 5000;
+const PUSH_DELAY = 700;
 
 let started = false;
 let applyingRemote = false;
 let pushTimer = null;
 let refreshTimer = null;
+let pushing = false;
 
 const dispatch = (eventName) => {
   window.dispatchEvent(new Event(eventName));
@@ -33,7 +44,9 @@ const readSnapshot = () => ({
 });
 
 const applySnapshot = (snapshot) => {
-  if (!snapshot) return;
+  if (!snapshot || typeof snapshot !== "object") {
+    return;
+  }
 
   applyingRemote = true;
 
@@ -74,32 +87,42 @@ const fetchSnapshot = async () => {
     cache: "no-store",
   });
 
+  const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    throw new Error("Không thể tải dữ liệu dùng chung.");
+    throw new Error(payload?.message || "Không thể tải dữ liệu dùng chung.");
   }
 
-  return response.json();
+  return payload;
 };
 
 const pushSnapshot = async () => {
-  if (applyingRemote) return;
+  if (applyingRemote || pushing) {
+    return;
+  }
 
-  const snapshot = readSnapshot();
+  pushing = true;
 
-  const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(snapshot),
-  });
+  try {
+    const snapshot = readSnapshot();
 
-  if (!response.ok) {
+    const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(snapshot),
+    });
+
     const payload = await response.json().catch(() => ({}));
 
-    throw new Error(
-      payload.message || "Không thể đồng bộ dữ liệu với máy chủ."
-    );
+    if (!response.ok) {
+      throw new Error(
+        payload?.message || "Không thể đồng bộ dữ liệu với máy chủ."
+      );
+    }
+  } finally {
+    pushing = false;
   }
 };
 
@@ -107,29 +130,31 @@ const pullSnapshot = async () => {
   try {
     const payload = await fetchSnapshot();
 
-    if (payload?.initialized && payload?.snapshot) {
+    if (payload?.initialized === true && payload?.snapshot) {
       applySnapshot(payload.snapshot);
       return;
     }
 
-    if (!payload?.initialized) {
+    if (payload?.initialized === false) {
       await pushSnapshot();
     }
   } catch (error) {
-    console.warn("Shared data sync:", error.message);
+    console.warn("[sharedDataSync] Pull:", error?.message || error);
   }
 };
 
 const schedulePush = () => {
-  if (applyingRemote) return;
+  if (applyingRemote) {
+    return;
+  }
 
   window.clearTimeout(pushTimer);
 
   pushTimer = window.setTimeout(() => {
-    pushSnapshot().catch((error) =>
-      console.warn("Shared data push:", error.message)
-    );
-  }, 700);
+    pushSnapshot().catch((error) => {
+      console.warn("[sharedDataSync] Push:", error?.message || error);
+    });
+  }, PUSH_DELAY);
 };
 
 export const startSharedDataSync = () => {
@@ -138,10 +163,6 @@ export const startSharedDataSync = () => {
   }
 
   started = true;
-
-  pullSnapshot();
-
-  refreshTimer = window.setInterval(pullSnapshot, 5000);
 
   const handleChange = () => {
     schedulePush();
@@ -153,9 +174,12 @@ export const startSharedDataSync = () => {
 
   window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, handleChange);
 
+  pullSnapshot();
+
+  refreshTimer = window.setInterval(pullSnapshot, POLL_INTERVAL);
+
   return () => {
     window.clearInterval(refreshTimer);
-
     window.clearTimeout(pushTimer);
 
     window.removeEventListener(PRODUCT_UPDATED_EVENT, handleChange);

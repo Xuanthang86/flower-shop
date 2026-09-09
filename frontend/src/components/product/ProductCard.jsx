@@ -43,7 +43,6 @@ const ProductCard = ({ product }) => {
     "";
 
   const discountPercent = getDiscountPercent(product);
-
   const showAddToCart = !isStaff;
 
   const showToast = (message) => {
@@ -144,7 +143,7 @@ const ProductCard = ({ product }) => {
           <div className="mt-3 flex w-full gap-2">
             <Link
               to={`/products/${product.id}`}
-              className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-pink-600 px-2 py-2 text-center text-[11px] font-semibold text-white transition hover:bg-pink-700 sm:text-xs"
+              className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-gray-100 px-2 py-2 text-center text-[11px] font-semibold text-gray-800 shadow-sm transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 sm:text-xs"
             >
               Xem sản phẩm
             </Link>
@@ -153,7 +152,7 @@ const ProductCard = ({ product }) => {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-pink-600 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-pink-700 sm:text-xs"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-pink-600 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-300 sm:text-xs"
               >
                 <FiShoppingCart size={13} />
                 <span>Thêm vào giỏ</span>
