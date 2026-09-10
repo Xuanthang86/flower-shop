@@ -4,13 +4,13 @@ import FeaturedProducts from "@/components/home/FeaturedProducts";
 
 const HomePage = () => {
   return (
-    <>
+    <div className="min-h-screen bg-gray-50">
       <Hero />
 
       <Categories />
 
       <FeaturedProducts />
-    </>
+    </div>
   );
 };
 

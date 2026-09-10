@@ -1,4 +1,4 @@
-// import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   FiClock,
@@ -112,7 +112,6 @@ const ContactPage = () => {
   ].filter((item) => item.value);
 
   const isAdmin = user?.role === ROLES.ADMIN;
-
   const contactStyle = contact.style || {};
 
   const columns =
@@ -147,13 +146,15 @@ const ContactPage = () => {
           </p>
 
           {isAdmin && (
-            <Link
-              to="/admin/contact"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 shadow-sm hover:bg-pink-50"
-            >
-              <FiSettings />
-              Quản lý thông tin liên hệ
-            </Link>
+            <div className="mt-5 flex justify-center">
+              <Link
+                to="/admin/contact"
+                className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 shadow-sm transition hover:bg-pink-50"
+              >
+                <FiSettings />
+                Quản lý thông tin liên hệ
+              </Link>
+            </div>
           )}
         </header>
 

@@ -1,12 +1,17 @@
-/*
-============================================================
-FLOWER SHOP — SITE SETTINGS
-============================================================
-*/
-
 export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
+
+export const DEFAULT_ROLE_PERMISSIONS = {
+  manager: ["view_admin", "manage_orders", "view_reports"],
+
+  product_manager: [
+    "view_admin",
+    "manage_products",
+    "create_products",
+    "update_products",
+  ],
+};
 
 const DEFAULT_SITE_SETTINGS = {
   announcementMessages: [
@@ -17,6 +22,8 @@ const DEFAULT_SITE_SETTINGS = {
   ],
 
   branding: {
+    siteName: "Flower Shop",
+    tagline: "Fresh Flower Everyday",
     logoImage: "",
     logoAlt: "Flower Shop",
   },
@@ -34,7 +41,6 @@ const DEFAULT_SITE_SETTINGS = {
     bannerHeightDesktop: 240,
     bannerHeightMobile: 125,
     bannerRadius: 14,
-
     bannerInterval: 8,
 
     banners: [],
@@ -43,10 +49,8 @@ const DEFAULT_SITE_SETTINGS = {
   sections: {
     categoriesTitle: "Danh mục nổi bật",
     categoriesSubtitle: "Lựa chọn hoa phù hợp với từng dịp đặc biệt",
-
     featuredTitle: "Sản phẩm nổi bật",
     featuredSubtitle: "Những sản phẩm mới và được yêu thích nhất.",
-
     customerTitle: "KHÁCH HÀNG TIÊU BIỂU",
   },
 
@@ -64,7 +68,15 @@ const DEFAULT_SITE_SETTINGS = {
     email: "",
     address: "",
     workingHours: "",
+    extraItems: [],
+    style: {
+      columns: 2,
+      cardRadius: 12,
+      sectionRadius: 16,
+    },
   },
+
+  rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 
   blogPosts: [],
 
@@ -89,7 +101,6 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const normalizeBanner = (banner, index, defaultInterval = 8) => {
   const duration = Number(banner?.duration || defaultInterval || 8);
-
   const priority = Number(banner?.priority || index + 1);
 
   return {
@@ -102,6 +113,8 @@ const normalizeBanner = (banner, index, defaultInterval = 8) => {
     mobileImage: String(banner?.mobileImage || ""),
 
     alt: String(banner?.alt || `Banner ${index + 1}`),
+
+    visible: banner?.visible !== false,
 
     priority: Math.max(1, Number.isFinite(priority) ? priority : index + 1),
 
@@ -126,6 +139,22 @@ const normalizeBanners = (banners, defaultInterval = 8) => {
     )
     .map((banner, index) => normalizeBanner(banner, index, defaultInterval))
     .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0));
+};
+
+const normalizeRolePermissions = (input) => {
+  const defaults = clone(DEFAULT_ROLE_PERMISSIONS);
+
+  const source = input && typeof input === "object" ? input : {};
+
+  return {
+    manager: Array.isArray(source.manager)
+      ? [...new Set(source.manager)]
+      : defaults.manager,
+
+    product_manager: Array.isArray(source.product_manager)
+      ? [...new Set(source.product_manager)]
+      : defaults.product_manager,
+  };
 };
 
 const mergeSettings = (input = {}) => {
@@ -202,6 +231,13 @@ const mergeSettings = (input = {}) => {
     contact: {
       ...defaults.contact,
       ...(source.contact || {}),
+      style: {
+        ...defaults.contact.style,
+        ...(source.contact?.style || {}),
+      },
+      extraItems: Array.isArray(source.contact?.extraItems)
+        ? source.contact.extraItems
+        : [],
     },
 
     blog: {
@@ -213,6 +249,8 @@ const mergeSettings = (input = {}) => {
       ...defaults.theme,
       ...(source.theme || {}),
     },
+
+    rolePermissions: normalizeRolePermissions(source.rolePermissions),
 
     announcementMessages: Array.isArray(source.announcementMessages)
       ? source.announcementMessages
@@ -234,9 +272,7 @@ export const readSiteSettings = () => {
       return clone(DEFAULT_SITE_SETTINGS);
     }
 
-    const parsed = JSON.parse(raw);
-
-    return mergeSettings(parsed);
+    return mergeSettings(JSON.parse(raw));
   } catch (error) {
     console.error("Không thể đọc site settings:", error);
 
@@ -248,18 +284,13 @@ export const saveSiteSettings = (settings) => {
   const normalized = mergeSettings(settings);
 
   try {
-    const serialized = JSON.stringify(normalized);
-
-    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, serialized);
+    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
   } catch (error) {
     console.error("Không thể lưu site settings:", error);
 
-    const message =
-      "Không thể lưu cấu hình website. " +
-      "Bộ nhớ trình duyệt có thể đã đầy. " +
-      "Hãy giảm dung lượng ảnh hoặc xóa dữ liệu banner cũ.";
-
-    throw new Error(message);
+    throw new Error(
+      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy."
+    );
   }
 
   window.dispatchEvent(new Event(SITE_SETTINGS_UPDATED_EVENT));

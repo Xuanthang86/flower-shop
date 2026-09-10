@@ -1,14 +1,14 @@
 const normalizeApiBaseUrl = () => {
   const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  return String(configured).replace(/\/+$/, "").endsWith("/api")
-    ? String(configured).replace(/\/+$/, "")
-    : `${String(configured).replace(/\/+$/, "")}/api`;
+  const base = String(configured).replace(/\/+$/, "");
+
+  return base.endsWith("/api") ? base : `${base}/api`;
 };
 
 const API_BASE_URL = normalizeApiBaseUrl();
 
-const readImageDimensions = (file) =>
+export const readImageDimensions = (file) =>
   new Promise((resolve, reject) => {
     if (!file?.type?.startsWith("image/")) {
       reject(new Error("Vui lòng chọn đúng file hình ảnh."));
@@ -41,6 +41,8 @@ const readImageDimensions = (file) =>
 
     reader.readAsDataURL(file);
   });
+
+export const getImageDimensions = readImageDimensions;
 
 const fileToCompressedDataUri = (
   file,
@@ -99,8 +101,6 @@ const fileToCompressedDataUri = (
     reader.readAsDataURL(file);
   });
 
-export const getImageDimensions = readImageDimensions;
-
 export const uploadImageFile = async (
   file,
   {
@@ -131,7 +131,7 @@ export const uploadImageFile = async (
     });
   } catch {
     throw new Error(
-      "Không thể kết nối backend. Hãy kiểm tra server backend đang chạy tại http://localhost:5000."
+      "Không thể kết nối backend. Hãy kiểm tra backend đang chạy tại http://localhost:5000."
     );
   }
 

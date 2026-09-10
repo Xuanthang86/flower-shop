@@ -149,7 +149,7 @@ const BlogPage = () => {
                   alt={currentPost.title}
                   loading="eager"
                   decoding="async"
-                  className="block h-auto max-h-[360px] w-2/3 min-w-[280px] rounded-xl object-contain"
+                  className="block h-auto max-h-[300px] w-1/2 min-w-[240px] rounded-xl object-contain"
                 />
               </div>
             )}

@@ -76,7 +76,7 @@ const PermissionRoute = ({ permission, children }) => {
   }
 
   if (!hasPermission(permission)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   return children;
@@ -94,7 +94,7 @@ const AdminOnlyRoute = ({ children }) => {
   }
 
   if (user.role !== ROLES.ADMIN) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   return children;
@@ -111,28 +111,32 @@ const AdminEntry = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const canAccessManagement = [
-    ROLES.ADMIN,
-    ROLES.MANAGER,
-    ROLES.PRODUCT_MANAGER,
-  ].includes(user.role);
-
-  if (!canAccessManagement) {
+  if (
+    ![ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(user.role)
+  ) {
     return <Navigate to="/" replace />;
   }
 
   return <AdminManagementPage />;
 };
 
-const AdminSubPage = ({ children }) => (
-  <div className="w-full bg-gray-50 px-4 pb-2 pt-2">
-    <div className="mx-auto max-w-7xl">
-      <AdminManagementBackButton />
-    </div>
+const AdminSubPage = ({ children }) => {
+  const { user } = useAuth();
 
-    <div className="w-full">{children}</div>
-  </div>
-);
+  const showBackButton = user?.role === ROLES.ADMIN;
+
+  return (
+    <div className="w-full bg-gray-50 pb-2 pt-2">
+      {showBackButton && (
+        <div className="mx-auto max-w-7xl px-4">
+          <AdminManagementBackButton />
+        </div>
+      )}
+
+      <div className="w-full">{children}</div>
+    </div>
+  );
+};
 
 const AppRoutes = () => (
   <>
@@ -271,55 +275,55 @@ const AppRoutes = () => (
         <Route
           path="/admin/blog"
           element={
-            <AdminOnlyRoute>
+            <PermissionRoute permission={PERMISSIONS.MANAGE_BLOG}>
               <AdminSubPage>
                 <AdminBlogManagementPage />
               </AdminSubPage>
-            </AdminOnlyRoute>
+            </PermissionRoute>
           }
         />
 
         <Route
           path="/admin/images"
           element={
-            <AdminOnlyRoute>
+            <PermissionRoute permission={PERMISSIONS.MANAGE_IMAGES}>
               <AdminSubPage>
                 <AdminImageManagementPage />
               </AdminSubPage>
-            </AdminOnlyRoute>
+            </PermissionRoute>
           }
         />
 
         <Route
           path="/admin/appearance"
           element={
-            <AdminOnlyRoute>
+            <PermissionRoute permission={PERMISSIONS.MANAGE_APPEARANCE}>
               <AdminSubPage>
                 <AdminAppearancePage />
               </AdminSubPage>
-            </AdminOnlyRoute>
+            </PermissionRoute>
           }
         />
 
         <Route
           path="/admin/contact"
           element={
-            <AdminOnlyRoute>
+            <PermissionRoute permission={PERMISSIONS.MANAGE_CONTACT}>
               <AdminSubPage>
                 <AdminContactManagementPage />
               </AdminSubPage>
-            </AdminOnlyRoute>
+            </PermissionRoute>
           }
         />
 
         <Route
           path="/admin/content"
           element={
-            <AdminOnlyRoute>
+            <PermissionRoute permission={PERMISSIONS.MANAGE_CONTENT}>
               <AdminSubPage>
                 <AdminContentManagementPage />
               </AdminSubPage>
-            </AdminOnlyRoute>
+            </PermissionRoute>
           }
         />
 

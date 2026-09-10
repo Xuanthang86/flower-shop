@@ -143,7 +143,11 @@ const ProductCard = ({ product }) => {
           <div className="mt-3 flex w-full gap-2">
             <Link
               to={`/products/${product.id}`}
-              className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-gray-100 px-2 py-2 text-center text-[11px] font-semibold text-gray-800 shadow-sm transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 sm:text-xs"
+              className={`flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 py-2 text-center text-[11px] font-semibold text-white shadow-sm transition focus:outline-none sm:text-xs ${
+                isStaff
+                  ? "bg-pink-600 hover:bg-pink-700 focus:ring-2 focus:ring-pink-300"
+                  : "bg-gray-500 text-white hover:bg-gray-600 focus:ring-2 focus:ring-gray-300"
+              }`}
             >
               Xem sản phẩm
             </Link>

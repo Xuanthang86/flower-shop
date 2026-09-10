@@ -1,37 +1,56 @@
 import { Link } from "react-router-dom";
 
 const Logo = ({ settings, onClick }) => {
-  const image = settings?.branding?.logoImage || settings?.branding?.logo || "";
+  const branding = settings?.branding || {};
 
-  const alt = settings?.branding?.logoAlt || "Flower Shop";
+  const image = branding.logoImage || branding.logo || "";
+  const siteName = branding.siteName || "Flower Shop";
+  const tagline = branding.tagline || "Fresh Flower Everyday";
+  const alt = branding.logoAlt || siteName;
 
   return (
     <Link
       to="/"
       onClick={onClick}
-      aria-label="Flower Shop"
+      aria-label={siteName}
       className="flex min-w-0 shrink-0 items-center"
     >
       {image ? (
-        <img
-          src={image}
-          alt={alt}
-          className="block h-10 w-auto max-w-[190px] object-contain sm:h-11 sm:max-w-[220px]"
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-pink-100 bg-white shadow-sm">
+            <img
+              src={image}
+              alt={alt}
+              className="h-11 w-11 object-contain rounded-full"
+            />
+          </div>
+
+          <div className="hidden min-w-0 sm:block">
+            <div className="truncate text-lg font-bold leading-tight text-gray-900">
+              {siteName}
+            </div>
+
+            {tagline && (
+              <div className="mt-0.5 truncate text-[10px] text-gray-500">
+                {tagline}
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-50 text-lg">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-lg sm:h-12 sm:w-12">
             🌸
           </div>
 
           <div className="hidden sm:block">
             <div className="text-lg font-bold leading-tight text-gray-900">
-              Flower Shop
+              {siteName}
             </div>
 
-            <div className="mt-0.5 text-[10px] text-gray-500">
-              Fresh Flower Everyday
-            </div>
+            {tagline && (
+              <div className="mt-0.5 text-[10px] text-gray-500">{tagline}</div>
+            )}
           </div>
         </div>
       )}

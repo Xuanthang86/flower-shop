@@ -17,12 +17,14 @@ import { PRODUCT_CATEGORIES_STORAGE_KEY } from "@/constants/productCategories";
 const normalizeApiBaseUrl = () => {
   const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  return String(configured).replace(/\/+$/, "").endsWith("/api")
-    ? String(configured).replace(/\/+$/, "")
-    : `${String(configured).replace(/\/+$/, "")}/api`;
+  const base = String(configured).replace(/\/+$/, "");
+
+  return base.endsWith("/api") ? base : `${base}/api`;
 };
 
 const API_BASE_URL = normalizeApiBaseUrl();
+
+const SYNC_TIMESTAMP_KEY = "flower-shop-shared-sync-updated-at";
 
 const POLL_INTERVAL = 5000;
 const PUSH_DELAY = 700;
@@ -43,7 +45,19 @@ const readSnapshot = () => ({
   settings: readSiteSettings(),
 });
 
-const applySnapshot = (snapshot) => {
+const readLastSyncedAt = () => {
+  const value = localStorage.getItem(SYNC_TIMESTAMP_KEY);
+
+  return value ? new Date(value).getTime() : 0;
+};
+
+const writeLastSyncedAt = (updatedAt) => {
+  if (!updatedAt) return;
+
+  localStorage.setItem(SYNC_TIMESTAMP_KEY, updatedAt);
+};
+
+const applySnapshot = (snapshot, updatedAt) => {
   if (!snapshot || typeof snapshot !== "object") {
     return;
   }
@@ -77,6 +91,8 @@ const applySnapshot = (snapshot) => {
 
       dispatch(SITE_SETTINGS_UPDATED_EVENT);
     }
+
+    writeLastSyncedAt(updatedAt);
   } finally {
     applyingRemote = false;
   }
@@ -121,6 +137,10 @@ const pushSnapshot = async () => {
         payload?.message || "Không thể đồng bộ dữ liệu với máy chủ."
       );
     }
+
+    if (payload?.updatedAt) {
+      writeLastSyncedAt(payload.updatedAt);
+    }
   } finally {
     pushing = false;
   }
@@ -130,14 +150,26 @@ const pullSnapshot = async () => {
   try {
     const payload = await fetchSnapshot();
 
-    if (payload?.initialized === true && payload?.snapshot) {
-      applySnapshot(payload.snapshot);
+    if (payload?.initialized === false) {
+      await pushSnapshot();
       return;
     }
 
-    if (payload?.initialized === false) {
-      await pushSnapshot();
+    if (payload?.initialized !== true || !payload?.snapshot) {
+      return;
     }
+
+    const serverTime = payload.updatedAt
+      ? new Date(payload.updatedAt).getTime()
+      : 0;
+
+    const localTime = readLastSyncedAt();
+
+    if (serverTime && localTime && serverTime <= localTime) {
+      return;
+    }
+
+    applySnapshot(payload.snapshot, payload.updatedAt);
   } catch (error) {
     console.warn("[sharedDataSync] Pull:", error?.message || error);
   }
@@ -180,6 +212,7 @@ export const startSharedDataSync = () => {
 
   return () => {
     window.clearInterval(refreshTimer);
+
     window.clearTimeout(pushTimer);
 
     window.removeEventListener(PRODUCT_UPDATED_EVENT, handleChange);
