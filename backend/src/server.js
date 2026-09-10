@@ -32,37 +32,73 @@ const corsOptions = {
 
     callback(new Error(`Origin không được phép: ${origin}`));
   },
+
   methods: ["GET", "HEAD", "PUT", "POST", "OPTIONS"],
+
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(helmet());
-
 app.use(cors(corsOptions));
-
-app.options("*", cors(corsOptions));
-
 app.use(morgan("dev"));
 
 app.use(
   express.json({
-    limit: "15mb",
+    limit: "20mb",
   }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
-    limit: "15mb",
+    limit: "20mb",
   }),
 );
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
-});
+const hasPlaceholder = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    !normalized ||
+    normalized.includes("your_api_key") ||
+    normalized.includes("your_api_secret") ||
+    normalized.includes("your_cloud_name") ||
+    normalized.includes("replace_me")
+  );
+};
+
+const cloudinaryConfigured = () => {
+  if (
+    process.env.CLOUDINARY_URL &&
+    !hasPlaceholder(process.env.CLOUDINARY_URL)
+  ) {
+    cloudinary.config(process.env.CLOUDINARY_URL);
+
+    return true;
+  }
+
+  if (
+    hasPlaceholder(process.env.CLOUDINARY_CLOUD_NAME) ||
+    hasPlaceholder(process.env.CLOUDINARY_API_KEY) ||
+    hasPlaceholder(process.env.CLOUDINARY_API_SECRET)
+  ) {
+    return false;
+  }
+
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+
+    api_key: process.env.CLOUDINARY_API_KEY,
+
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+
+    secure: true,
+  });
+
+  return true;
+};
 
 const snapshotSchema = new mongoose.Schema(
   {
@@ -107,20 +143,16 @@ const validateEnvironment = () => {
     missing.push("MONGODB_URI");
   }
 
-  if (!process.env.CLOUDINARY_CLOUD_NAME) {
-    missing.push("CLOUDINARY_CLOUD_NAME");
+  if (!cloudinaryConfigured()) {
+    missing.push("Cloudinary credentials");
   }
 
-  if (!process.env.CLOUDINARY_API_KEY) {
-    missing.push("CLOUDINARY_API_KEY");
-  }
-
-  if (!process.env.CLOUDINARY_API_SECRET) {
-    missing.push("CLOUDINARY_API_SECRET");
-  }
-
-  if (missing.length > 0) {
-    throw new Error(`Thiếu biến môi trường: ${missing.join(", ")}`);
+  if (missing.length) {
+    throw new Error(
+      `Thiếu cấu hình backend: ${missing.join(
+        ", ",
+      )}. Hãy kiểm tra file backend/.env.`,
+    );
   }
 };
 
@@ -140,11 +172,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     databaseReady,
-    cloudinaryConfigured: Boolean(
-      process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_SECRET,
-    ),
+    cloudinaryConfigured: cloudinaryConfigured(),
     timestamp: new Date().toISOString(),
   });
 });
@@ -166,11 +194,13 @@ app.get("/api/data/snapshot", async (req, res, next) => {
       return res.json({
         initialized: false,
         snapshot: null,
+        updatedAt: null,
       });
     }
 
     return res.json({
       initialized: true,
+
       snapshot: {
         products: Array.isArray(document.products) ? document.products : [],
 
@@ -220,6 +250,7 @@ app.put("/api/data/snapshot", async (req, res, next) => {
           categories,
           settings,
         },
+
         $setOnInsert: {
           key: "main",
         },
@@ -256,14 +287,10 @@ app.post("/api/media/upload", async (req, res, next) => {
       });
     }
 
-    if (
-      !process.env.CLOUDINARY_CLOUD_NAME ||
-      !process.env.CLOUDINARY_API_KEY ||
-      !process.env.CLOUDINARY_API_SECRET
-    ) {
+    if (!cloudinaryConfigured()) {
       return res.status(503).json({
         message:
-          "Backend chưa được cấu hình Cloudinary. Hãy kiểm tra CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET trong file .env.",
+          "Cloudinary chưa được cấu hình đúng. Hãy kiểm tra CLOUDINARY_URL hoặc bộ ba CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET trong backend/.env.",
       });
     }
 
