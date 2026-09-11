@@ -36,6 +36,7 @@ const ensureMeta = (attribute, value, content) => {
 
     if (attribute === "property") {
       element.setAttribute("property", value);
+
       element.removeAttribute("name");
     }
 
@@ -79,6 +80,38 @@ const readWishlistValue = (key, productId) => {
   }
 };
 
+const getProductScore = (item, currentProduct) => {
+  if (!item) {
+    return -Infinity;
+  }
+
+  let score = 0;
+
+  if (String(item.category || "") === String(currentProduct?.category || "")) {
+    score += 1000000;
+  }
+
+  if (item.isNew) {
+    score += 10000;
+  }
+
+  score += Number(item.salesCount || 0);
+
+  return score;
+};
+
+const sortRelatedProducts = (items, currentProduct) =>
+  [...items].sort((a, b) => {
+    const scoreDifference =
+      getProductScore(b, currentProduct) - getProductScore(a, currentProduct);
+
+    if (scoreDifference !== 0) {
+      return scoreDifference;
+    }
+
+    return String(a.name || "").localeCompare(String(b.name || ""), "vi");
+  });
+
 const ProductDetailPage = () => {
   const { productId } = useParams();
 
@@ -110,10 +143,18 @@ const ProductDetailPage = () => {
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
+    window.addEventListener("storage", refreshProducts);
+
+    window.addEventListener("storage", refreshCategories);
+
     return () => {
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+      window.removeEventListener("storage", refreshProducts);
+
+      window.removeEventListener("storage", refreshCategories);
     };
   }, []);
 
@@ -316,27 +357,44 @@ const ProductDetailPage = () => {
     };
   }, [product, category, productId]);
 
+  /*
+   * Logic mới:
+   *
+   * 1. Không lấy sản phẩm hiện tại.
+   * 2. Ưu tiên sản phẩm cùng danh mục.
+   * 3. Nếu chưa đủ 12 sản phẩm thì bổ sung
+   *    từ danh mục khác.
+   * 4. Mỗi lần productId thay đổi, product thay đổi,
+   *    useMemo tính lại danh sách hoàn toàn mới.
+   *
+   * Điều này tránh việc danh sách liên quan
+   * chỉ còn một sản phẩm B khi đang xem A,
+   * rồi khi chuyển sang B chỉ đổi ngược lại thành A.
+   */
   const relatedProducts = useMemo(() => {
     if (!product) {
       return [];
     }
 
-    return products
-      .filter(
-        (item) =>
-          item.category === product.category &&
-          String(item.id) !== String(product.id)
-      )
-      .sort((a, b) => {
-        const newDiff = Number(Boolean(b.isNew)) - Number(Boolean(a.isNew));
+    const currentId = String(product.id);
 
-        if (newDiff !== 0) {
-          return newDiff;
-        }
+    const candidates = products.filter(
+      (item) => item && String(item.id) !== currentId
+    );
 
-        return Number(b.salesCount || 0) - Number(a.salesCount || 0);
-      })
-      .slice(0, 12);
+    const sameCategory = candidates.filter(
+      (item) => String(item.category || "") === String(product.category || "")
+    );
+
+    const otherCategories = candidates.filter(
+      (item) => String(item.category || "") !== String(product.category || "")
+    );
+
+    const sortedSameCategory = sortRelatedProducts(sameCategory, product);
+
+    const sortedOtherCategories = sortRelatedProducts(otherCategories, product);
+
+    return [...sortedSameCategory, ...sortedOtherCategories].slice(0, 12);
   }, [product, products]);
 
   const formatPrice = (value) =>
@@ -410,13 +468,6 @@ const ProductDetailPage = () => {
 
     const key = `${WISHLIST_KEY}-${userId}`;
 
-    /*
-     * Không khởi tạo let ids = [] rồi gán lại trong try.
-     * Việc đó tạo ra cảnh báo:
-     * "value assigned to ids is not used".
-     *
-     * const + IIFE đảm bảo ids luôn nhận đúng một giá trị.
-     */
     const ids = (() => {
       try {
         const raw = localStorage.getItem(key);
