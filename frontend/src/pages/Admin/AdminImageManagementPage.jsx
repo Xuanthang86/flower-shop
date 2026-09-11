@@ -4,7 +4,6 @@ import {
   FiEye,
   FiEyeOff,
   FiImage,
-  FiSave,
   FiTrash2,
   FiUpload,
 } from "react-icons/fi";
@@ -19,44 +18,10 @@ import { readProducts, PRODUCT_UPDATED_EVENT } from "@/services/catalog";
 
 import { getImageDimensions, uploadImageFile } from "@/services/media";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const STANDARD_WIDTH = 1600;
 const STANDARD_HEIGHT = 700;
-
-const MessageModal = ({ message, error, onClose }) => {
-  if (!message && !error) return null;
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/25 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div
-          className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
-            error ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
-          }`}
-        >
-          {error ? <FiTrash2 /> : <FiSave />}
-        </div>
-
-        <p
-          className={`mt-4 text-center text-sm font-medium ${
-            error ? "text-red-700" : "text-gray-700"
-          }`}
-        >
-          {error || message}
-        </p>
-
-        <div className="mt-5 flex justify-center">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
-          >
-            Đóng
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
   const sorted = [...list].sort(
@@ -86,15 +51,12 @@ const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
 
 const AdminImageManagementPage = () => {
   const [activeTab, setActiveTab] = useState("banners");
-
   const [settings, setSettings] = useState(() => readSiteSettings());
-
   const [products, setProducts] = useState(() => readProducts());
-
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteBanner, setDeleteBanner] = useState(null);
+
+  const { notifySuccess, notifyError, notifyInfo } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý hình ảnh | Flower Shop";
@@ -108,28 +70,25 @@ const AdminImageManagementPage = () => {
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
     const refreshSettings = () => setSettings(readSiteSettings());
-
     const refreshProducts = () => setProducts(readProducts());
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
-
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
     window.addEventListener("storage", refreshSettings);
-
     window.addEventListener("storage", refreshProducts);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
-
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
       window.removeEventListener("storage", refreshSettings);
-
       window.removeEventListener("storage", refreshProducts);
     };
   }, []);
@@ -148,11 +107,6 @@ const AdminImageManagementPage = () => {
     () => products.filter((product) => product.image),
     [products]
   );
-
-  const closeMessage = () => {
-    setMessage("");
-    setError("");
-  };
 
   const saveBanners = (nextBanners) => {
     const normalized = [...nextBanners].map((banner, index) => ({
@@ -174,13 +128,11 @@ const AdminImageManagementPage = () => {
 
   const handleAddBanner = async (event) => {
     const file = event.target.files?.[0];
-
     event.target.value = "";
 
     if (!file) return;
 
     setBusy(true);
-    closeMessage();
 
     try {
       const dimensions = await getImageDimensions(file);
@@ -211,13 +163,13 @@ const AdminImageManagementPage = () => {
         dimensions.width === STANDARD_WIDTH &&
         dimensions.height === STANDARD_HEIGHT;
 
-      setMessage(
+      notifySuccess(
         isStandard
-          ? `Đã thêm banner thành công. Kích thước ${dimensions.width} × ${dimensions.height}px đúng kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px.`
-          : `Đã thêm banner thành công. Kích thước ảnh hiện tại là ${dimensions.width} × ${dimensions.height}px, khác kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Banner vẫn được chấp nhận và hệ thống sẽ hiển thị ảnh theo tỷ lệ.`
+          ? `Đã thêm banner thành công. Kích thước ${dimensions.width} × ${dimensions.height}px đúng chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px.`
+          : `Đã thêm banner thành công. Ảnh ${dimensions.width} × ${dimensions.height}px khác tỷ lệ chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px; hệ thống sẽ giữ nguyên toàn bộ ảnh khi hiển thị.`
       );
     } catch (uploadError) {
-      setError(
+      notifyError(
         uploadError.message || "Không thể tải banner lên kho ảnh dùng chung."
       );
     } finally {
@@ -236,33 +188,27 @@ const AdminImageManagementPage = () => {
       );
 
       setDeleteBanner(null);
-      setMessage("Đã xóa banner.");
+      notifySuccess("Đã xóa banner.");
     } catch (deleteError) {
       setDeleteBanner(null);
-      setError(deleteError.message || "Không thể xóa banner.");
+      notifyError(deleteError.message || "Không thể xóa banner.");
     }
   };
 
   const updateBannerField = (bannerId, field, value) => {
     try {
-      let next;
-
-      if (field === "priority") {
-        next = normalizePriorityOrder(banners, bannerId, value);
-      } else {
-        next = banners.map((banner) =>
-          String(banner.id) === String(bannerId)
-            ? {
-                ...banner,
-                [field]: value,
-              }
-            : banner
-        );
-      }
+      const next =
+        field === "priority"
+          ? normalizePriorityOrder(banners, bannerId, value)
+          : banners.map((banner) =>
+              String(banner.id) === String(bannerId)
+                ? { ...banner, [field]: value }
+                : banner
+            );
 
       saveBanners(next);
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu cấu hình banner.");
+      notifyError(saveError.message || "Không thể lưu cấu hình banner.");
     }
   };
 
@@ -271,7 +217,6 @@ const AdminImageManagementPage = () => {
       <div className="mx-auto max-w-7xl px-4">
         <header className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Quản lý hình ảnh</h1>
-
           <p className="mt-2 text-sm text-gray-500">
             Quản lý Banner và hình ảnh sản phẩm.
           </p>
@@ -308,16 +253,12 @@ const AdminImageManagementPage = () => {
             <div className="flex flex-col gap-3 border-b border-gray-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-bold">Banner trang chủ</h2>
-
-                <p className="mt-1 text-sm text-gray-500">
-                  {banners.length} banner
-                </p>
+                <p className="mt-1 text-sm text-gray-500">{banners.length} banner</p>
               </div>
 
               <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700">
                 <FiUpload />
                 {busy ? "Đang tải..." : "Thêm banner"}
-
                 <input
                   type="file"
                   accept="image/*"
@@ -330,14 +271,12 @@ const AdminImageManagementPage = () => {
 
             <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
               Kích thước chuẩn khuyến nghị: <strong>1600 × 700 px</strong>.
-              Banner khác kích thước vẫn được upload, hệ thống chỉ thông báo để
-              người quản trị biết.
+              Banner khác kích thước vẫn được upload. Khi hiển thị, hệ thống giữ
+              nguyên toàn bộ nội dung ảnh, không crop.
             </div>
 
             {banners.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                Chưa có banner.
-              </div>
+              <div className="py-12 text-center text-gray-500">Chưa có banner.</div>
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {banners.map((banner, index) => (
@@ -345,13 +284,12 @@ const AdminImageManagementPage = () => {
                     key={banner.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="relative flex h-28 items-center justify-center overflow-hidden bg-gray-50 p-2">
+                    <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gray-50 p-2">
                       <img
                         src={banner.image}
                         alt={banner.alt || `Banner ${index + 1}`}
                         className="max-h-full max-w-full object-contain"
                       />
-
                       <span className="absolute left-2 top-2 rounded-md bg-gray-900/80 px-2 py-1 text-[10px] font-bold text-white">
                         Ưu tiên {index + 1}
                       </span>
@@ -415,16 +353,13 @@ const AdminImageManagementPage = () => {
                             }
                             className="h-4 w-4 rounded border-gray-300 text-pink-600"
                           />
-
                           {banner.visible !== false ? (
                             <>
-                              <FiEye />
-                              Hiển thị
+                              <FiEye /> Hiển thị
                             </>
                           ) : (
                             <>
-                              <FiEyeOff />
-                              Đang ẩn
+                              <FiEyeOff /> Đang ẩn
                             </>
                           )}
                         </label>
@@ -434,8 +369,7 @@ const AdminImageManagementPage = () => {
                           onClick={() => setDeleteBanner(banner)}
                           className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                         >
-                          <FiTrash2 />
-                          Xóa
+                          <FiTrash2 /> Xóa
                         </button>
                       </div>
                     </div>
@@ -450,7 +384,6 @@ const AdminImageManagementPage = () => {
           <section className="rounded-2xl bg-white p-5 shadow-sm">
             <div className="border-b border-gray-100 pb-4">
               <h2 className="text-xl font-bold">Hình ảnh sản phẩm</h2>
-
               <p className="mt-1 text-sm text-gray-500">
                 Giao diện ảnh đồng nhất với Tất cả sản phẩm.
               </p>
@@ -476,21 +409,15 @@ const AdminImageManagementPage = () => {
                         className="max-h-full max-w-full rounded-lg object-contain"
                       />
                     </div>
-
                     <div className="p-3">
                       <h3 className="line-clamp-2 min-h-[38px] text-sm font-semibold text-gray-800">
                         {product.name}
                       </h3>
-
                       <p className="mt-1 text-xs font-bold text-pink-600">
                         {Number(product.price || 0).toLocaleString("vi-VN")} ₫
                       </p>
-
                       <p className="mt-1 text-xs text-gray-500">
-                        Đã bán:{" "}
-                        {Number(product.salesCount || 0).toLocaleString(
-                          "vi-VN"
-                        )}
+                        Đã bán: {Number(product.salesCount || 0).toLocaleString("vi-VN")}
                       </p>
                     </div>
                   </article>
@@ -501,17 +428,13 @@ const AdminImageManagementPage = () => {
         )}
       </div>
 
-      <MessageModal message={message} error={error} onClose={closeMessage} />
-
       {deleteBanner && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
             <h2 className="text-lg font-bold">Xóa banner?</h2>
-
             <p className="mt-2 text-sm text-gray-500">
               Banner này sẽ bị xóa khỏi danh sách.
             </p>
-
             <div className="mt-5 flex justify-center gap-3">
               <button
                 type="button"
@@ -520,7 +443,6 @@ const AdminImageManagementPage = () => {
               >
                 Hủy
               </button>
-
               <button
                 type="button"
                 onClick={handleDeleteBanner}
