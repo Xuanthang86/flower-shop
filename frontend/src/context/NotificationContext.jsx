@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   createContext,
   useCallback,
@@ -63,9 +65,7 @@ export const NotificationProvider = ({ children }) => {
 
       setNotification({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-
         message: String(message),
-
         type: normalizedType,
       });
 
@@ -160,13 +160,13 @@ export const NotificationToast = () => {
 
   const toast = (
     <div
-      className="pointer-events-none fixed inset-0 z-[99999] flex items-center justify-center p-4"
+      className="pointer-events-none fixed left-1/2 top-1/2 z-[99999] w-full -translate-x-1/2 -translate-y-1/2 px-4"
       aria-live="polite"
       aria-atomic="true"
     >
       <div
         key={notification.id}
-        className={`pointer-events-auto flex w-full max-w-md items-center gap-4 rounded-2xl border px-5 py-4 ${config.wrapper}`}
+        className={`pointer-events-auto mx-auto flex w-full max-w-md items-center gap-4 rounded-2xl border px-5 py-4 ${config.wrapper}`}
         role={notification.type === "error" ? "alert" : "status"}
       >
         <div

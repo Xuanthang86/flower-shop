@@ -28,7 +28,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
  * - Có liên kết nội bộ.
  * - Có cấu trúc phù hợp cho nội dung bài viết.
  */
-const DEFAULT_BLOG_SHOP_INFO_HTML = `
+export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 <section
   data-flower-shop-default-info="true"
   style="
@@ -307,6 +307,66 @@ const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 </p>
 `;
 
+/*
+ * Chuẩn hóa HTML trước khi so sánh.
+ */
+const normalizeHtmlForComparison = (value) =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/*
+ * Nhận diện các template mặc định cũ.
+ *
+ * Bao gồm:
+ * 1. Template legacy nằm trực tiếp trong siteSettings.js.
+ * 2. Template mặc định cũ từng nằm trong AdminBlogManagementPage.jsx.
+ *
+ * Không tự động thay thế nội dung mà người quản trị đã viết riêng,
+ * trừ khi nội dung rõ ràng là template mặc định cũ của hệ thống.
+ */
+const isLegacyDefaultBlogShopInfo = (value) => {
+  const normalized = normalizeHtmlForComparison(value);
+
+  if (!normalized) {
+    return true;
+  }
+
+  const legacyTemplate = normalizeHtmlForComparison(
+    LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML
+  );
+
+  if (normalized === legacyTemplate) {
+    return true;
+  }
+
+  /*
+   * Template cũ từng được khai báo trực tiếp trong
+   * AdminBlogManagementPage.jsx.
+   */
+  const isOldAdminBlogTemplate =
+    normalized.includes('data-flower-shop-default-info="true"') &&
+    normalized.includes("Hoa tươi tinh tế cho những khoảnh khắc đáng nhớ.") &&
+    normalized.includes("Bạn có thể tham khảo thêm:") &&
+    normalized.includes("Xem danh mục sản phẩm");
+
+  if (isOldAdminBlogTemplate) {
+    return true;
+  }
+
+  /*
+   * Một số dữ liệu rất cũ chỉ có cấu trúc:
+   * <h2> + vài <p> + thông tin liên hệ.
+   */
+  const isVeryOldSimpleTemplate =
+    normalized.includes("<h2>Về Flower Shop</h2>") &&
+    normalized.includes("Thông tin liên hệ") &&
+    normalized.includes("Danh mục sản phẩm") &&
+    normalized.includes("/contact");
+
+  return isVeryOldSimpleTemplate;
+};
+
 const DEFAULT_SITE_SETTINGS = {
   announcementMessages: [
     "🌸 Miễn phí giao hàng cho đơn từ 500.000đ",
@@ -481,17 +541,15 @@ const mergeSettings = (input = {}) => {
   /*
    * Tự động migrate nội dung mặc định cũ.
    *
-   * Nếu localStorage đang chứa đúng template cũ,
+   * Nếu localStorage đang chứa template mặc định cũ,
    * hệ thống thay bằng template mới.
    *
    * Nếu người quản trị đã tự chỉnh sửa nội dung,
    * không ghi đè.
    */
-  const defaultShopInfoHtml =
-    !sourceBlogHtml ||
-    sourceBlogHtml === LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML.trim()
-      ? defaults.blog.defaultShopInfoHtml
-      : sourceBlogHtml;
+  const defaultShopInfoHtml = isLegacyDefaultBlogShopInfo(sourceBlogHtml)
+    ? defaults.blog.defaultShopInfoHtml
+    : sourceBlogHtml;
 
   return {
     ...defaults,

@@ -32,7 +32,12 @@ const ensureMeta = (attribute, value, content) => {
   if (!element) {
     element = document.createElement("meta");
 
-    element.setAttribute(attribute, value);
+    element.setAttribute("name", value);
+
+    if (attribute === "property") {
+      element.setAttribute("property", value);
+      element.removeAttribute("name");
+    }
 
     document.head.appendChild(element);
   }
@@ -58,6 +63,22 @@ const ensureCanonical = (url) => {
   return link;
 };
 
+const readWishlistValue = (key, productId) => {
+  if (!key || productId === undefined || productId === null) {
+    return false;
+  }
+
+  try {
+    const raw = localStorage.getItem(key);
+
+    const ids = raw ? JSON.parse(raw) : [];
+
+    return Array.isArray(ids) && ids.map(String).includes(String(productId));
+  } catch {
+    return false;
+  }
+};
+
 const ProductDetailPage = () => {
   const { productId } = useParams();
 
@@ -73,7 +94,10 @@ const ProductDetailPage = () => {
 
   const [categories, setCategories] = useState(() => readCategories());
 
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteOverride, setFavoriteOverride] = useState({
+    key: null,
+    value: null,
+  });
 
   const isStaff = STAFF_ROLES.has(user?.role);
 
@@ -102,27 +126,20 @@ const ProductDetailPage = () => {
     ? categories.find((item) => item.slug === product.category)
     : null;
 
-  useEffect(() => {
-    if (!user || isStaff || !product) {
-      setIsFavorite(false);
+  const wishlistKey =
+    user && !isStaff && product
+      ? `${WISHLIST_KEY}-${user.id || user.email}`
+      : null;
 
-      return;
-    }
+  const storedIsFavorite = useMemo(
+    () => readWishlistValue(wishlistKey, product?.id),
+    [wishlistKey, product?.id]
+  );
 
-    const userId = user.id || user.email;
-
-    try {
-      const raw = localStorage.getItem(`${WISHLIST_KEY}-${userId}`);
-
-      const ids = raw ? JSON.parse(raw) : [];
-
-      setIsFavorite(
-        Array.isArray(ids) && ids.map(String).includes(String(product.id))
-      );
-    } catch {
-      setIsFavorite(false);
-    }
-  }, [user, product, isStaff]);
+  const isFavorite =
+    favoriteOverride.key === wishlistKey && favoriteOverride.value !== null
+      ? favoriteOverride.value
+      : storedIsFavorite;
 
   useEffect(() => {
     window.scrollTo({
@@ -322,7 +339,7 @@ const ProductDetailPage = () => {
 
         return Number(b.salesCount || 0) - Number(a.salesCount || 0);
       })
-      .slice(0, 8);
+      .slice(0, 12);
   }, [product, products]);
 
   const formatPrice = (value) =>
@@ -416,10 +433,15 @@ const ProductDetailPage = () => {
 
     localStorage.setItem(key, JSON.stringify(updatedIds));
 
-    setIsFavorite(updatedIds.includes(id));
+    const nextFavorite = updatedIds.includes(id);
+
+    setFavoriteOverride({
+      key,
+      value: nextFavorite,
+    });
 
     notifySuccess(
-      updatedIds.includes(id)
+      nextFavorite
         ? "Đã thêm sản phẩm vào danh sách yêu thích."
         : "Đã bỏ sản phẩm khỏi danh sách yêu thích."
     );
