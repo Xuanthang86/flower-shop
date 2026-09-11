@@ -26,7 +26,6 @@ const normalizeHeader = (value) =>
 
 const HEADER_ALIASES = {
   "ten san pham": "Tên sản phẩm",
-  "ten san pham ": "Tên sản phẩm",
   gia: "Giá",
   "gia cu": "Giá cũ",
   "danh muc": "Danh mục",
@@ -125,44 +124,42 @@ const findCategory = (value, categories) => {
   );
 };
 
-const getStatus = ({ name, price, category, image }) => {
+const createStatus = (code, label, level) => ({
+  code,
+  label,
+  level,
+});
+
+const getStatus = ({ name, price, category, image, oldPrice, hasOldPrice }) => {
   if (!name) {
-    return {
-      code: "missing_name",
-      label: "❌ Thiếu tên",
-      level: "error",
-    };
+    return createStatus("missing_name", "❌ Thiếu tên", "error");
   }
 
   if (!Number.isFinite(price) || price <= 0) {
-    return {
-      code: "invalid_price",
-      label: "❌ Giá không hợp lệ",
-      level: "error",
-    };
+    return createStatus("invalid_price", "❌ Giá không hợp lệ", "error");
   }
 
   if (!category) {
-    return {
-      code: "invalid_category",
-      label: "❌ Danh mục không tồn tại",
-      level: "error",
-    };
+    return createStatus(
+      "invalid_category",
+      "❌ Danh mục không tồn tại",
+      "error"
+    );
+  }
+
+  if (hasOldPrice && (!Number.isFinite(oldPrice) || oldPrice <= price)) {
+    return createStatus("invalid_price", "❌ Giá không hợp lệ", "error");
   }
 
   if (image.warning) {
-    return {
-      code: "invalid_image",
-      label: "⚠️ URL hình ảnh không hợp lệ",
-      level: "warning",
-    };
+    return createStatus(
+      "invalid_image",
+      "⚠️ URL hình ảnh không hợp lệ",
+      "warning"
+    );
   }
 
-  return {
-    code: "valid",
-    label: "✅ Hợp lệ",
-    level: "success",
-  };
+  return createStatus("valid", "✅ Hợp lệ", "success");
 };
 
 export const createProductFromExcelRow = (row, categories, index) => {
@@ -172,12 +169,9 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
   const oldPriceRaw = row["Giá cũ"];
 
-  const oldPrice =
-    oldPriceRaw === null ||
-    oldPriceRaw === undefined ||
-    normalizeText(oldPriceRaw) === ""
-      ? null
-      : parsePrice(oldPriceRaw);
+  const hasOldPrice = normalizeText(oldPriceRaw) !== "";
+
+  const oldPrice = hasOldPrice ? parsePrice(oldPriceRaw) : null;
 
   const category = findCategory(row["Danh mục"], categories);
 
@@ -190,19 +184,9 @@ export const createProductFromExcelRow = (row, categories, index) => {
     price,
     category,
     image,
+    oldPrice,
+    hasOldPrice,
   });
-
-  const validOldPrice =
-    oldPrice === null || (Number.isFinite(oldPrice) && oldPrice > price);
-
-  const finalStatus =
-    status.level === "success" && !validOldPrice
-      ? {
-          code: "invalid_price",
-          label: "❌ Giá không hợp lệ",
-          level: "error",
-        }
-      : status;
 
   return {
     rowNumber: index + 2,
@@ -211,7 +195,7 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
     price: Number.isFinite(price) ? price : 0,
 
-    oldPrice: oldPrice === null || !Number.isFinite(oldPrice) ? null : oldPrice,
+    oldPrice: hasOldPrice && Number.isFinite(oldPrice) ? oldPrice : null,
 
     category: category?.slug || "",
 
@@ -221,7 +205,7 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
     image: image.value,
 
-    status: finalStatus,
+    status,
 
     raw: row,
   };
@@ -315,21 +299,29 @@ export const downloadProductExcelTemplate = () => {
     ["Cột", "Quy định"],
     ["Tên sản phẩm", "Bắt buộc. Không được để trống."],
     ["Giá", "Bắt buộc. Nhập số, ví dụ 450000."],
-    ["Giá cũ", "Không bắt buộc. Nếu nhập phải lớn hơn Giá."],
+    ["Giá cũ", "Không bắt buộc. Nếu nhập phải là số và lớn hơn Giá."],
     ["Danh mục", "Nhập đúng tên danh mục hoặc slug đang có trong hệ thống."],
     ["Tóm tắt", "Nội dung ngắn dùng làm mô tả sản phẩm."],
     [
       "Hình ảnh",
-      "Nên dùng URL Cloudinary https://res.cloudinary.com/... . Không dùng đường dẫn C:\\ hoặc D:\\.",
+      "Dùng URL http/https. Khuyến nghị URL Cloudinary của Flower Shop.",
     ],
     [],
     [
       "Lưu ý",
-      "Ảnh nên được upload lên Quản lý sản phẩm trước, sau đó copy URL Cloudinary vào cột Hình ảnh.",
+      "Không dùng đường dẫn C:\\ hoặc D:\\ trong Excel vì đó là đường dẫn chỉ tồn tại trên máy cá nhân.",
+    ],
+    [
+      "Cách lưu ảnh",
+      "Upload ảnh bằng chức năng Chọn tệp trong Quản lý sản phẩm để ảnh được lưu lên Cloudinary, sau đó copy địa chỉ ảnh và dán vào cột Hình ảnh.",
+    ],
+    [
+      "Nhiều ảnh",
+      "Phiên bản hiện tại nhập 1 ảnh chính cho mỗi sản phẩm. Hỗ trợ nhiều ảnh sẽ triển khai ở giai đoạn sau.",
     ],
   ]);
 
-  guideWorksheet["!cols"] = [{ wch: 24 }, { wch: 100 }];
+  guideWorksheet["!cols"] = [{ wch: 24 }, { wch: 110 }];
 
   const workbook = utils.book_new();
 

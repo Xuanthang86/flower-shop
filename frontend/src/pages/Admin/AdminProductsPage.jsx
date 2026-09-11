@@ -5,6 +5,7 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiChevronUp,
+  FiDownload,
   FiEdit2,
   FiEye,
   FiEyeOff,
@@ -29,6 +30,10 @@ import {
 import { slugifyCategory } from "@/constants/productCategories";
 
 import { uploadImageFile } from "@/services/media";
+
+import { downloadProductExcelTemplate } from "@/services/productExcel";
+
+import ProductExcelImportModal from "./ProductExcelImportModal";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -56,6 +61,7 @@ const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
 const getDiscountPercent = (price, oldPrice) => {
   const current = Number(price);
+
   const old = Number(oldPrice);
 
   if (
@@ -82,6 +88,7 @@ const FilePicker = ({ id, selected, disabled, onChange }) => (
         }`}
       >
         <FiUpload size={16} />
+
         {disabled ? "Đang tải..." : "Chọn tệp"}
       </label>
 
@@ -103,24 +110,33 @@ const FilePicker = ({ id, selected, disabled, onChange }) => (
 
 const AdminProductsPage = () => {
   const [products, setProducts] = useState(() => readProducts());
+
   const [categories, setCategories] = useState(() => readCategories());
 
   const [keyword, setKeyword] = useState("");
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showCategories, setShowCategories] = useState(false);
+
   const [showProductModal, setShowProductModal] = useState(false);
+
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
+  const [showExcelImportModal, setShowExcelImportModal] = useState(false);
+
   const [editingProduct, setEditingProduct] = useState(null);
+
   const [editingCategory, setEditingCategory] = useState(null);
 
   const [productForm, setProductForm] = useState(EMPTY_PRODUCT);
+
   const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY);
 
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const [message, setMessage] = useState("");
+
   const [error, setError] = useState("");
 
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -132,7 +148,9 @@ const AdminProductsPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
+
       robots.name = "robots";
+
       document.head.appendChild(robots);
     }
 
@@ -141,18 +159,24 @@ const AdminProductsPage = () => {
 
   useEffect(() => {
     const refreshProducts = () => setProducts(readProducts());
+
     const refreshCategories = () => setCategories(readCategories());
 
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
     window.addEventListener("storage", refreshProducts);
+
     window.addEventListener("storage", refreshCategories);
 
     return () => {
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
       window.removeEventListener("storage", refreshProducts);
+
       window.removeEventListener("storage", refreshCategories);
     };
   }, []);
@@ -168,7 +192,9 @@ const AdminProductsPage = () => {
   const filteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
 
-    if (!query) return products;
+    if (!query) {
+      return products;
+    }
 
     return products.filter((product) =>
       [product.name, product.category, product.description]
@@ -205,6 +231,7 @@ const AdminProductsPage = () => {
 
   const openCreateProduct = () => {
     clearMessages();
+
     setEditingProduct(null);
 
     setProductForm({
@@ -217,6 +244,7 @@ const AdminProductsPage = () => {
 
   const openEditProduct = (product) => {
     clearMessages();
+
     setEditingProduct(product);
 
     setProductForm({
@@ -234,19 +262,25 @@ const AdminProductsPage = () => {
 
   const closeProductModal = () => {
     setShowProductModal(false);
+
     setEditingProduct(null);
+
     setProductForm(EMPTY_PRODUCT);
   };
 
   const openCreateCategory = () => {
     clearMessages();
+
     setEditingCategory(null);
+
     setCategoryForm(EMPTY_CATEGORY);
+
     setShowCategoryModal(true);
   };
 
   const openEditCategory = (category) => {
     clearMessages();
+
     setEditingCategory(category);
 
     setCategoryForm({
@@ -261,7 +295,9 @@ const AdminProductsPage = () => {
 
   const closeCategoryModal = () => {
     setShowCategoryModal(false);
+
     setEditingCategory(null);
+
     setCategoryForm(EMPTY_CATEGORY);
   };
 
@@ -270,9 +306,12 @@ const AdminProductsPage = () => {
 
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setUploadingImage(true);
+
     clearMessages();
 
     try {
@@ -281,8 +320,11 @@ const AdminProductsPage = () => {
           target === "product"
             ? "flower-shop/products"
             : "flower-shop/categories",
+
         maxWidth: target === "product" ? 1400 : 1100,
+
         maxHeight: target === "product" ? 1000 : 800,
+
         quality: 0.82,
       });
 
@@ -308,12 +350,14 @@ const AdminProductsPage = () => {
 
   const saveCategory = (event) => {
     event.preventDefault();
+
     clearMessages();
 
     const name = categoryForm.name.trim();
 
     if (!name) {
       setError("Vui lòng nhập tên danh mục.");
+
       return;
     }
 
@@ -321,6 +365,7 @@ const AdminProductsPage = () => {
 
     if (!slug) {
       setError("Tên danh mục không hợp lệ.");
+
       return;
     }
 
@@ -332,18 +377,27 @@ const AdminProductsPage = () => {
 
     if (duplicate) {
       setError("Danh mục này đã tồn tại.");
+
       return;
     }
 
     const nextCategory = {
       id: editingCategory?.id || slug,
+
       name,
+
       slug,
+
       label: name,
+
       query: slug,
+
       summary: categoryForm.summary.trim(),
+
       image: categoryForm.image || "",
+
       active: categoryForm.active !== false,
+
       sortOrder: editingCategory?.sortOrder || categories.length + 1,
     };
 
@@ -359,6 +413,7 @@ const AdminProductsPage = () => {
       const saved = saveCategories(updated);
 
       setCategories(saved);
+
       closeCategoryModal();
 
       setMessage(
@@ -376,7 +431,9 @@ const AdminProductsPage = () => {
       (category) => String(category.id) === String(categoryId)
     );
 
-    if (index < 0) return;
+    if (index < 0) {
+      return;
+    }
 
     const targetIndex = direction === "up" ? index - 1 : index + 1;
 
@@ -396,8 +453,11 @@ const AdminProductsPage = () => {
 
     try {
       const saved = saveCategories(normalized);
+
       setCategories(saved);
+
       setMessage("Đã cập nhật thứ tự danh mục.");
+
       setError("");
     } catch (saveError) {
       setError(saveError.message || "Không thể cập nhật thứ tự danh mục.");
@@ -435,9 +495,11 @@ const AdminProductsPage = () => {
 
   const saveProduct = (event) => {
     event.preventDefault();
+
     clearMessages();
 
     const name = productForm.name.trim();
+
     const price = Number(productForm.price);
 
     const oldPrice =
@@ -447,11 +509,13 @@ const AdminProductsPage = () => {
 
     if (!name) {
       setError("Vui lòng nhập Tên sản phẩm.");
+
       return;
     }
 
     if (!Number.isFinite(price) || price <= 0) {
       setError("Giá phải lớn hơn 0.");
+
       return;
     }
 
@@ -460,26 +524,35 @@ const AdminProductsPage = () => {
       (!Number.isFinite(oldPrice) || oldPrice <= price)
     ) {
       setError("Giá cũ phải lớn hơn giá hiện tại.");
+
       return;
     }
 
     if (!productForm.category) {
       setError("Vui lòng chọn Danh mục.");
+
       return;
     }
 
     if (!Number.isFinite(salesCount) || salesCount < 0) {
       setError("Đã bán phải là số nguyên không âm.");
+
       return;
     }
 
     const data = {
       name,
+
       price,
+
       oldPrice,
+
       category: productForm.category,
+
       description: productForm.description.trim(),
+
       image: productForm.image || "",
+
       salesCount: Math.floor(salesCount),
     };
 
@@ -506,8 +579,11 @@ const AdminProductsPage = () => {
             id: `product-${Date.now()}-${Math.random()
               .toString(36)
               .slice(2, 8)}`,
+
             ...data,
+
             isNew: true,
+
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -516,9 +592,62 @@ const AdminProductsPage = () => {
       }
 
       setProducts(saved);
+
       closeProductModal();
     } catch (saveError) {
       setError(saveError.message || "Không thể lưu sản phẩm.");
+    }
+  };
+
+  const handleExcelImport = (rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      setError("Không có dòng sản phẩm hợp lệ để nhập.");
+
+      return;
+    }
+
+    clearMessages();
+
+    const importedProducts = rows.map((row, index) => ({
+      id: `product-${Date.now()}-${index}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`,
+
+      name: row.name,
+
+      price: Number(row.price || 0),
+
+      oldPrice: row.oldPrice === null ? null : Number(row.oldPrice),
+
+      category: row.category,
+
+      description: row.description || "",
+
+      image: row.image || "",
+
+      salesCount: 0,
+
+      isNew: true,
+
+      createdAt: new Date().toISOString(),
+
+      importedFrom: "excel",
+    }));
+
+    try {
+      const saved = saveProducts([...products, ...importedProducts]);
+
+      setProducts(saved);
+
+      setCurrentPage(1);
+
+      setShowExcelImportModal(false);
+
+      setMessage(
+        `Đã nhập thành công ${importedProducts.length} sản phẩm từ Excel.`
+      );
+    } catch (saveError) {
+      setError(saveError.message || "Không thể lưu sản phẩm từ Excel.");
     }
   };
 
@@ -539,6 +668,7 @@ const AdminProductsPage = () => {
       setError(
         `Không thể xóa "${category.name}" vì đang có ${count} sản phẩm sử dụng danh mục này.`
       );
+
       return;
     }
 
@@ -550,7 +680,9 @@ const AdminProductsPage = () => {
   };
 
   const executeDelete = () => {
-    if (!confirmDelete) return;
+    if (!confirmDelete) {
+      return;
+    }
 
     try {
       if (confirmDelete.type === "product") {
@@ -561,6 +693,7 @@ const AdminProductsPage = () => {
         );
 
         setProducts(saved);
+
         setMessage("Đã xóa sản phẩm.");
       }
 
@@ -577,19 +710,24 @@ const AdminProductsPage = () => {
         );
 
         setCategories(saved);
+
         setMessage("Đã xóa danh mục.");
       }
 
       setConfirmDelete(null);
+
       setError("");
     } catch (deleteError) {
       setConfirmDelete(null);
+
       setError(deleteError.message || "Không thể xóa dữ liệu.");
     }
   };
 
   const goToPage = (page) => {
-    if (page < 1 || page > totalPages) return;
+    if (page < 1 || page > totalPages) {
+      return;
+    }
 
     setCurrentPage(page);
 
@@ -778,7 +916,7 @@ const AdminProductsPage = () => {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <label className="relative">
                 <FiSearch
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -789,12 +927,31 @@ const AdminProductsPage = () => {
                   value={keyword}
                   onChange={(event) => {
                     setKeyword(event.target.value);
+
                     setCurrentPage(1);
                   }}
                   placeholder="Tìm sản phẩm..."
                   className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pink-400 sm:w-64"
                 />
               </label>
+
+              <button
+                type="button"
+                onClick={() => setShowExcelImportModal(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-pink-200 bg-pink-50 px-4 py-2.5 text-sm font-semibold text-pink-700 hover:bg-pink-100"
+              >
+                <FiUpload />
+                Nhập Excel
+              </button>
+
+              <button
+                type="button"
+                onClick={downloadProductExcelTemplate}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <FiDownload />
+                Tải Excel mẫu
+              </button>
 
               <button
                 type="button"
@@ -911,22 +1068,25 @@ const AdminProductsPage = () => {
                 <FiChevronLeft />
               </button>
 
-              {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-                (page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => goToPage(page)}
-                    className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-semibold ${
-                      page === safePage
-                        ? "border-pink-600 bg-pink-600 text-white"
-                        : "border-gray-200 bg-white text-gray-700 hover:bg-pink-50"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )
-              )}
+              {Array.from(
+                {
+                  length: totalPages,
+                },
+                (_, index) => index + 1
+              ).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => goToPage(page)}
+                  className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-semibold ${
+                    page === safePage
+                      ? "border-pink-600 bg-pink-600 text-white"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-pink-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
 
               <button
                 type="button"
@@ -1264,6 +1424,13 @@ const AdminProductsPage = () => {
           </div>
         </div>
       )}
+
+      <ProductExcelImportModal
+        open={showExcelImportModal}
+        categories={categoriesSorted}
+        onClose={() => setShowExcelImportModal(false)}
+        onConfirm={handleExcelImport}
+      />
     </main>
   );
 };
