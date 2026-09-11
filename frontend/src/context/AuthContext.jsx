@@ -36,10 +36,10 @@ export const PERMISSIONS = Object.freeze({
   MANAGE_CONTACT: "manage_contact",
   MANAGE_CONTENT: "manage_content",
 
-  // Đây là quyền kỹ thuật riêng của Admin,
-  // không đưa vào nhóm checkbox module quản lý của Manager/Product Manager.
+  // Chỉ Admin, không đưa vào nhóm quyền Manager/Product Manager.
   MANAGE_APPEARANCE: "manage_appearance",
 
+  // Có thể dùng cho module báo cáo trong tương lai.
   VIEW_REPORTS: "view_reports",
 });
 
@@ -62,15 +62,45 @@ export const PERMISSION_LABELS = Object.freeze({
 });
 
 /*
- * Đây mới là danh sách MODULE QUẢN LÝ mà Admin có thể
- * cấp cho Manager / Product Manager.
+ * Đây là các ROLE được phép cấu hình quyền nghiệp vụ tập trung.
  *
- * Không đưa MANAGE_APPEARANCE vào đây vì:
+ * Khi thêm role mới trong tương lai:
+ * 1. Thêm role vào ROLES.
+ * 2. Thêm role vào ROLE_PERMISSION_ROLES.
+ * 3. Thêm quyền mặc định vào siteSettings.js.
+ * 4. Các checkbox trong AdminUsersPage sẽ tự hiển thị role mới.
+ */
+export const ROLE_PERMISSION_ROLES = Object.freeze([
+  ROLES.MANAGER,
+  ROLES.PRODUCT_MANAGER,
+]);
+
+export const ROLE_PERMISSION_GROUPS = Object.freeze([
+  {
+    role: ROLES.MANAGER,
+    label: ROLE_LABELS[ROLES.MANAGER],
+    description:
+      "Quyền này áp dụng đồng thời cho tất cả tài khoản có vai trò Manager.",
+  },
+  {
+    role: ROLES.PRODUCT_MANAGER,
+    label: ROLE_LABELS[ROLES.PRODUCT_MANAGER],
+    description:
+      "Quyền này áp dụng đồng thời cho tất cả tài khoản có vai trò Product Manager.",
+  },
+]);
+
+/*
+ * Danh sách quyền nghiệp vụ có thể cấp cho Manager/Product Manager.
+ *
+ * KHÔNG đưa MANAGE_APPEARANCE vào đây vì:
  * - Tùy chỉnh giao diện chỉ dành cho Admin.
- * - Nó không phải một module quản lý nghiệp vụ.
+ * - Đây không phải quyền quản lý nghiệp vụ của Manager/Product Manager.
  *
- * Khi sau này có module mới, chỉ cần thêm permission vào đây
- * và thêm module tương ứng trong AdminManagementPage/AppRoutes.
+ * Khi có module mới như "Xem báo cáo":
+ * - Thêm PERMISSIONS.VIEW_REPORTS vào danh sách này.
+ * - Thêm label trong PERMISSION_LABELS.
+ * - Thêm module tương ứng vào AdminManagementPage/AppRoutes.
  */
 export const MANAGEMENT_PERMISSIONS = [
   PERMISSIONS.MANAGE_ORDERS,
@@ -79,6 +109,7 @@ export const MANAGEMENT_PERMISSIONS = [
   PERMISSIONS.MANAGE_IMAGES,
   PERMISSIONS.MANAGE_CONTENT,
   PERMISSIONS.MANAGE_CONTACT,
+  // PERMISSIONS.VIEW_REPORTS,
 ];
 
 export const useAuth = () => {

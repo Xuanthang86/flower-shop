@@ -16,7 +16,7 @@ export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
  * - Đơn hàng
  * - Sản phẩm
  *
- * Không đưa MANAGE_APPEARANCE vào đây.
+ * Tùy chỉnh giao diện chỉ dành cho Admin.
  */
 export const DEFAULT_ROLE_PERMISSIONS = {
   manager: [
@@ -29,6 +29,32 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 
   product_manager: ["manage_orders", "manage_products"],
 };
+
+const DEFAULT_BLOG_SHOP_INFO_HTML = `
+<h2>Về Flower Shop</h2>
+<p>
+  Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
+  được tuyển chọn và chăm sóc kỹ lưỡng cho nhiều dịp đặc biệt như sinh nhật,
+  khai trương, cưới hỏi, chúc mừng, tri ân và các sự kiện quan trọng.
+</p>
+<p>
+  {{siteName}} luôn hướng tới những sản phẩm hoa tươi chất lượng,
+  cách trình bày tinh tế và dịch vụ hỗ trợ tận tâm.
+</p>
+<p>
+  <strong>Thông tin liên hệ:</strong><br />
+  Địa chỉ: {{address}}<br />
+  Điện thoại: {{phone}}<br />
+  Email: {{email}}<br />
+  Thời gian làm việc: {{workingHours}}
+</p>
+<p>
+  Bạn có thể tham khảo thêm các sản phẩm hoa tại
+  <a href="/products">Danh mục sản phẩm</a>
+  hoặc liên hệ với shop qua trang
+  <a href="/contact">Liên hệ</a>.
+</p>
+`;
 
 const DEFAULT_SITE_SETTINGS = {
   announcementMessages: [
@@ -101,6 +127,7 @@ const DEFAULT_SITE_SETTINGS = {
   blog: {
     columns: 3,
     borderRadius: 16,
+    defaultShopInfoHtml: DEFAULT_BLOG_SHOP_INFO_HTML,
   },
 
   theme: {
@@ -190,6 +217,11 @@ const mergeSettings = (input = {}) => {
     Math.max(5, Number.isFinite(rawInterval) ? rawInterval : 8)
   );
 
+  const defaultShopInfoHtml =
+    String(
+      source.blog?.defaultShopInfoHtml ?? defaults.blog.defaultShopInfoHtml
+    ).trim() || defaults.blog.defaultShopInfoHtml;
+
   return {
     ...defaults,
     ...source,
@@ -264,6 +296,7 @@ const mergeSettings = (input = {}) => {
     blog: {
       ...defaults.blog,
       ...(source.blog || {}),
+      defaultShopInfoHtml,
     },
 
     theme: {

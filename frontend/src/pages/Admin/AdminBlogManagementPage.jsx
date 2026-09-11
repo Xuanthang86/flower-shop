@@ -43,17 +43,55 @@ const stripHtml = (html = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const buildDefaultShopInfo = (settings) => {
+  const template = String(settings?.blog?.defaultShopInfoHtml || "").trim();
+
+  if (!template) {
+    return "";
+  }
+
+  const branding = settings?.branding || {};
+
+  const contact = settings?.contact || {};
+
+  return template
+    .replace(
+      /\{\{siteName\}\}/g,
+      escapeHtml(branding.siteName || "Flower Shop")
+    )
+    .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
+    .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
+    .replace(/\{\{phone\}\}/g, escapeHtml(contact.phone || "Đang cập nhật"))
+    .replace(/\{\{email\}\}/g, escapeHtml(contact.email || "Đang cập nhật"))
+    .replace(
+      /\{\{workingHours\}\}/g,
+      escapeHtml(contact.workingHours || "Đang cập nhật")
+    );
+};
+
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [editorOpen, setEditorOpen] = useState(false);
+
   const [editingPost, setEditingPost] = useState(null);
+
   const [form, setForm] = useState(EMPTY_POST);
 
   const [message, setMessage] = useState("");
+
   const [error, setError] = useState("");
 
   const [confirmDelete, setConfirmDelete] = useState(null);
+
   const [uploading, setUploading] = useState(false);
 
   const editorRef = useRef(null);
@@ -65,7 +103,9 @@ const AdminBlogManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
+
       robots.name = "robots";
+
       document.head.appendChild(robots);
     }
 
@@ -101,12 +141,16 @@ const AdminBlogManagementPage = () => {
 
   const openCreate = () => {
     clearMessages();
+
     setEditingPost(null);
+
+    const defaultShopInfo = buildDefaultShopInfo(settings);
 
     setForm({
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
+      content: defaultShopInfo,
     });
 
     setEditorOpen(true);
@@ -114,6 +158,7 @@ const AdminBlogManagementPage = () => {
 
   const openEdit = (post) => {
     clearMessages();
+
     setEditingPost(post);
 
     setForm({
@@ -129,12 +174,16 @@ const AdminBlogManagementPage = () => {
 
   const closeEditor = () => {
     setEditorOpen(false);
+
     setEditingPost(null);
+
     setForm(EMPTY_POST);
   };
 
   const executeFormat = (command, value = null) => {
-    if (!editorRef.current) return;
+    if (!editorRef.current) {
+      return;
+    }
 
     editorRef.current.focus();
 
@@ -149,7 +198,9 @@ const AdminBlogManagementPage = () => {
   const createLink = () => {
     const url = window.prompt("Nhập liên kết:");
 
-    if (!url) return;
+    if (!url) {
+      return;
+    }
 
     executeFormat("createLink", url);
   };
@@ -166,9 +217,12 @@ const AdminBlogManagementPage = () => {
 
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setUploading(true);
+
     clearMessages();
 
     try {
@@ -184,7 +238,7 @@ const AdminBlogManagementPage = () => {
         image,
       }));
     } catch (imageError) {
-      setError(imageError.message || "Không thể tải ảnh.");
+      setError(imageError?.message || "Không thể tải ảnh.");
     } finally {
       setUploading(false);
     }
@@ -195,9 +249,12 @@ const AdminBlogManagementPage = () => {
 
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setUploading(true);
+
     clearMessages();
 
     try {
@@ -210,6 +267,7 @@ const AdminBlogManagementPage = () => {
 
       if (!editorRef.current) {
         setError("Trình soạn thảo chưa sẵn sàng.");
+
         return;
       }
 
@@ -222,7 +280,7 @@ const AdminBlogManagementPage = () => {
         content: editorRef.current?.innerHTML || "",
       }));
     } catch (imageError) {
-      setError(imageError.message || "Không thể chèn hình ảnh.");
+      setError(imageError?.message || "Không thể chèn hình ảnh.");
     } finally {
       setUploading(false);
     }
@@ -237,11 +295,13 @@ const AdminBlogManagementPage = () => {
 
     if (!title) {
       setError("Vui lòng nhập tiêu đề bài viết.");
+
       return;
     }
 
     if (!content || content === "<br>" || content === "<div><br></div>") {
       setError("Vui lòng nhập nội dung bài viết.");
+
       return;
     }
 
@@ -249,11 +309,17 @@ const AdminBlogManagementPage = () => {
       id:
         editingPost?.id ||
         `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+
       title,
+
       date: form.date,
+
       time: form.time || "08:00",
+
       image: form.image || "",
+
       content,
+
       updatedAt: new Date().toISOString(),
     };
 
@@ -277,27 +343,33 @@ const AdminBlogManagementPage = () => {
 
       closeEditor();
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu bài viết.");
+      setError(saveError?.message || "Không thể lưu bài viết.");
     }
   };
 
   const executeDelete = () => {
-    if (!confirmDelete) return;
+    if (!confirmDelete) {
+      return;
+    }
 
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         blogPosts: (settings.blogPosts || []).filter(
           (item) => String(item.id) !== String(confirmDelete.id)
         ),
       });
 
       setSettings(saved);
+
       setConfirmDelete(null);
+
       setMessage("Đã xóa bài viết.");
     } catch (deleteError) {
       setConfirmDelete(null);
-      setError(deleteError.message || "Không thể xóa bài viết.");
+
+      setError(deleteError?.message || "Không thể xóa bài viết.");
     }
   };
 
@@ -492,6 +564,7 @@ const AdminBlogManagementPage = () => {
                       className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
                     >
                       <FiImage />
+
                       {uploading ? "Đang tải..." : "Chọn tệp"}
                     </label>
 
@@ -545,8 +618,11 @@ const AdminBlogManagementPage = () => {
                       className="rounded-lg border-0 bg-transparent px-2 text-sm outline-none"
                     >
                       <option value="">Đoạn văn</option>
+
                       <option value="h2">Tiêu đề H2</option>
+
                       <option value="h3">Tiêu đề H3</option>
+
                       <option value="p">Đoạn văn</option>
                     </select>
 

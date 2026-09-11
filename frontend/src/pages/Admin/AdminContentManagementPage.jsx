@@ -112,6 +112,7 @@ const AdminContentManagementPage = () => {
     }
 
     setUploading(true);
+
     clearMessages();
 
     try {
@@ -214,9 +215,28 @@ const AdminContentManagementPage = () => {
     saveSettings(settings, "Đã lưu nội dung trang chủ.");
   };
 
+  const updateBlogShopInfo = (value) => {
+    setSettings((current) => ({
+      ...current,
+
+      blog: {
+        ...(current.blog || {}),
+        defaultShopInfoHtml: value,
+      },
+    }));
+
+    clearMessages();
+  };
+
+  const saveBlogShopInfo = () => {
+    saveSettings(settings, "Đã lưu thông tin Shop mặc định cho bài viết.");
+  };
+
   const branding = settings.branding || {};
 
   const sections = settings.sections || {};
+
+  const blog = settings.blog || {};
 
   const announcementMessages = Array.isArray(settings.announcementMessages)
     ? settings.announcementMessages
@@ -224,14 +244,15 @@ const AdminContentManagementPage = () => {
 
   return (
     <main className="min-h-screen bg-gray-50 py-5">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-7xl px-4">
         <header className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
             Quản lý nội dung website
           </h1>
 
           <p className="mx-auto mt-2 max-w-2xl text-sm text-gray-500">
-            Quản lý Logo, thương hiệu, thanh thông báo và nội dung trang chủ.
+            Quản lý Logo, thương hiệu, thanh thông báo, nội dung trang chủ và
+            nội dung mặc định cho bài viết.
           </p>
         </header>
 
@@ -252,7 +273,6 @@ const AdminContentManagementPage = () => {
         )}
 
         <div className="space-y-6">
-          {/* LOGO */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-1">
               <h2 className="text-xl font-bold text-gray-900">
@@ -358,7 +378,6 @@ const AdminContentManagementPage = () => {
             </div>
           </section>
 
-          {/* ANNOUNCEMENT */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -417,7 +436,6 @@ const AdminContentManagementPage = () => {
             </div>
           </section>
 
-          {/* HOMEPAGE */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">
               Nội dung trang chủ
@@ -510,10 +528,55 @@ const AdminContentManagementPage = () => {
               </button>
             </div>
           </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Thông tin Shop mặc định trong bài viết
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Nội dung này sẽ tự động được chèn vào cuối mỗi bài viết mới. Bạn
+                có thể chỉnh sửa nội dung HTML để bổ sung thông tin thương hiệu,
+                liên hệ và liên kết nội bộ phục vụ SEO.
+              </p>
+
+              <p className="mt-2 rounded-xl bg-pink-50 p-3 text-xs leading-5 text-pink-700">
+                Có thể sử dụng các biến:{" "}
+                <strong>
+                  {
+                    "{{siteName}} {{address}} {{phone}} {{email}} {{workingHours}}"
+                  }
+                </strong>
+                . Khi tạo bài viết, hệ thống sẽ tự thay bằng thông tin hiện tại
+                của Shop.
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <textarea
+                value={blog.defaultShopInfoHtml || ""}
+                onChange={(event) => updateBlogShopInfo(event.target.value)}
+                rows={14}
+                className={`${inputClass} font-mono text-xs leading-6`}
+                aria-label="Thông tin Shop mặc định trong bài viết"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={saveBlogShopInfo}
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu thông tin Shop cho bài viết
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 
-      {/* DELETE CONFIRMATION */}
       {confirmAnnouncement && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
           <div

@@ -78,8 +78,16 @@ const BlogPage = () => {
   );
 
   useEffect(() => {
+    const existingSchema = document.getElementById("flower-shop-blog-schema");
+
+    if (existingSchema) {
+      existingSchema.remove();
+    }
+
     if (currentPost) {
-      document.title = `${currentPost.title} | Flower Shop`;
+      const siteName = settings.branding?.siteName || "Flower Shop";
+
+      document.title = `${currentPost.title} | ${siteName}`;
 
       let description = document.querySelector('meta[name="description"]');
 
@@ -93,7 +101,7 @@ const BlogPage = () => {
 
       description.content =
         stripHtml(currentPost.content).slice(0, 155) ||
-        "Bài viết từ Flower Shop.";
+        `Bài viết từ ${siteName}.`;
 
       let canonical = document.querySelector('link[rel="canonical"]');
 
@@ -106,10 +114,65 @@ const BlogPage = () => {
       }
 
       canonical.href = `${window.location.origin}/blog/${currentPost.id}`;
+
+      const coverImage = getCoverImage(currentPost);
+
+      const schema = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: currentPost.title,
+        description: stripHtml(currentPost.content).slice(0, 300),
+        url: canonical.href,
+        mainEntityOfPage: {
+          "@type": "WebPage",
+          "@id": canonical.href,
+        },
+        datePublished: currentPost.date
+          ? `${currentPost.date}T${currentPost.time || "08:00"}:00`
+          : undefined,
+        dateModified: currentPost.updatedAt || undefined,
+        image: coverImage ? [coverImage] : undefined,
+        author: {
+          "@type": "Organization",
+          name: siteName,
+          url: window.location.origin,
+        },
+        publisher: {
+          "@type": "Organization",
+          name: siteName,
+          url: window.location.origin,
+          logo: settings.branding?.logoImage
+            ? {
+                "@type": "ImageObject",
+                url: settings.branding.logoImage,
+              }
+            : undefined,
+        },
+      };
+
+      Object.keys(schema).forEach((key) => {
+        if (schema[key] === undefined || schema[key] === null) {
+          delete schema[key];
+        }
+      });
+
+      const schemaScript = document.createElement("script");
+
+      schemaScript.id = "flower-shop-blog-schema";
+
+      schemaScript.type = "application/ld+json";
+
+      schemaScript.textContent = JSON.stringify(schema);
+
+      document.head.appendChild(schemaScript);
     } else if (!postId) {
       document.title = "Bài viết | Flower Shop";
     }
-  }, [currentPost, postId]);
+
+    return () => {
+      document.getElementById("flower-shop-blog-schema")?.remove();
+    };
+  }, [currentPost, postId, settings]);
 
   if (postId) {
     if (!currentPost) {

@@ -8,6 +8,7 @@ import {
   FiKey,
   FiLock,
   FiPlus,
+  FiSave,
   FiTrash2,
   FiUnlock,
   FiX,
@@ -16,6 +17,7 @@ import {
 import {
   MANAGEMENT_PERMISSIONS,
   PERMISSION_LABELS,
+  ROLE_PERMISSION_GROUPS,
   ROLES,
   useAuth,
 } from "@/context/AuthContext";
@@ -28,7 +30,6 @@ const EMPTY_FORM = {
   phone: "",
   password: "",
   role: ROLES.MANAGER,
-  permissions: [],
 };
 
 const ROLE_OPTIONS = [
@@ -49,60 +50,6 @@ const ROLE_OPTIONS = [
 const fieldClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100 disabled:bg-gray-50";
 
-const PermissionSelector = ({ role, permissions, onChange }) => {
-  if (role === ROLES.ADMIN) {
-    return (
-      <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-        <strong>Admin:</strong> có toàn bộ quyền quản trị hệ thống. Không cần
-        cấu hình từng checkbox.
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-      <div className="mb-3">
-        <h3 className="font-semibold text-gray-800">Quyền được phép sử dụng</h3>
-
-        <p className="mt-1 text-xs leading-5 text-gray-500">
-          Khi thay đổi bộ quyền này, toàn bộ tài khoản cùng loại quyền sẽ được
-          cập nhật.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {MANAGEMENT_PERMISSIONS.map((permission) => {
-          const checked = permissions.includes(permission);
-
-          return (
-            <label
-              key={permission}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 transition hover:border-pink-200 hover:bg-pink-50"
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => {
-                  const next = checked
-                    ? permissions.filter((item) => item !== permission)
-                    : [...permissions, permission];
-
-                  onChange([...new Set(next)]);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
-              />
-
-              <span className="text-sm font-medium text-gray-700">
-                {PERMISSION_LABELS[permission] || permission}
-              </span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 const AdminUsersPage = () => {
   const {
     user,
@@ -122,6 +69,10 @@ const AdminUsersPage = () => {
   const [formData, setFormData] = useState(EMPTY_FORM);
 
   const [createOpen, setCreateOpen] = useState(false);
+
+  const [permissionsOpen, setPermissionsOpen] = useState(true);
+
+  const [rolePermissionDraft, setRolePermissionDraft] = useState({});
 
   const [editingUser, setEditingUser] = useState(null);
 
@@ -189,8 +140,75 @@ const AdminUsersPage = () => {
     clearMessages();
   };
 
+  const initializeRolePermissions = () => {
+    const next = {};
+
+    ROLE_PERMISSION_GROUPS.forEach(({ role }) => {
+      next[role] = getRolePermissions(role);
+    });
+
+    setRolePermissionDraft(next);
+  };
+
+  const openPermissionManager = () => {
+    initializeRolePermissions();
+
+    setPermissionsOpen((value) => !value);
+
+    clearMessages();
+  };
+
+  const getDraftPermissions = (role) => {
+    if (Array.isArray(rolePermissionDraft?.[role])) {
+      return rolePermissionDraft[role];
+    }
+
+    return getRolePermissions(role);
+  };
+
+  const togglePermission = (role, permission) => {
+    const current = getDraftPermissions(role);
+
+    const next = current.includes(permission)
+      ? current.filter((item) => item !== permission)
+      : [...current, permission];
+
+    setRolePermissionDraft((previous) => ({
+      ...previous,
+      [role]: [...new Set(next)],
+    }));
+
+    clearMessages();
+  };
+
+  const savePermissions = () => {
+    clearMessages();
+
+    setSubmitting(true);
+
+    try {
+      for (const { role } of ROLE_PERMISSION_GROUPS) {
+        const result = updateRolePermissions(role, getDraftPermissions(role));
+
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+      }
+
+      initializeRolePermissions();
+
+      setMessage(
+        "Đã lưu quyền. Các tài khoản Manager/Product Manager hiện có và các tài khoản tạo mới sẽ sử dụng bộ quyền tương ứng."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCreate = (event) => {
     event.preventDefault();
+
     clearMessages();
 
     if (!formData.name.trim()) {
@@ -236,7 +254,6 @@ const AdminUsersPage = () => {
         phone: formData.phone.trim(),
         password: formData.password,
         role: formData.role,
-        permissions: formData.permissions,
       });
 
       if (!result.success) {
@@ -244,14 +261,12 @@ const AdminUsersPage = () => {
         return;
       }
 
-      if (formData.role !== ROLES.ADMIN) {
-        updateRolePermissions(formData.role, formData.permissions);
-      }
-
       setMessage(result.message || "Tạo tài khoản thành công.");
 
       setFormData(EMPTY_FORM);
+
       setShowPassword(false);
+
       setCreateOpen(false);
     } finally {
       setSubmitting(false);
@@ -271,20 +286,23 @@ const AdminUsersPage = () => {
       phone: account.phone || "",
       password: "",
       role,
-      permissions: getRolePermissions(role),
     });
   };
 
   const closeEdit = () => {
     setEditingUser(null);
+
     setEditForm(EMPTY_FORM);
   };
 
   const handleUpdate = (event) => {
     event.preventDefault();
+
     clearMessages();
 
-    if (!editingUser) return;
+    if (!editingUser) {
+      return;
+    }
 
     if (!editForm.name.trim()) {
       setError("Vui lòng nhập họ tên.");
@@ -308,10 +326,6 @@ const AdminUsersPage = () => {
       if (!result.success) {
         setError(result.message);
         return;
-      }
-
-      if (editingUser.role !== ROLES.ADMIN && editForm.role !== ROLES.ADMIN) {
-        updateRolePermissions(editForm.role, editForm.permissions);
       }
 
       setMessage(result.message || "Cập nhật tài khoản thành công.");
@@ -385,17 +399,21 @@ const AdminUsersPage = () => {
     setResetPasswordUser(account);
 
     setResetPassword("");
+
     setShowResetPassword(false);
   };
 
   const closeReset = () => {
     setResetPasswordUser(null);
+
     setResetPassword("");
+
     setShowResetPassword(false);
   };
 
   const handleReset = (event) => {
     event.preventDefault();
+
     clearMessages();
 
     if (!resetPasswordUser) {
@@ -467,6 +485,99 @@ const AdminUsersPage = () => {
           </div>
         )}
 
+        <div className="mb-6 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={openPermissionManager}
+            className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-gray-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
+                <FiKey />
+              </div>
+
+              <div>
+                <h2 className="font-bold text-gray-800">
+                  Quản lý quyền được phép sử dụng
+                </h2>
+
+                <p className="text-sm text-gray-500">
+                  Thiết lập quyền tập trung cho Manager và Product Manager.
+                  Không cần chỉnh sửa từng tài khoản.
+                </p>
+              </div>
+            </div>
+
+            <FiChevronDown
+              className={
+                permissionsOpen ? "rotate-180 transition" : "transition"
+              }
+            />
+          </button>
+
+          {permissionsOpen && (
+            <div className="space-y-5 border-t border-gray-100 p-6 md:p-8">
+              {ROLE_PERMISSION_GROUPS.map(({ role, label, description }) => {
+                const permissions = getDraftPermissions(role);
+
+                return (
+                  <section
+                    key={role}
+                    className="rounded-xl border border-gray-100 bg-gray-50 p-5"
+                  >
+                    <div className="mb-4">
+                      <h3 className="font-bold text-gray-800">{label}</h3>
+
+                      <p className="mt-1 text-sm leading-6 text-gray-500">
+                        {description}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {MANAGEMENT_PERMISSIONS.map((permission) => {
+                        const checked = permissions.includes(permission);
+
+                        return (
+                          <label
+                            key={permission}
+                            className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 transition hover:border-pink-200 hover:bg-pink-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                togglePermission(role, permission)
+                              }
+                              className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                            />
+
+                            <span className="text-sm font-medium text-gray-700">
+                              {PERMISSION_LABELS[permission] || permission}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={savePermissions}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-6 py-3 font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
+                >
+                  <FiSave />
+
+                  {submitting ? "Đang lưu..." : "Lưu quyền được phép sử dụng"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <button
             type="button"
@@ -482,7 +593,8 @@ const AdminUsersPage = () => {
                 <h2 className="font-bold text-gray-800">Thêm tài khoản</h2>
 
                 <p className="text-sm text-gray-500">
-                  Tạo tài khoản Manager hoặc Product Manager và cấp quyền.
+                  Tạo tài khoản Manager hoặc Product Manager. Quyền sẽ tự lấy
+                  theo cấu hình role hiện tại.
                 </p>
               </div>
             </div>
@@ -576,6 +688,9 @@ const AdminUsersPage = () => {
                         type="button"
                         onClick={() => setShowPassword((value) => !value)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                        aria-label={
+                          showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                        }
                       >
                         {showPassword ? <FiEyeOff /> : <FiEye />}
                       </button>
@@ -589,17 +704,9 @@ const AdminUsersPage = () => {
 
                     <select
                       value={formData.role}
-                      onChange={(event) => {
-                        const role = event.target.value;
-
-                        setFormData((current) => ({
-                          ...current,
-                          role,
-                          permissions: getRolePermissions(role),
-                        }));
-
-                        clearMessages();
-                      }}
+                      onChange={(event) =>
+                        updateField(setFormData, "role", event.target.value)
+                      }
                       className={fieldClass}
                     >
                       {ROLE_OPTIONS.map((option) => (
@@ -608,19 +715,22 @@ const AdminUsersPage = () => {
                         </option>
                       ))}
                     </select>
+
+                    {formData.role !== ROLES.ADMIN && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Quyền được lấy tự động từ mục “Quản lý quyền được phép
+                        sử dụng”.
+                      </p>
+                    )}
+
+                    {formData.role === ROLES.ADMIN && (
+                      <p className="mt-2 text-xs text-red-600">
+                        Admin - Quản trị viên có toàn bộ quyền quản trị hệ
+                        thống.
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <PermissionSelector
-                  role={formData.role}
-                  permissions={formData.permissions}
-                  onChange={(permissions) =>
-                    setFormData((current) => ({
-                      ...current,
-                      permissions,
-                    }))
-                  }
-                />
 
                 <div className="flex justify-end">
                   <button
@@ -645,8 +755,8 @@ const AdminUsersPage = () => {
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Thay đổi quyền tại một tài khoản sẽ cập nhật toàn bộ tài khoản
-              cùng loại quyền.
+              Quyền Manager/Product Manager được quản lý tập trung và áp dụng
+              cho toàn bộ tài khoản cùng role.
             </p>
           </div>
 
@@ -720,7 +830,7 @@ const AdminUsersPage = () => {
                           type="button"
                           onClick={() => openEdit(account)}
                           className="rounded-lg border border-blue-100 p-2 text-blue-600 hover:bg-blue-50"
-                          title="Sửa thông tin và quyền"
+                          title="Sửa thông tin"
                         >
                           <FiEdit2 />
                         </button>
@@ -832,15 +942,9 @@ const AdminUsersPage = () => {
                   <select
                     value={editForm.role}
                     disabled={editingUser.role === ROLES.ADMIN}
-                    onChange={(event) => {
-                      const role = event.target.value;
-
-                      setEditForm((current) => ({
-                        ...current,
-                        role,
-                        permissions: getRolePermissions(role),
-                      }));
-                    }}
+                    onChange={(event) =>
+                      updateField(setEditForm, "role", event.target.value)
+                    }
                     className={fieldClass}
                   >
                     {ROLE_OPTIONS.map((option) => (
@@ -849,19 +953,15 @@ const AdminUsersPage = () => {
                       </option>
                     ))}
                   </select>
+
+                  {editForm.role !== ROLES.ADMIN && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Quyền sử dụng được lấy từ cấu hình role trong “Quản lý
+                      quyền được phép sử dụng”.
+                    </p>
+                  )}
                 </div>
               </div>
-
-              <PermissionSelector
-                role={editForm.role}
-                permissions={editForm.permissions}
-                onChange={(permissions) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    permissions,
-                  }))
-                }
-              />
 
               <div className="flex justify-end gap-3">
                 <button
@@ -918,6 +1018,9 @@ const AdminUsersPage = () => {
                   type="button"
                   onClick={() => setShowResetPassword((value) => !value)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  aria-label={
+                    showResetPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                  }
                 >
                   {showResetPassword ? <FiEyeOff /> : <FiEye />}
                 </button>

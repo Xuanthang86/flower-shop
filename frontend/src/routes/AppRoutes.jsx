@@ -135,13 +135,6 @@ const AdminSubPage = ({ children }) => {
     hasPermission(permission)
   ).length;
 
-  /*
-   * Admin luôn có thể quay lại.
-   *
-   * Manager/Product Manager:
-   * - Có từ 2 module trở lên: cần nút quay lại
-   * - Chỉ 1 module: không cần nút quay lại
-   */
   const showBackButton = isAdmin || accessibleModuleCount > 1;
 
   return (
