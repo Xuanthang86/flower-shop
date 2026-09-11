@@ -16,7 +16,7 @@ import { ROLES, useAuth } from "@/context/AuthContext";
 
 import { useCart } from "@/context/useCart";
 
-import { useNotification } from "@/context/NotificationContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 const WISHLIST_KEY = "flower-shop-wishlist";
 

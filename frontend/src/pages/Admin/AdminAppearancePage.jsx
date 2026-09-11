@@ -11,7 +11,7 @@ import {
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
-import { useNotification } from "@/context/NotificationContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 const FONT_OPTIONS = [
   {

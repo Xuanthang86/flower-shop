@@ -10,7 +10,7 @@ import {
 
 import { uploadImageFile } from "@/services/media";
 
-import { useNotification } from "@/context/NotificationContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";

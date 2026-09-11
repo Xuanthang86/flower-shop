@@ -8,7 +8,7 @@ import Footer from "@/components/layout/Footer";
 import {
   NotificationProvider,
   NotificationToast,
-} from "@/context/NotificationContext";
+} from "@/context/NotificationProvider";
 
 import { startSharedDataSync } from "@/services/sharedDataSync";
 

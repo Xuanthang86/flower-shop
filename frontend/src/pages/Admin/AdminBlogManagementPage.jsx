@@ -25,7 +25,7 @@ import {
 
 import { uploadImageFile } from "@/services/media";
 
-import { useNotification } from "@/context/NotificationContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 const DEFAULT_SHOP_INFO_HTML = `
 <div
