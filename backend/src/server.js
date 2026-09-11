@@ -36,10 +36,26 @@ const corsOptions = {
   methods: ["GET", "HEAD", "PUT", "POST", "OPTIONS"],
 
   allowedHeaders: ["Content-Type", "Authorization"],
+
+  optionsSuccessStatus: 204,
 };
 
+app.disable("x-powered-by");
+
 app.use(helmet());
+
+/*
+ * Không dùng:
+ *
+ * app.options("*", ...)
+ *
+ * vì Express 5/path-to-regexp không còn
+ * chấp nhận wildcard "*" kiểu cũ.
+ *
+ * cors middleware tự xử lý preflight.
+ */
 app.use(cors(corsOptions));
+
 app.use(morgan("dev"));
 
 app.use(
@@ -55,49 +71,67 @@ app.use(
   }),
 );
 
-const hasPlaceholder = (value) => {
+const isPlaceholder = (value) => {
   const normalized = String(value || "")
     .trim()
     .toLowerCase();
 
-  return (
-    !normalized ||
-    normalized.includes("your_api_key") ||
-    normalized.includes("your_api_secret") ||
-    normalized.includes("your_cloud_name") ||
-    normalized.includes("replace_me")
-  );
+  if (!normalized) {
+    return true;
+  }
+
+  return [
+    "your_api_key",
+    "your_api_secret",
+    "your_cloud_name",
+    "<your_api_key>",
+    "<your_api_secret>",
+    "<your_cloud_name>",
+    "replace_me",
+    "replace-this",
+  ].some((placeholder) => normalized.includes(placeholder));
 };
 
-const cloudinaryConfigured = () => {
+const configureCloudinary = () => {
+  /*
+   * Ưu tiên bộ ba riêng nếu đầy đủ.
+   * Điều này tránh trường hợp CLOUDINARY_URL
+   * còn placeholder nhưng biến riêng đã đúng.
+   */
+  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+
+  const apiKey = String(process.env.CLOUDINARY_API_KEY || "").trim();
+
+  const apiSecret = String(process.env.CLOUDINARY_API_SECRET || "").trim();
+
   if (
-    process.env.CLOUDINARY_URL &&
-    !hasPlaceholder(process.env.CLOUDINARY_URL)
+    !isPlaceholder(cloudName) &&
+    !isPlaceholder(apiKey) &&
+    !isPlaceholder(apiSecret)
   ) {
-    cloudinary.config(process.env.CLOUDINARY_URL);
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
 
     return true;
   }
 
-  if (
-    hasPlaceholder(process.env.CLOUDINARY_CLOUD_NAME) ||
-    hasPlaceholder(process.env.CLOUDINARY_API_KEY) ||
-    hasPlaceholder(process.env.CLOUDINARY_API_SECRET)
-  ) {
-    return false;
+  const cloudinaryUrl = String(process.env.CLOUDINARY_URL || "").trim();
+
+  if (cloudinaryUrl && !isPlaceholder(cloudinaryUrl)) {
+    cloudinary.config(cloudinaryUrl);
+
+    return true;
   }
 
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  return false;
+};
 
-    api_key: process.env.CLOUDINARY_API_KEY,
-
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-
-    secure: true,
-  });
-
-  return true;
+const isCloudinaryConfigured = () => {
+  return configureCloudinary();
 };
 
 const snapshotSchema = new mongoose.Schema(
@@ -136,28 +170,14 @@ const SharedSnapshot =
 
 let databaseReady = false;
 
-const validateEnvironment = () => {
-  const missing = [];
-
-  if (!process.env.MONGODB_URI) {
-    missing.push("MONGODB_URI");
-  }
-
-  if (!cloudinaryConfigured()) {
-    missing.push("Cloudinary credentials");
-  }
-
-  if (missing.length) {
-    throw new Error(
-      `Thiếu cấu hình backend: ${missing.join(
-        ", ",
-      )}. Hãy kiểm tra file backend/.env.`,
-    );
+const validateMongoEnvironment = () => {
+  if (!String(process.env.MONGODB_URI || "").trim()) {
+    throw new Error("Thiếu MONGODB_URI. Hãy kiểm tra backend/.env.");
   }
 };
 
 const connectDatabase = async () => {
-  validateEnvironment();
+  validateMongoEnvironment();
 
   await mongoose.connect(process.env.MONGODB_URI, {
     serverSelectionTimeoutMS: 10000,
@@ -166,13 +186,15 @@ const connectDatabase = async () => {
   databaseReady = true;
 
   console.log("MongoDB connected successfully.");
+
+  console.log(`Cloudinary configured: ${isCloudinaryConfigured()}`);
 };
 
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     databaseReady,
-    cloudinaryConfigured: cloudinaryConfigured(),
+    cloudinaryConfigured: isCloudinaryConfigured(),
     timestamp: new Date().toISOString(),
   });
 });
@@ -271,7 +293,7 @@ app.put("/api/data/snapshot", async (req, res, next) => {
   }
 });
 
-app.post("/api/media/upload", async (req, res, next) => {
+app.post("/api/media/upload", async (req, res) => {
   try {
     const { dataUri, folder } = req.body || {};
 
@@ -287,10 +309,12 @@ app.post("/api/media/upload", async (req, res, next) => {
       });
     }
 
-    if (!cloudinaryConfigured()) {
+    const configured = isCloudinaryConfigured();
+
+    if (!configured) {
       return res.status(503).json({
         message:
-          "Cloudinary chưa được cấu hình đúng. Hãy kiểm tra CLOUDINARY_URL hoặc bộ ba CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET trong backend/.env.",
+          "Cloudinary chưa được cấu hình. Hãy điền CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET hợp lệ trong backend/.env rồi khởi động lại backend.",
       });
     }
 
