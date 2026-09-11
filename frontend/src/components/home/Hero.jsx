@@ -15,9 +15,7 @@ const DEFAULT_DURATION = 7000;
 const normalizeDuration = (value) => {
   const duration = Number(value);
 
-  if (!Number.isFinite(duration)) {
-    return DEFAULT_DURATION;
-  }
+  if (!Number.isFinite(duration)) return DEFAULT_DURATION;
 
   return Math.min(15000, Math.max(3000, duration));
 };
@@ -30,7 +28,6 @@ const getBannerMobileImage = (banner) =>
 
 const Hero = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
-
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const banners = useMemo(() => {
@@ -39,9 +36,7 @@ const Hero = () => {
       : [];
 
     return source
-      .filter((banner) => {
-        return banner?.visible !== false && getBannerImage(banner);
-      })
+      .filter((banner) => banner?.visible !== false && getBannerImage(banner))
       .slice()
       .sort((a, b) => Number(a?.priority ?? 0) - Number(b?.priority ?? 0));
   }, [settings]);
@@ -53,22 +48,18 @@ const Hero = () => {
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
   useEffect(() => {
-    if (banners.length <= 1) {
-      return undefined;
-    }
+    if (banners.length <= 1) return undefined;
 
-    const activeBanner = banners[currentIndex];
+    const activeBanner = banners[currentIndex] || banners[0];
 
     const timer = window.setTimeout(() => {
       setCurrentIndex((index) => (index >= banners.length - 1 ? 0 : index + 1));
@@ -91,16 +82,12 @@ const Hero = () => {
   };
 
   const displayBanners = banners.length > 0 ? banners : [fallbackBanner];
-
   const activeBanner = displayBanners[currentIndex] || displayBanners[0];
-
   const desktopImage = getBannerImage(activeBanner);
-
   const mobileImage = getBannerMobileImage(activeBanner);
 
   const goPrevious = () => {
     if (displayBanners.length <= 1) return;
-
     setCurrentIndex((index) =>
       index <= 0 ? displayBanners.length - 1 : index - 1
     );
@@ -108,14 +95,13 @@ const Hero = () => {
 
   const goNext = () => {
     if (displayBanners.length <= 1) return;
-
     setCurrentIndex((index) =>
       index >= displayBanners.length - 1 ? 0 : index + 1
     );
   };
 
   return (
-    <section className="py-4 md:py-5">
+    <section className="py-4 md:py-5" aria-label="Banner Flower Shop">
       <Container>
         <div className="mx-auto w-full max-w-[1280px]">
           <div className="relative overflow-hidden rounded-xl bg-gray-100">
@@ -128,7 +114,7 @@ const Hero = () => {
                 key={activeBanner.id}
                 src={desktopImage}
                 alt={activeBanner.alt || "Flower Shop"}
-                className="block h-[145px] w-full object-cover sm:h-[185px] md:h-[245px] lg:h-[300px]"
+                className="block h-auto max-h-[420px] min-h-[145px] w-full object-contain object-center sm:min-h-[185px] md:min-h-[245px] lg:min-h-[300px]"
                 onError={(event) => {
                   if (event.currentTarget.src !== defaultHeroImage) {
                     event.currentTarget.src = defaultHeroImage;
