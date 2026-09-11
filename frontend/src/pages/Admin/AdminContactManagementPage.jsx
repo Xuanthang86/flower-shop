@@ -17,6 +17,8 @@ import {
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -38,13 +40,12 @@ const ContactIcon = ({ type }) => {
 const AdminContactManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
-  const [extraForm, setExtraForm] = useState(EMPTY_EXTRA);
+  const [extraForm, setExtraForm] = useState({ ...EMPTY_EXTRA });
   const [editingExtraId, setEditingExtraId] = useState(null);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý thông tin liên hệ | Flower Shop";
@@ -58,6 +59,10 @@ const AdminContactManagementPage = () => {
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
@@ -86,25 +91,20 @@ const AdminContactManagementPage = () => {
         [field]: value,
       },
     }));
-
-    setMessage("");
-    setError("");
   };
 
   const saveContact = () => {
     try {
       const saved = saveSiteSettings(settings);
       setSettings(saved);
-      setMessage("Đã lưu thông tin liên hệ.");
-      setError("");
+      notifySuccess("Đã lưu thông tin liên hệ.");
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu thông tin liên hệ.");
-      setMessage("");
+      notifyError(saveError.message || "Không thể lưu thông tin liên hệ.");
     }
   };
 
   const resetExtraForm = () => {
-    setExtraForm(EMPTY_EXTRA);
+    setExtraForm({ ...EMPTY_EXTRA });
     setEditingExtraId(null);
   };
 
@@ -113,14 +113,15 @@ const AdminContactManagementPage = () => {
     const value = extraForm.value.trim();
 
     if (!label || !value) {
-      setError("Vui lòng nhập tên và nội dung thông tin liên hệ.");
-      setMessage("");
+      notifyError("Vui lòng nhập tên và nội dung thông tin liên hệ.");
       return;
     }
 
+    const currentEditingId = editingExtraId;
+
     const nextItem = {
       id:
-        editingExtraId ||
+        currentEditingId ||
         `contact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       label,
       value,
@@ -128,9 +129,9 @@ const AdminContactManagementPage = () => {
       visible: extraForm.visible !== false,
     };
 
-    const nextItems = editingExtraId
+    const nextItems = currentEditingId
       ? extraItems.map((item) =>
-          String(item.id) === String(editingExtraId) ? nextItem : item
+          String(item.id) === String(currentEditingId) ? nextItem : item
         )
       : [...extraItems, nextItem];
 
@@ -146,15 +147,13 @@ const AdminContactManagementPage = () => {
       setSettings(saved);
       resetExtraForm();
 
-      setMessage(
-        editingExtraId
+      notifySuccess(
+        currentEditingId
           ? "Đã cập nhật thông tin liên hệ."
           : "Đã thêm thông tin liên hệ."
       );
-      setError("");
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu thông tin liên hệ.");
-      setMessage("");
+      notifyError(saveError.message || "Không thể lưu thông tin liên hệ.");
     }
   };
 
@@ -167,9 +166,6 @@ const AdminContactManagementPage = () => {
       type: item.type || "text",
       visible: item.visible !== false,
     });
-
-    setMessage("");
-    setError("");
   };
 
   const deleteExtra = () => {
@@ -186,6 +182,8 @@ const AdminContactManagementPage = () => {
         },
       });
 
+      const deletedLabel = confirmDelete.label;
+
       setSettings(saved);
       setConfirmDelete(null);
 
@@ -193,12 +191,10 @@ const AdminContactManagementPage = () => {
         resetExtraForm();
       }
 
-      setMessage("Đã xóa thông tin liên hệ.");
-      setError("");
+      notifySuccess(`Đã xóa thông tin "${deletedLabel}".`);
     } catch (deleteError) {
       setConfirmDelete(null);
-      setError(deleteError.message || "Không thể xóa thông tin liên hệ.");
-      setMessage("");
+      notifyError(deleteError.message || "Không thể xóa thông tin liên hệ.");
     }
   };
 
@@ -220,8 +216,14 @@ const AdminContactManagementPage = () => {
       });
 
       setSettings(saved);
+
+      notifySuccess(
+        item.visible === false
+          ? `Đã hiển thị "${item.label}".`
+          : `Đã ẩn "${item.label}".`
+      );
     } catch (toggleError) {
-      setError(toggleError.message || "Không thể cập nhật trạng thái.");
+      notifyError(toggleError.message || "Không thể cập nhật trạng thái.");
     }
   };
 
@@ -238,18 +240,6 @@ const AdminContactManagementPage = () => {
           </p>
         </header>
 
-        {(message || error) && (
-          <div
-            className={`mb-5 rounded-xl border bg-white p-4 text-sm ${
-              error
-                ? "border-red-100 text-red-600"
-                : "border-green-100 text-green-600"
-            }`}
-          >
-            {error || message}
-          </div>
-        )}
-
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900">
             Thông tin liên hệ chính
@@ -257,10 +247,7 @@ const AdminContactManagementPage = () => {
 
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-semibold">
-                Tiêu đề
-              </label>
-
+              <label className="mb-2 block text-sm font-semibold">Tiêu đề</label>
               <input
                 value={contact.title || ""}
                 onChange={(event) => updateContact("title", event.target.value)}
@@ -270,7 +257,6 @@ const AdminContactManagementPage = () => {
 
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-semibold">Mô tả</label>
-
               <textarea
                 rows={3}
                 value={contact.description || ""}
@@ -282,10 +268,7 @@ const AdminContactManagementPage = () => {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold">
-                Điện thoại
-              </label>
-
+              <label className="mb-2 block text-sm font-semibold">Điện thoại</label>
               <input
                 value={contact.phone || ""}
                 onChange={(event) => updateContact("phone", event.target.value)}
@@ -295,7 +278,6 @@ const AdminContactManagementPage = () => {
 
             <div>
               <label className="mb-2 block text-sm font-semibold">Email</label>
-
               <input
                 type="email"
                 value={contact.email || ""}
@@ -305,15 +287,10 @@ const AdminContactManagementPage = () => {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold">
-                Địa chỉ
-              </label>
-
+              <label className="mb-2 block text-sm font-semibold">Địa chỉ</label>
               <input
                 value={contact.address || ""}
-                onChange={(event) =>
-                  updateContact("address", event.target.value)
-                }
+                onChange={(event) => updateContact("address", event.target.value)}
                 className={inputClass}
               />
             </div>
@@ -322,7 +299,6 @@ const AdminContactManagementPage = () => {
               <label className="mb-2 block text-sm font-semibold">
                 Thời gian làm việc
               </label>
-
               <input
                 value={contact.workingHours || ""}
                 onChange={(event) =>
@@ -350,7 +326,6 @@ const AdminContactManagementPage = () => {
               <h2 className="text-xl font-bold text-gray-900">
                 Thông tin liên hệ bổ sung
               </h2>
-
               <p className="mt-1 text-sm text-gray-500">
                 Có thể thêm, sửa, xóa và bật/tắt từng thông tin.
               </p>
@@ -456,10 +431,7 @@ const AdminContactManagementPage = () => {
                     </div>
 
                     <div>
-                      <h3 className="font-semibold text-gray-800">
-                        {item.label}
-                      </h3>
-
+                      <h3 className="font-semibold text-gray-800">{item.label}</h3>
                       <p className="mt-1 text-sm text-gray-500">{item.value}</p>
                     </div>
                   </div>
