@@ -106,6 +106,41 @@ const isPlaceholder = (value) => {
 };
 
 const configureCloudinary = () => {
+  const cloudinaryUrl = normalizeEnvValue(process.env.CLOUDINARY_URL);
+
+  if (
+    cloudinaryUrl &&
+    !isPlaceholder(cloudinaryUrl) &&
+    cloudinaryUrl.startsWith("cloudinary://")
+  ) {
+    try {
+      const parsed = new URL(cloudinaryUrl);
+
+      const apiKey = decodeURIComponent(parsed.username || "");
+
+      const apiSecret = decodeURIComponent(parsed.password || "");
+
+      const cloudName = String(parsed.hostname || "").trim();
+
+      if (
+        !isPlaceholder(apiKey) &&
+        !isPlaceholder(apiSecret) &&
+        !isPlaceholder(cloudName)
+      ) {
+        cloudinary.config({
+          cloud_name: cloudName,
+          api_key: apiKey,
+          api_secret: apiSecret,
+          secure: true,
+        });
+
+        return true;
+      }
+    } catch (error) {
+      console.warn("CLOUDINARY_URL không hợp lệ:", error?.message || error);
+    }
+  }
+
   const cloudName = normalizeEnvValue(process.env.CLOUDINARY_CLOUD_NAME);
 
   const apiKey = normalizeEnvValue(process.env.CLOUDINARY_API_KEY);
@@ -127,45 +162,36 @@ const configureCloudinary = () => {
     return true;
   }
 
-  const cloudinaryUrl = normalizeEnvValue(process.env.CLOUDINARY_URL);
-
-  if (
-    cloudinaryUrl &&
-    !isPlaceholder(cloudinaryUrl) &&
-    cloudinaryUrl.startsWith("cloudinary://")
-  ) {
-    try {
-      const parsed = new URL(cloudinaryUrl);
-
-      const urlApiKey = decodeURIComponent(parsed.username || "");
-
-      const urlApiSecret = decodeURIComponent(parsed.password || "");
-
-      const urlCloudName = String(parsed.hostname || "").trim();
-
-      if (
-        !isPlaceholder(urlApiKey) &&
-        !isPlaceholder(urlApiSecret) &&
-        !isPlaceholder(urlCloudName)
-      ) {
-        cloudinary.config({
-          cloud_name: urlCloudName,
-          api_key: urlApiKey,
-          api_secret: urlApiSecret,
-          secure: true,
-        });
-
-        return true;
-      }
-    } catch (error) {
-      console.warn("CLOUDINARY_URL không hợp lệ:", error?.message || error);
-    }
-  }
-
   return false;
 };
 
-const isCloudinaryConfigured = () => configureCloudinary();
+let cloudinaryConfigured = false;
+
+let cloudinaryVerified = false;
+
+const verifyCloudinary = async () => {
+  cloudinaryConfigured = configureCloudinary();
+
+  if (!cloudinaryConfigured) {
+    cloudinaryVerified = false;
+
+    return false;
+  }
+
+  try {
+    await cloudinary.api.ping();
+
+    cloudinaryVerified = true;
+
+    return true;
+  } catch (error) {
+    cloudinaryVerified = false;
+
+    console.error("Cloudinary verification error:", error?.message || error);
+
+    return false;
+  }
+};
 
 const snapshotSchema = new mongoose.Schema(
   {
@@ -220,14 +246,21 @@ const connectDatabase = async () => {
 
   console.log("MongoDB connected successfully.");
 
-  console.log(`Cloudinary configured: ${isCloudinaryConfigured()}`);
+  const verified = await verifyCloudinary();
+
+  console.log(`Cloudinary configured: ${cloudinaryConfigured}`);
+
+  console.log(`Cloudinary verified: ${verified}`);
 };
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  const verified = await verifyCloudinary();
+
   res.json({
     ok: true,
     databaseReady,
-    cloudinaryConfigured: isCloudinaryConfigured(),
+    cloudinaryConfigured,
+    cloudinaryVerified: verified,
     timestamp: new Date().toISOString(),
   });
 });
@@ -342,12 +375,34 @@ app.post("/api/media/upload", async (req, res) => {
       });
     }
 
-    const configured = isCloudinaryConfigured();
+    const configured = configureCloudinary();
 
     if (!configured) {
+      cloudinaryConfigured = false;
+      cloudinaryVerified = false;
+
       return res.status(503).json({
         message:
-          "Cloudinary chưa được cấu hình. Hãy điền CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET hợp lệ trong backend/.env hoặc cấu hình CLOUDINARY_URL rồi khởi động lại backend.",
+          "Cloudinary chưa được cấu hình đúng. Hãy kiểm tra CLOUDINARY_URL hoặc CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET trong backend/.env.",
+      });
+    }
+
+    try {
+      await cloudinary.api.ping();
+
+      cloudinaryVerified = true;
+    } catch (verificationError) {
+      cloudinaryVerified = false;
+
+      console.error(
+        "Cloudinary verification failed:",
+        verificationError?.message || verificationError,
+      );
+
+      return res.status(503).json({
+        message:
+          "Cloudinary không xác thực được thông tin cấu hình. Hãy kiểm tra lại Cloud Name, API Key và API Secret trong Cloudinary Console.",
+        detail: verificationError?.message || "Cloudinary verification failed.",
       });
     }
 
