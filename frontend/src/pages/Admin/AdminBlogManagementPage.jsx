@@ -6,6 +6,7 @@ import {
   FiAlignLeft,
   FiAlignRight,
   FiBold,
+  FiCheckCircle,
   FiImage,
   FiItalic,
   FiLink,
@@ -24,30 +25,223 @@ import {
 
 import { uploadImageFile } from "@/services/media";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const DEFAULT_SHOP_INFO_HTML = `
-<h2>Về Flower Shop</h2>
-<p>
-  Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
-  được tuyển chọn và chăm sóc kỹ lưỡng cho nhiều dịp đặc biệt như sinh nhật,
-  khai trương, cưới hỏi, chúc mừng, tri ân và các sự kiện quan trọng.
-</p>
-<p>
-  {{siteName}} luôn hướng tới những sản phẩm hoa tươi chất lượng,
-  cách trình bày tinh tế và dịch vụ hỗ trợ tận tâm.
-</p>
-<p>
-  <strong>Thông tin liên hệ:</strong><br />
-  Địa chỉ: {{address}}<br />
-  Điện thoại: {{phone}}<br />
-  Email: {{email}}<br />
-  Thời gian làm việc: {{workingHours}}
-</p>
-<p>
-  Bạn có thể tham khảo thêm các sản phẩm hoa tại
-  <a href="/products">Danh mục sản phẩm</a>
-  hoặc liên hệ với shop qua trang
-  <a href="/contact">Liên hệ</a>.
-</p>
+<div
+  data-flower-shop-default-info="true"
+  style="
+    display:block;
+    width:100%;
+    max-width:100%;
+    margin:28px 0 8px;
+    padding:28px;
+    border:1px solid #fce7f3;
+    border-radius:20px;
+    background:linear-gradient(135deg,#fff7fb 0%,#ffffff 55%,#fffafc 100%);
+    box-sizing:border-box;
+  "
+>
+  <div
+    style="
+      display:block;
+      width:100%;
+      margin:0 0 20px;
+      padding:0 0 18px;
+      border-bottom:1px solid #fbcfe8;
+      box-sizing:border-box;
+    "
+  >
+    <p
+      style="
+        margin:0 0 7px;
+        color:#db2777;
+        font-size:12px;
+        line-height:18px;
+        font-weight:700;
+        letter-spacing:0.08em;
+        text-transform:uppercase;
+      "
+    >
+      Thông tin Shop
+    </p>
+
+    <h2
+      style="
+        margin:0;
+        color:#1f2937;
+        font-size:26px;
+        line-height:34px;
+        font-weight:800;
+      "
+    >
+      Về {{siteName}}
+    </h2>
+
+    <p
+      style="
+        margin:9px 0 0;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      Hoa tươi tinh tế cho những khoảnh khắc đáng nhớ.
+    </p>
+  </div>
+
+  <p
+    style="
+      margin:0 0 18px;
+      color:#4b5563;
+      font-size:15px;
+      line-height:27px;
+    "
+  >
+    <strong style="color:#374151;">{{siteName}}</strong> là cửa hàng hoa tươi
+    chuyên cung cấp những sản phẩm hoa được tuyển chọn và chăm sóc kỹ lưỡng,
+    phù hợp cho sinh nhật, khai trương, cưới hỏi, chúc mừng, tri ân và nhiều
+    dịp đặc biệt khác.
+  </p>
+
+  <p
+    style="
+      margin:0 0 22px;
+      color:#4b5563;
+      font-size:15px;
+      line-height:27px;
+    "
+  >
+    Chúng tôi hướng tới những sản phẩm hoa tươi chất lượng, cách trình bày tinh
+    tế và trải nghiệm mua sắm thuận tiện, thân thiện cho khách hàng.
+  </p>
+
+  <div
+    style="
+      width:100%;
+      margin:0 0 22px;
+      padding:18px 20px;
+      border-radius:15px;
+      background:#ffffff;
+      border:1px solid #f3f4f6;
+      box-sizing:border-box;
+    "
+  >
+    <h3
+      style="
+        margin:0 0 13px;
+        color:#374151;
+        font-size:16px;
+        line-height:24px;
+        font-weight:700;
+      "
+    >
+      Thông tin liên hệ
+    </h3>
+
+    <p
+      style="
+        margin:0 0 8px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">Địa chỉ:</strong>
+      {{address}}
+    </p>
+
+    <p
+      style="
+        margin:0 0 8px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">Điện thoại:</strong>
+      <a
+        href="tel:{{phone}}"
+        style="color:#db2777;text-decoration:none;font-weight:600;"
+      >
+        {{phone}}
+      </a>
+    </p>
+
+    <p
+      style="
+        margin:0 0 8px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">Email:</strong>
+      <a
+        href="mailto:{{email}}"
+        style="color:#db2777;text-decoration:none;font-weight:600;"
+      >
+        {{email}}
+      </a>
+    </p>
+
+    <p
+      style="
+        margin:0;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">Thời gian làm việc:</strong>
+      {{workingHours}}
+    </p>
+  </div>
+
+  <div
+    style="
+      display:block;
+      width:100%;
+      box-sizing:border-box;
+    "
+  >
+    <p
+      style="
+        margin:0 0 12px;
+        color:#374151;
+        font-size:14px;
+        line-height:23px;
+        font-weight:600;
+      "
+    >
+      Bạn có thể tham khảo thêm:
+    </p>
+
+    <p
+      style="
+        margin:0;
+        font-size:14px;
+        line-height:24px;
+      "
+    >
+      <a
+        href="/products"
+        style="color:#db2777;text-decoration:none;font-weight:700;"
+      >
+        Xem danh mục sản phẩm
+      </a>
+
+      <span style="color:#d1d5db;">&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+
+      <a
+        href="/contact"
+        style="color:#db2777;text-decoration:none;font-weight:700;"
+      >
+        Liên hệ với Flower Shop
+      </a>
+    </p>
+  </div>
+</div>
 `;
 
 const EMPTY_POST = {
@@ -101,15 +295,6 @@ const buildDefaultShopInfo = (settings) => {
     );
 };
 
-const wrapDefaultShopInfo = (html) => `
-<div
-  data-flower-shop-default-info="true"
-  style="display:block;width:100%;max-width:100%;"
->
-  ${html}
-</div>
-`;
-
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
@@ -119,15 +304,13 @@ const AdminBlogManagementPage = () => {
 
   const [form, setForm] = useState(EMPTY_POST);
 
-  const [message, setMessage] = useState("");
-
-  const [error, setError] = useState("");
-
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const [uploading, setUploading] = useState(false);
 
   const editorRef = useRef(null);
+
+  const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý bài viết | Flower Shop";
@@ -136,9 +319,7 @@ const AdminBlogManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-
       robots.name = "robots";
-
       document.head.appendChild(robots);
     }
 
@@ -153,12 +334,10 @@ const AdminBlogManagementPage = () => {
     const refresh = () => setSettings(readSiteSettings());
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -169,33 +348,61 @@ const AdminBlogManagementPage = () => {
     }
 
     editorRef.current.innerHTML = form.content || "";
+
+    if (!editingPost) {
+      const editor = editorRef.current;
+
+      window.requestAnimationFrame(() => {
+        if (!editor || !editor.isConnected) {
+          return;
+        }
+
+        editor.focus();
+
+        const selection = window.getSelection();
+
+        if (!selection) {
+          return;
+        }
+
+        const range = document.createRange();
+
+        const firstChild = editor.firstChild;
+
+        if (firstChild) {
+          range.setStart(firstChild, 0);
+          range.collapse(true);
+        } else {
+          range.selectNodeContents(editor);
+          range.collapse(true);
+        }
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+      });
+    }
   }, [editorOpen, editingPost, form.content]);
 
-  const clearMessages = () => {
-    setMessage("");
-    setError("");
-  };
-
   const openCreate = () => {
-    clearMessages();
-
     setEditingPost(null);
 
-    const defaultShopInfo = buildDefaultShopInfo(settings);
+    const latestSettings = readSiteSettings();
+
+    setSettings(latestSettings);
+
+    const defaultShopInfo = buildDefaultShopInfo(latestSettings);
 
     setForm({
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
-      content: wrapDefaultShopInfo(defaultShopInfo),
+      content: `<p><br /></p>${defaultShopInfo}`,
     });
 
     setEditorOpen(true);
   };
 
   const openEdit = (post) => {
-    clearMessages();
-
     setEditingPost(post);
 
     setForm({
@@ -264,8 +471,6 @@ const AdminBlogManagementPage = () => {
 
     setUploading(true);
 
-    clearMessages();
-
     try {
       const image = await uploadImageFile(file, {
         folder: "flower-shop/blog",
@@ -278,8 +483,10 @@ const AdminBlogManagementPage = () => {
         ...current,
         image,
       }));
+
+      notifySuccess("Đã tải ảnh đại diện lên thành công.");
     } catch (imageError) {
-      setError(imageError?.message || "Không thể tải ảnh.");
+      notifyError(imageError?.message || "Không thể tải ảnh.");
     } finally {
       setUploading(false);
     }
@@ -296,8 +503,6 @@ const AdminBlogManagementPage = () => {
 
     setUploading(true);
 
-    clearMessages();
-
     try {
       const image = await uploadImageFile(file, {
         folder: "flower-shop/blog/content",
@@ -307,8 +512,7 @@ const AdminBlogManagementPage = () => {
       });
 
       if (!editorRef.current) {
-        setError("Trình soạn thảo chưa sẵn sàng.");
-
+        notifyError("Trình soạn thảo chưa sẵn sàng.");
         return;
       }
 
@@ -320,29 +524,27 @@ const AdminBlogManagementPage = () => {
         ...current,
         content: editorRef.current?.innerHTML || "",
       }));
+
+      notifySuccess("Đã chèn hình ảnh vào bài viết.");
     } catch (imageError) {
-      setError(imageError?.message || "Không thể chèn hình ảnh.");
+      notifyError(imageError?.message || "Không thể chèn hình ảnh.");
     } finally {
       setUploading(false);
     }
   };
 
   const savePost = () => {
-    clearMessages();
-
     const title = form.title.trim();
 
     const content = editorRef.current?.innerHTML?.trim() || form.content.trim();
 
     if (!title) {
-      setError("Vui lòng nhập tiêu đề bài viết.");
-
+      notifyError("Vui lòng nhập tiêu đề bài viết.");
       return;
     }
 
     if (!content || content === "<br>" || content === "<div><br></div>") {
-      setError("Vui lòng nhập nội dung bài viết.");
-
+      notifyError("Vui lòng nhập nội dung bài viết.");
       return;
     }
 
@@ -380,11 +582,13 @@ const AdminBlogManagementPage = () => {
 
       setSettings(saved);
 
-      setMessage(editingPost ? "Đã cập nhật bài viết." : "Đã thêm bài viết.");
+      notifySuccess(
+        editingPost ? "Đã cập nhật bài viết." : "Đã thêm bài viết."
+      );
 
       closeEditor();
     } catch (saveError) {
-      setError(saveError?.message || "Không thể lưu bài viết.");
+      notifyError(saveError?.message || "Không thể lưu bài viết.");
     }
   };
 
@@ -396,7 +600,6 @@ const AdminBlogManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
-
         blogPosts: (settings.blogPosts || []).filter(
           (item) => String(item.id) !== String(confirmDelete.id)
         ),
@@ -406,11 +609,11 @@ const AdminBlogManagementPage = () => {
 
       setConfirmDelete(null);
 
-      setMessage("Đã xóa bài viết.");
+      notifySuccess("Đã xóa bài viết.");
     } catch (deleteError) {
       setConfirmDelete(null);
 
-      setError(deleteError?.message || "Không thể xóa bài viết.");
+      notifyError(deleteError?.message || "Không thể xóa bài viết.");
     }
   };
 
@@ -456,18 +659,6 @@ const AdminBlogManagementPage = () => {
             Thêm bài viết
           </button>
         </header>
-
-        {(message || error) && (
-          <div
-            className={`mb-5 rounded-xl border bg-white p-4 text-sm shadow-sm ${
-              error
-                ? "border-red-100 text-red-600"
-                : "border-green-100 text-green-600"
-            }`}
-          >
-            {error || message}
-          </div>
-        )}
 
         <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
@@ -537,6 +728,7 @@ const AdminBlogManagementPage = () => {
                 type="button"
                 onClick={closeEditor}
                 className="rounded-full p-2 hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
@@ -657,13 +849,11 @@ const AdminBlogManagementPage = () => {
                       }
                       defaultValue=""
                       className="rounded-lg border-0 bg-transparent px-2 text-sm outline-none"
+                      aria-label="Định dạng đoạn văn"
                     >
                       <option value="">Đoạn văn</option>
-
                       <option value="h2">Tiêu đề H2</option>
-
                       <option value="h3">Tiêu đề H3</option>
-
                       <option value="p">Đoạn văn</option>
                     </select>
 
@@ -672,6 +862,7 @@ const AdminBlogManagementPage = () => {
                       onClick={createLink}
                       className="rounded-lg p-2.5 hover:bg-white"
                       title="Chèn liên kết"
+                      aria-label="Chèn liên kết"
                     >
                       <FiLink />
                     </button>
@@ -680,6 +871,7 @@ const AdminBlogManagementPage = () => {
                       htmlFor="blog-inline-image"
                       className="cursor-pointer rounded-lg p-2.5 hover:bg-white"
                       title="Chèn hình ảnh"
+                      aria-label="Chèn hình ảnh"
                     >
                       <FiImage />
                     </label>
@@ -707,7 +899,7 @@ const AdminBlogManagementPage = () => {
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
-                    className="blog-editor-content min-h-[320px] w-full p-5 text-sm leading-7 text-gray-700 outline-none [&_h2]:w-full [&_h3]:w-full [&_p]:w-full [&_div]:w-full [&_img]:mx-auto [&_img]:my-4 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none"
+                    className="blog-editor-content min-h-[320px] w-full overflow-x-hidden p-5 text-sm leading-7 text-gray-700 outline-none [&_a]:font-semibold [&_a]:text-pink-600 [&_div]:w-full [&_h2]:w-full [&_h3]:w-full [&_img]:mx-auto [&_img]:my-4 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[80%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none [&_p]:w-full"
                     style={{
                       whiteSpace: "pre-wrap",
                     }}

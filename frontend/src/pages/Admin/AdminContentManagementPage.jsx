@@ -10,6 +10,8 @@ import {
 
 import { uploadImageFile } from "@/services/media";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -18,11 +20,9 @@ const AdminContentManagementPage = () => {
 
   const [uploading, setUploading] = useState(false);
 
-  const [message, setMessage] = useState("");
-
-  const [error, setError] = useState("");
-
   const [confirmAnnouncement, setConfirmAnnouncement] = useState(null);
+
+  const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý nội dung website | Flower Shop";
@@ -60,26 +60,17 @@ const AdminContentManagementPage = () => {
     };
   }, []);
 
-  const clearMessages = () => {
-    setMessage("");
-    setError("");
-  };
-
   const saveSettings = (nextSettings, successMessage) => {
     try {
       const saved = saveSiteSettings(nextSettings);
 
       setSettings(saved);
 
-      setMessage(successMessage);
-
-      setError("");
+      notifySuccess(successMessage);
 
       return true;
     } catch (saveError) {
-      setError(saveError?.message || "Không thể lưu dữ liệu.");
-
-      setMessage("");
+      notifyError(saveError?.message || "Không thể lưu dữ liệu.");
 
       return false;
     }
@@ -94,8 +85,6 @@ const AdminContentManagementPage = () => {
         [field]: value,
       },
     }));
-
-    clearMessages();
   };
 
   const saveBranding = () => {
@@ -112,8 +101,6 @@ const AdminContentManagementPage = () => {
     }
 
     setUploading(true);
-
-    clearMessages();
 
     try {
       const logo = await uploadImageFile(file, {
@@ -132,13 +119,9 @@ const AdminContentManagementPage = () => {
         },
       };
 
-      const saved = saveSettings(nextSettings, "Đã tải và lưu Logo.");
-
-      if (!saved) {
-        return;
-      }
+      saveSettings(nextSettings, "Đã tải và lưu Logo.");
     } catch (uploadError) {
-      setError(uploadError?.message || "Không thể tải Logo.");
+      notifyError(uploadError?.message || "Không thể tải Logo.");
     } finally {
       setUploading(false);
     }
@@ -155,8 +138,6 @@ const AdminContentManagementPage = () => {
         announcementMessages: messages,
       };
     });
-
-    clearMessages();
   };
 
   const addAnnouncement = () => {
@@ -165,8 +146,6 @@ const AdminContentManagementPage = () => {
 
       announcementMessages: [...(current.announcementMessages || []), ""],
     }));
-
-    clearMessages();
   };
 
   const askRemoveAnnouncement = (index) => {
@@ -207,8 +186,6 @@ const AdminContentManagementPage = () => {
         [field]: value,
       },
     }));
-
-    clearMessages();
   };
 
   const saveHomepageContent = () => {
@@ -224,8 +201,6 @@ const AdminContentManagementPage = () => {
         defaultShopInfoHtml: value,
       },
     }));
-
-    clearMessages();
   };
 
   const saveBlogShopInfo = () => {
@@ -255,22 +230,6 @@ const AdminContentManagementPage = () => {
             nội dung mặc định cho bài viết.
           </p>
         </header>
-
-        {(message || error) && (
-          <div className="mb-5 flex justify-center">
-            <div
-              className={`rounded-xl border bg-white px-5 py-3 text-center text-sm shadow-sm ${
-                error
-                  ? "border-red-100 text-red-600"
-                  : "border-green-100 text-green-600"
-              }`}
-              role="status"
-              aria-live="polite"
-            >
-              {error || message}
-            </div>
-          </div>
-        )}
 
         <div className="space-y-6">
           <section className="rounded-2xl bg-white p-6 shadow-sm">
@@ -536,9 +495,9 @@ const AdminContentManagementPage = () => {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                Nội dung này sẽ tự động được chèn vào cuối mỗi bài viết mới. Bạn
-                có thể chỉnh sửa nội dung HTML để bổ sung thông tin thương hiệu,
-                liên hệ và liên kết nội bộ phục vụ SEO.
+                Nội dung này sẽ tự động được chèn vào bài viết mới. Bạn có thể
+                chỉnh sửa nội dung HTML để bổ sung thông tin thương hiệu, liên
+                hệ và liên kết nội bộ phục vụ SEO.
               </p>
 
               <p className="mt-2 rounded-xl bg-pink-50 p-3 text-xs leading-5 text-pink-700">

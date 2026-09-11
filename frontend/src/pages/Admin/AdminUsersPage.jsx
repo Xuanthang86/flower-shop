@@ -92,7 +92,7 @@ const AdminUsersPage = () => {
 
   const [createOpen, setCreateOpen] = useState(false);
 
-  const [permissionsOpen, setPermissionsOpen] = useState(true);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
 
   const [rolePermissionDraft, setRolePermissionDraft] = useState({});
 

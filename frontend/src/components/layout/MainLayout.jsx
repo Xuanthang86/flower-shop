@@ -5,6 +5,11 @@ import AnnouncementBar from "@/components/layout/AnnouncementBar";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
+import {
+  NotificationProvider,
+  NotificationToast,
+} from "@/context/NotificationContext";
+
 import { startSharedDataSync } from "@/services/sharedDataSync";
 
 const MainLayout = () => {
@@ -17,17 +22,21 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <AnnouncementBar />
+    <NotificationProvider>
+      <div className="flex min-h-screen flex-col">
+        <AnnouncementBar />
 
-      <Header />
+        <Header />
 
-      <main className="flex-1">
-        <Outlet />
-      </main>
+        <main className="flex-1">
+          <Outlet />
+        </main>
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+
+      <NotificationToast />
+    </NotificationProvider>
   );
 };
 

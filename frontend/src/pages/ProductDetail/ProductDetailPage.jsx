@@ -31,6 +31,8 @@ import { ROLES, useAuth } from "@/context/AuthContext";
 
 import { useCart } from "@/context/useCart";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const WISHLIST_KEY = "flower-shop-wishlist";
 
 const STAFF_ROLES = new Set([
@@ -48,6 +50,8 @@ const ProductDetailPage = () => {
 
   const { addToCart } = useCart();
 
+  const { notifySuccess, notifyError, notifyInfo } = useNotification();
+
   const [products, setProducts] = useState(() => readProducts());
 
   const [categories, setCategories] = useState(() => readCategories());
@@ -55,12 +59,6 @@ const ProductDetailPage = () => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   const isStaff = STAFF_ROLES.has(user?.role);
-
-  /*
-  ==========================================================
-  REFRESH
-  ==========================================================
-  */
 
   useEffect(() => {
     const refreshProducts = () => setProducts(readProducts());
@@ -78,32 +76,14 @@ const ProductDetailPage = () => {
     };
   }, []);
 
-  /*
-  ==========================================================
-  PRODUCT
-  ==========================================================
-  */
-
   const product = useMemo(
     () => getProductById(productId, products),
     [productId, products]
   );
 
-  /*
-  ==========================================================
-  CATEGORY
-  ==========================================================
-  */
-
   const category = product
     ? categories.find((item) => item.slug === product.category)
     : null;
-
-  /*
-  ==========================================================
-  FAVORITE STATE
-  ==========================================================
-  */
 
   useEffect(() => {
     if (!user || isStaff || !product) {
@@ -126,11 +106,12 @@ const ProductDetailPage = () => {
     }
   }, [user, product, isStaff]);
 
-  /*
-  ==========================================================
-  RELATED
-  ==========================================================
-  */
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }, [productId]);
 
   const relatedProducts = useMemo(() => {
     if (!product) {
@@ -155,23 +136,11 @@ const ProductDetailPage = () => {
       .slice(0, 4);
   }, [product, products]);
 
-  /*
-  ==========================================================
-  PRICE
-  ==========================================================
-  */
-
   const formatPrice = (value) =>
     new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(value || 0);
-
-  /*
-  ==========================================================
-  ADD TO CART
-  ==========================================================
-  */
 
   const handleAddToCart = () => {
     if (!product) {
@@ -179,7 +148,7 @@ const ProductDetailPage = () => {
     }
 
     if (isStaff) {
-      window.alert(
+      notifyError(
         "Tài khoản quản trị không có quyền mua hàng. Vui lòng sử dụng tài khoản khách hàng."
       );
 
@@ -187,7 +156,7 @@ const ProductDetailPage = () => {
     }
 
     if (!user) {
-      window.alert("Vui lòng đăng nhập để mua hàng.");
+      notifyInfo("Vui lòng đăng nhập để mua hàng.");
 
       navigate("/login", {
         state: {
@@ -201,19 +170,13 @@ const ProductDetailPage = () => {
     const result = addToCart(product);
 
     if (!result?.success) {
-      window.alert(result?.message || "Không thể thêm sản phẩm vào giỏ hàng.");
+      notifyError(result?.message || "Không thể thêm sản phẩm vào giỏ hàng.");
 
       return;
     }
 
-    window.alert(`Đã thêm "${product.name}" vào giỏ hàng.`);
+    notifySuccess(`Đã thêm "${product.name}" vào giỏ hàng.`);
   };
-
-  /*
-  ==========================================================
-  FAVORITE
-  ==========================================================
-  */
 
   const handleToggleFavorite = () => {
     if (!product) {
@@ -221,7 +184,7 @@ const ProductDetailPage = () => {
     }
 
     if (isStaff) {
-      window.alert(
+      notifyError(
         "Tài khoản quản trị không có quyền sử dụng sản phẩm yêu thích."
       );
 
@@ -229,7 +192,7 @@ const ProductDetailPage = () => {
     }
 
     if (!user) {
-      window.alert("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
+      notifyInfo("Vui lòng đăng nhập để thêm sản phẩm vào yêu thích.");
 
       navigate("/login", {
         state: {
@@ -265,13 +228,13 @@ const ProductDetailPage = () => {
     localStorage.setItem(key, JSON.stringify(updatedIds));
 
     setIsFavorite(updatedIds.includes(id));
-  };
 
-  /*
-  ==========================================================
-  NOT FOUND
-  ==========================================================
-  */
+    notifySuccess(
+      updatedIds.includes(id)
+        ? "Đã thêm sản phẩm vào danh sách yêu thích."
+        : "Đã bỏ sản phẩm khỏi danh sách yêu thích."
+    );
+  };
 
   if (!product) {
     return (
@@ -300,7 +263,7 @@ const ProductDetailPage = () => {
   }
 
   return (
-    <section className="min-h-screen bg-gray-50 py-8 md:py-10">
+    <section key={productId} className="min-h-screen bg-gray-50 py-8 md:py-10">
       <div className="mx-auto max-w-5xl px-4">
         <Link
           to="/products"
@@ -399,8 +362,6 @@ const ProductDetailPage = () => {
 
               <div className="my-6 border-t border-gray-100" />
 
-              {/* STAFF NOTICE */}
-
               {isStaff ? (
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
                   <p className="font-semibold text-blue-800">
@@ -477,6 +438,8 @@ const ProductDetailPage = () => {
                       <img
                         src={item.image}
                         alt={item.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover transition duration-500 hover:scale-105"
                       />
                     </div>
