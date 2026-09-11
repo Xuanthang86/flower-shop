@@ -148,9 +148,6 @@ const ProductDetailPage = () => {
     });
   }, [productId]);
 
-  /*
-   * SEO metadata + Product JSON-LD.
-   */
   useEffect(() => {
     const jsonLdId = "flower-shop-product-jsonld";
 
@@ -168,9 +165,9 @@ const ProductDetailPage = () => {
       existingBreadcrumbSchema.remove();
     }
 
-    const canonicalUrl = `${window.location.origin}/products/${encodeURIComponent(
-      productId
-    )}`;
+    const canonicalUrl = `${
+      window.location.origin
+    }/products/${encodeURIComponent(productId)}`;
 
     if (!product) {
       document.title = "Không tìm thấy sản phẩm | Flower Shop";
@@ -413,17 +410,24 @@ const ProductDetailPage = () => {
 
     const key = `${WISHLIST_KEY}-${userId}`;
 
-    let ids = [];
+    /*
+     * Không khởi tạo let ids = [] rồi gán lại trong try.
+     * Việc đó tạo ra cảnh báo:
+     * "value assigned to ids is not used".
+     *
+     * const + IIFE đảm bảo ids luôn nhận đúng một giá trị.
+     */
+    const ids = (() => {
+      try {
+        const raw = localStorage.getItem(key);
 
-    try {
-      const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : [];
 
-      const parsed = raw ? JSON.parse(raw) : [];
-
-      ids = Array.isArray(parsed) ? parsed.map(String) : [];
-    } catch {
-      ids = [];
-    }
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {
+        return [];
+      }
+    })();
 
     const id = String(product.id);
 

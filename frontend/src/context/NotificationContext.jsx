@@ -1,19 +1,10 @@
-/* eslint-disable react-refresh/only-export-components */
-
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createPortal } from "react-dom";
 
 import { FiAlertCircle, FiCheckCircle, FiInfo, FiX } from "react-icons/fi";
 
-const NotificationContext = createContext(null);
+import { NotificationContext } from "./notificationContext.js";
 
 const NOTIFICATION_DURATION = 2800;
 
@@ -134,20 +125,8 @@ export const NotificationProvider = ({ children }) => {
   );
 };
 
-export const useNotification = () => {
-  const context = useContext(NotificationContext);
-
-  if (!context) {
-    throw new Error(
-      "useNotification phải được sử dụng bên trong NotificationProvider."
-    );
-  }
-
-  return context;
-};
-
 export const NotificationToast = () => {
-  const { notification, dismissNotification } = useNotification();
+  const { notification, dismissNotification } = ReactUseNotification();
 
   if (!notification) {
     return null;
@@ -193,3 +172,17 @@ export const NotificationToast = () => {
 
   return createPortal(toast, document.body);
 };
+
+const ReactUseNotification = () => {
+  const context = React.useContext(NotificationContext);
+
+  if (!context) {
+    throw new Error(
+      "NotificationToast phải được sử dụng bên trong NotificationProvider."
+    );
+  }
+
+  return context;
+};
+
+export default NotificationProvider;

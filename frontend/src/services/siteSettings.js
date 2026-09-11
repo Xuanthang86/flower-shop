@@ -18,15 +18,20 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 };
 
 /*
- * Nội dung mặc định mới.
+ * Template mặc định mới.
  *
- * Mục tiêu:
- * - Không còn vài đoạn <p> đơn điệu.
- * - Có cấu trúc heading rõ ràng.
- * - Có phần giới thiệu.
- * - Có thông tin liên hệ.
- * - Có liên kết nội bộ.
- * - Có cấu trúc phù hợp cho nội dung bài viết.
+ * Đã giảm khoảng cách:
+ * - padding ngoài
+ * - margin giữa các block
+ * - line-height
+ * - khoảng cách heading
+ *
+ * Đồng thời vẫn giữ:
+ * - heading
+ * - giới thiệu
+ * - thông tin liên hệ
+ * - liên kết nội bộ
+ * - semantic HTML
  */
 export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 <section
@@ -34,10 +39,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
   style="
     width:100%;
     max-width:100%;
-    margin:32px 0 12px;
-    padding:28px;
+    margin:20px 0 8px;
+    padding:22px;
     border:1px solid #fce7f3;
-    border-radius:20px;
+    border-radius:18px;
     background:linear-gradient(
       135deg,
       #fff7fb 0%,
@@ -49,14 +54,14 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 >
   <header
     style="
-      margin:0 0 22px;
-      padding:0 0 18px;
+      margin:0 0 16px;
+      padding:0 0 14px;
       border-bottom:1px solid #fbcfe8;
     "
   >
     <p
       style="
-        margin:0 0 8px;
+        margin:0 0 6px;
         color:#db2777;
         font-size:12px;
         line-height:18px;
@@ -72,8 +77,8 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       style="
         margin:0;
         color:#1f2937;
-        font-size:26px;
-        line-height:34px;
+        font-size:24px;
+        line-height:31px;
         font-weight:800;
       "
     >
@@ -82,10 +87,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:9px 0 0;
+        margin:7px 0 0;
         color:#6b7280;
         font-size:14px;
-        line-height:23px;
+        line-height:21px;
       "
     >
       {{tagline}}
@@ -96,10 +101,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
     style="
       color:#4b5563;
       font-size:15px;
-      line-height:27px;
+      line-height:24px;
     "
   >
-    <p style="margin:0 0 17px;">
+    <p style="margin:0 0 13px;">
       <strong style="color:#374151;">
         {{siteName}}
       </strong>
@@ -108,13 +113,13 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       nghiệm mua sắm thuận tiện cho khách hàng.
     </p>
 
-    <p style="margin:0 0 17px;">
+    <p style="margin:0 0 13px;">
       Shop cung cấp các sản phẩm hoa phù hợp cho nhiều dịp
       đặc biệt như sinh nhật, khai trương, cưới hỏi,
       chúc mừng, tri ân, kỷ niệm và các sự kiện quan trọng.
     </p>
 
-    <p style="margin:0 0 22px;">
+    <p style="margin:0 0 17px;">
       Chúng tôi chú trọng chất lượng hoa, hình thức trình bày,
       khả năng tư vấn và hỗ trợ khách hàng trong suốt quá trình
       lựa chọn sản phẩm.
@@ -123,20 +128,20 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
   <section
     style="
-      margin:0 0 22px;
-      padding:20px;
+      margin:0 0 17px;
+      padding:16px;
       border:1px solid #f3f4f6;
-      border-radius:15px;
+      border-radius:14px;
       background:#ffffff;
       box-sizing:border-box;
     "
   >
     <h3
       style="
-        margin:0 0 14px;
+        margin:0 0 10px;
         color:#374151;
-        font-size:17px;
-        line-height:25px;
+        font-size:16px;
+        line-height:24px;
         font-weight:700;
       "
     >
@@ -145,10 +150,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 9px;
+        margin:0 0 7px;
         color:#6b7280;
         font-size:14px;
-        line-height:23px;
+        line-height:22px;
       "
     >
       <strong style="color:#374151;">
@@ -159,10 +164,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 9px;
+        margin:0 0 7px;
         color:#6b7280;
         font-size:14px;
-        line-height:23px;
+        line-height:22px;
       "
     >
       <strong style="color:#374151;">
@@ -183,10 +188,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 9px;
+        margin:0 0 7px;
         color:#6b7280;
         font-size:14px;
-        line-height:23px;
+        line-height:22px;
       "
     >
       <strong style="color:#374151;">
@@ -210,7 +215,7 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
         margin:0;
         color:#6b7280;
         font-size:14px;
-        line-height:23px;
+        line-height:22px;
       "
     >
       <strong style="color:#374151;">
@@ -223,17 +228,17 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
   <section
     style="
       margin:0;
-      padding:18px 20px;
-      border-radius:15px;
+      padding:14px 16px;
+      border-radius:14px;
       background:#fff;
     "
   >
     <h3
       style="
-        margin:0 0 12px;
+        margin:0 0 8px;
         color:#374151;
         font-size:16px;
-        line-height:24px;
+        line-height:23px;
         font-weight:700;
       "
     >
@@ -245,7 +250,7 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
         margin:0;
         color:#6b7280;
         font-size:14px;
-        line-height:24px;
+        line-height:23px;
       "
     >
       Khám phá thêm các sản phẩm hoa tại
@@ -276,10 +281,7 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 `;
 
 /*
- * Nội dung mặc định cũ của project.
- *
- * Dùng để nhận diện dữ liệu localStorage cũ và tự động
- * chuyển sang template mới.
+ * Template mặc định cũ.
  */
 const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 <h2>Về Flower Shop</h2>
@@ -318,12 +320,9 @@ const normalizeHtmlForComparison = (value) =>
 /*
  * Nhận diện các template mặc định cũ.
  *
- * Bao gồm:
- * 1. Template legacy nằm trực tiếp trong siteSettings.js.
- * 2. Template mặc định cũ từng nằm trong AdminBlogManagementPage.jsx.
- *
- * Không tự động thay thế nội dung mà người quản trị đã viết riêng,
- * trừ khi nội dung rõ ràng là template mặc định cũ của hệ thống.
+ * Không dùng việc "content có HTML" làm điều kiện,
+ * mà chỉ migrate khi có dấu hiệu rõ ràng của template
+ * mặc định do hệ thống sinh ra.
  */
 const isLegacyDefaultBlogShopInfo = (value) => {
   const normalized = normalizeHtmlForComparison(value);
@@ -340,10 +339,6 @@ const isLegacyDefaultBlogShopInfo = (value) => {
     return true;
   }
 
-  /*
-   * Template cũ từng được khai báo trực tiếp trong
-   * AdminBlogManagementPage.jsx.
-   */
   const isOldAdminBlogTemplate =
     normalized.includes('data-flower-shop-default-info="true"') &&
     normalized.includes("Hoa tươi tinh tế cho những khoảnh khắc đáng nhớ.") &&
@@ -354,10 +349,6 @@ const isLegacyDefaultBlogShopInfo = (value) => {
     return true;
   }
 
-  /*
-   * Một số dữ liệu rất cũ chỉ có cấu trúc:
-   * <h2> + vài <p> + thông tin liên hệ.
-   */
   const isVeryOldSimpleTemplate =
     normalized.includes("<h2>Về Flower Shop</h2>") &&
     normalized.includes("Thông tin liên hệ") &&
@@ -367,7 +358,121 @@ const isLegacyDefaultBlogShopInfo = (value) => {
   return isVeryOldSimpleTemplate;
 };
 
-const DEFAULT_SITE_SETTINGS = {
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+/*
+ * Render template mặc định với dữ liệu shop hiện tại.
+ */
+const buildDefaultBlogShopInfoHtml = (template, settings) => {
+  const branding = settings?.branding || {};
+  const contact = settings?.contact || {};
+
+  return String(template || "")
+    .replace(
+      /\{\{siteName\}\}/g,
+      escapeHtml(branding.siteName || "Flower Shop")
+    )
+    .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
+    .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
+    .replace(/\{\{phone\}\}/g, escapeHtml(contact.phone || "Đang cập nhật"))
+    .replace(/\{\{email\}\}/g, escapeHtml(contact.email || "Đang cập nhật"))
+    .replace(
+      /\{\{workingHours\}\}/g,
+      escapeHtml(contact.workingHours || "Đang cập nhật")
+    );
+};
+
+/*
+ * Thay template cũ bên trong content bài viết.
+ *
+ * Chỉ tác động tới:
+ * - toàn bộ content nếu content chính là template cũ;
+ * - block có data-flower-shop-default-info="true"
+ *   nếu block đó đúng là template cũ.
+ *
+ * Không tự ý thay đổi bài viết có nội dung riêng.
+ */
+const migrateLegacyBlogPostContent = (content, renderedDefaultTemplate) => {
+  const value = String(content || "").trim();
+
+  if (!value) {
+    return value;
+  }
+
+  if (isLegacyDefaultBlogShopInfo(value)) {
+    return renderedDefaultTemplate;
+  }
+
+  if (!value.includes('data-flower-shop-default-info="true"')) {
+    return value;
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="flower-shop-migration-root">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("flower-shop-migration-root");
+
+    const defaultBlock = root?.querySelector(
+      '[data-flower-shop-default-info="true"]'
+    );
+
+    if (
+      !root ||
+      !defaultBlock ||
+      !isLegacyDefaultBlogShopInfo(defaultBlock.outerHTML)
+    ) {
+      return value;
+    }
+
+    defaultBlock.outerHTML = renderedDefaultTemplate;
+
+    return root.innerHTML;
+  } catch {
+    return value;
+  }
+};
+
+const migrateLegacyBlogPosts = (posts, renderedDefaultTemplate) => {
+  if (!Array.isArray(posts)) {
+    return [];
+  }
+
+  return posts.map((post) => {
+    if (!post || typeof post !== "object") {
+      return post;
+    }
+
+    const content = String(post.content || "");
+
+    const migratedContent = migrateLegacyBlogPostContent(
+      content,
+      renderedDefaultTemplate
+    );
+
+    if (migratedContent === content) {
+      return post;
+    }
+
+    return {
+      ...post,
+      content: migratedContent,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+export const DEFAULT_SITE_SETTINGS = {
   announcementMessages: [
     "🌸 Miễn phí giao hàng cho đơn từ 500.000đ",
     "🚚 Đặt trước 14h — giao hoa trong ngày",
@@ -538,28 +643,47 @@ const mergeSettings = (input = {}) => {
 
   const sourceBlogHtml = String(source.blog?.defaultShopInfoHtml ?? "").trim();
 
-  /*
-   * Tự động migrate nội dung mặc định cũ.
-   *
-   * Nếu localStorage đang chứa template mặc định cũ,
-   * hệ thống thay bằng template mới.
-   *
-   * Nếu người quản trị đã tự chỉnh sửa nội dung,
-   * không ghi đè.
-   */
   const defaultShopInfoHtml = isLegacyDefaultBlogShopInfo(sourceBlogHtml)
     ? defaults.blog.defaultShopInfoHtml
     : sourceBlogHtml;
+
+  const branding = {
+    ...defaults.branding,
+    ...(source.branding || {}),
+  };
+
+  const contact = {
+    ...defaults.contact,
+    ...(source.contact || {}),
+    style: {
+      ...defaults.contact.style,
+      ...(source.contact?.style || {}),
+    },
+
+    extraItems: Array.isArray(source.contact?.extraItems)
+      ? source.contact.extraItems
+      : [],
+  };
+
+  const renderedDefaultTemplate = buildDefaultBlogShopInfoHtml(
+    defaultShopInfoHtml,
+    {
+      branding,
+      contact,
+    }
+  );
+
+  const migratedBlogPosts = migrateLegacyBlogPosts(
+    Array.isArray(source.blogPosts) ? source.blogPosts : [],
+    renderedDefaultTemplate
+  );
 
   return {
     ...defaults,
 
     ...source,
 
-    branding: {
-      ...defaults.branding,
-      ...(source.branding || {}),
-    },
+    branding,
 
     hero: {
       ...defaults.hero,
@@ -609,19 +733,7 @@ const mergeSettings = (input = {}) => {
       ...(source.footer || {}),
     },
 
-    contact: {
-      ...defaults.contact,
-      ...(source.contact || {}),
-
-      style: {
-        ...defaults.contact.style,
-        ...(source.contact?.style || {}),
-      },
-
-      extraItems: Array.isArray(source.contact?.extraItems)
-        ? source.contact.extraItems
-        : [],
-    },
+    contact,
 
     blog: {
       ...defaults.blog,
@@ -644,7 +756,13 @@ const mergeSettings = (input = {}) => {
       ? source.customerLogos
       : [],
 
-    blogPosts: Array.isArray(source.blogPosts) ? source.blogPosts : [],
+    /*
+     * Đây là phần quan trọng:
+     * các bài viết cũ được tạo từ template
+     * mặc định sẽ được migrate ngay khi
+     * siteSettings được đọc.
+     */
+    blogPosts: migratedBlogPosts,
   };
 };
 
@@ -653,10 +771,38 @@ export const readSiteSettings = () => {
     const raw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
 
     if (!raw) {
-      return clone(DEFAULT_SITE_SETTINGS);
+      const defaults = clone(DEFAULT_SITE_SETTINGS);
+
+      localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(defaults));
+
+      return defaults;
     }
 
-    return mergeSettings(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+
+    const normalized = mergeSettings(parsed);
+
+    /*
+     * Nếu mergeSettings đã migrate dữ liệu
+     * hoặc bổ sung default mới, lưu lại ngay.
+     *
+     * Không dispatch event tại đây vì hàm read
+     * có thể được gọi trong quá trình render.
+     */
+    const normalizedRaw = JSON.stringify(normalized);
+
+    if (normalizedRaw !== raw) {
+      try {
+        localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, normalizedRaw);
+      } catch (storageError) {
+        console.warn(
+          "Không thể lưu dữ liệu site settings sau migration:",
+          storageError
+        );
+      }
+    }
+
+    return normalized;
   } catch (error) {
     console.error("Không thể đọc site settings:", error);
 
@@ -698,5 +844,3 @@ export const updateSiteSettings = (updates) => {
 
 export const resetSiteSettings = () =>
   saveSiteSettings(clone(DEFAULT_SITE_SETTINGS));
-
-export { DEFAULT_SITE_SETTINGS };

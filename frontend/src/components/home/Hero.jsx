@@ -12,6 +12,13 @@ import defaultHeroImage from "@/assets/images/hero/hero-bouquet.jpg";
 
 const DEFAULT_DURATION = 7000;
 
+const FALLBACK_BANNER = {
+  id: "default-hero",
+  image: defaultHeroImage,
+  alt: "Flower Shop",
+  duration: DEFAULT_DURATION,
+};
+
 const normalizeDuration = (value) => {
   const duration = Number(value);
 
@@ -39,9 +46,7 @@ const Hero = () => {
       : [];
 
     return source
-      .filter((banner) => {
-        return banner?.visible !== false && getBannerImage(banner);
-      })
+      .filter((banner) => banner?.visible !== false && getBannerImage(banner))
       .slice()
       .sort((a, b) => Number(a?.priority ?? 0) - Number(b?.priority ?? 0));
   }, [settings]);
@@ -49,7 +54,6 @@ const Hero = () => {
   useEffect(() => {
     const refresh = () => {
       setSettings(readSiteSettings());
-      setCurrentIndex(0);
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
@@ -63,51 +67,57 @@ const Hero = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (banners.length <= 1) {
-      return undefined;
-    }
+  const displayBanners = useMemo(
+    () => (banners.length > 0 ? banners : [FALLBACK_BANNER]),
+    [banners]
+  );
 
-    const activeBanner = banners[currentIndex];
+  /*
+   * Không reset currentIndex bằng setState trong effect.
+   *
+   * Khi số banner thay đổi và currentIndex cũ không còn hợp lệ,
+   * safeCurrentIndex sẽ tự đưa UI về banner hợp lệ đầu tiên.
+   */
+  const safeCurrentIndex = Math.min(currentIndex, displayBanners.length - 1);
 
-    const timer = window.setTimeout(() => {
-      setCurrentIndex((index) => (index >= banners.length - 1 ? 0 : index + 1));
-    }, normalizeDuration(activeBanner?.duration));
-
-    return () => window.clearTimeout(timer);
-  }, [banners, currentIndex]);
-
-  useEffect(() => {
-    if (banners.length > 0 && currentIndex >= banners.length) {
-      setCurrentIndex(0);
-    }
-  }, [banners.length, currentIndex]);
-
-  const fallbackBanner = {
-    id: "default-hero",
-    image: defaultHeroImage,
-    alt: "Flower Shop",
-    duration: DEFAULT_DURATION,
-  };
-
-  const displayBanners = banners.length > 0 ? banners : [fallbackBanner];
-
-  const activeBanner = displayBanners[currentIndex] || displayBanners[0];
+  const activeBanner = displayBanners[safeCurrentIndex] || displayBanners[0];
 
   const desktopImage = getBannerImage(activeBanner);
 
   const mobileImage = getBannerMobileImage(activeBanner);
 
+  useEffect(() => {
+    if (displayBanners.length <= 1) {
+      return undefined;
+    }
+
+    const activeBannerForTimer = displayBanners[safeCurrentIndex];
+
+    const timer = window.setTimeout(() => {
+      setCurrentIndex((index) =>
+        index >= displayBanners.length - 1 ? 0 : index + 1
+      );
+    }, normalizeDuration(activeBannerForTimer?.duration));
+
+    return () => window.clearTimeout(timer);
+  }, [displayBanners, safeCurrentIndex]);
+
   const goPrevious = () => {
-    if (displayBanners.length <= 1) return;
+    if (displayBanners.length <= 1) {
+      return;
+    }
 
     setCurrentIndex((index) =>
-      index <= 0 ? displayBanners.length - 1 : index - 1
+      index <= 0
+        ? displayBanners.length - 1
+        : Math.min(index - 1, displayBanners.length - 1)
     );
   };
 
   const goNext = () => {
-    if (displayBanners.length <= 1) return;
+    if (displayBanners.length <= 1) {
+      return;
+    }
 
     setCurrentIndex((index) =>
       index >= displayBanners.length - 1 ? 0 : index + 1
@@ -128,7 +138,11 @@ const Hero = () => {
                 key={activeBanner.id}
                 src={desktopImage}
                 alt={activeBanner.alt || "Flower Shop"}
-                className="block h-[145px] w-full object-cover sm:h-[185px] md:h-[245px] lg:h-[300px]"
+                width="1600"
+                height="700"
+                decoding="async"
+                fetchPriority={safeCurrentIndex === 0 ? "high" : "auto"}
+                className="block h-auto w-full object-contain"
                 onError={(event) => {
                   if (event.currentTarget.src !== defaultHeroImage) {
                     event.currentTarget.src = defaultHeroImage;
@@ -164,7 +178,7 @@ const Hero = () => {
                       type="button"
                       onClick={() => setCurrentIndex(index)}
                       className={`h-1.5 rounded-full transition-all ${
-                        index === currentIndex
+                        index === safeCurrentIndex
                           ? "w-6 bg-pink-600"
                           : "w-1.5 bg-white/85"
                       }`}
