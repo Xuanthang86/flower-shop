@@ -61,7 +61,6 @@ const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
 const getDiscountPercent = (price, oldPrice) => {
   const current = Number(price);
-
   const old = Number(oldPrice);
 
   if (
@@ -209,6 +208,14 @@ const AdminProductsPage = () => {
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
 
+  /*
+   * Không dùng useEffect để setCurrentPage khi totalPages thay đổi.
+   *
+   * safePage bảo đảm UI luôn dùng một trang hợp lệ ngay cả khi:
+   * - xóa sản phẩm cuối cùng của trang hiện tại;
+   * - tìm kiếm làm giảm số trang;
+   * - nhập Excel làm thay đổi số lượng sản phẩm.
+   */
   const safePage = Math.min(currentPage, totalPages);
 
   const startIndex =
@@ -217,12 +224,6 @@ const AdminProductsPage = () => {
   const endIndex = Math.min(startIndex + PRODUCTS_PER_PAGE, totalProducts);
 
   const visibleProducts = filteredProducts.slice(startIndex, endIndex);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   const clearMessages = () => {
     setMessage("");
@@ -812,6 +813,7 @@ const AdminProductsPage = () => {
                           src={category.image}
                           alt={category.name}
                           loading="lazy"
+                          decoding="async"
                           className="max-h-full max-w-full rounded-lg object-contain"
                         />
                       ) : (
@@ -844,6 +846,11 @@ const AdminProductsPage = () => {
                               ? "Ẩn danh mục"
                               : "Hiện danh mục"
                           }
+                          aria-label={
+                            category.active !== false
+                              ? `Ẩn danh mục ${category.name}`
+                              : `Hiện danh mục ${category.name}`
+                          }
                         >
                           {category.active !== false ? (
                             <FiEye size={15} />
@@ -864,6 +871,7 @@ const AdminProductsPage = () => {
                           disabled={index === 0}
                           className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
                           title="Đưa lên"
+                          aria-label={`Đưa danh mục ${category.name} lên`}
                         >
                           <FiChevronUp size={15} />
                         </button>
@@ -874,6 +882,7 @@ const AdminProductsPage = () => {
                           disabled={index === categoriesSorted.length - 1}
                           className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
                           title="Đưa xuống"
+                          aria-label={`Đưa danh mục ${category.name} xuống`}
                         >
                           <FiChevronDown size={15} />
                         </button>
@@ -1064,6 +1073,7 @@ const AdminProductsPage = () => {
                 disabled={safePage === 1}
                 onClick={() => goToPage(safePage - 1)}
                 className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-40"
+                aria-label="Trang trước"
               >
                 <FiChevronLeft />
               </button>
@@ -1093,6 +1103,7 @@ const AdminProductsPage = () => {
                 disabled={safePage === totalPages}
                 onClick={() => goToPage(safePage + 1)}
                 className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-40"
+                aria-label="Trang sau"
               >
                 <FiChevronRight />
               </button>
@@ -1116,6 +1127,7 @@ const AdminProductsPage = () => {
                 type="button"
                 onClick={closeProductModal}
                 className="rounded-full p-2 hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
@@ -1263,6 +1275,8 @@ const AdminProductsPage = () => {
                     <img
                       src={productForm.image}
                       alt="Xem trước sản phẩm"
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-full max-w-full rounded-lg object-contain"
                     />
                   </div>
@@ -1306,6 +1320,7 @@ const AdminProductsPage = () => {
                 type="button"
                 onClick={closeCategoryModal}
                 className="rounded-full p-2 hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
@@ -1349,6 +1364,8 @@ const AdminProductsPage = () => {
                   <img
                     src={categoryForm.image}
                     alt="Xem trước danh mục"
+                    loading="lazy"
+                    decoding="async"
                     className="max-h-full max-w-full object-contain"
                   />
                 </div>
