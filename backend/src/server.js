@@ -1,4 +1,8 @@
-require("dotenv").config();
+const path = require("path");
+
+require("dotenv").config({
+  path: path.resolve(__dirname, "../.env"),
+});
 
 const express = require("express");
 const cors = require("cors");
@@ -18,6 +22,10 @@ const allowedOrigins = String(
   .map((item) => item.trim())
   .filter(Boolean);
 
+const isDevelopmentOrigin = (origin) =>
+  /^https?:\/\/localhost(?::\d+)?$/i.test(origin) ||
+  /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(origin);
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
@@ -25,7 +33,11 @@ const corsOptions = {
       return;
     }
 
-    if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+    if (
+      allowedOrigins.includes("*") ||
+      allowedOrigins.includes(origin) ||
+      isDevelopmentOrigin(origin)
+    ) {
       callback(null, true);
       return;
     }
@@ -44,12 +56,6 @@ app.disable("x-powered-by");
 
 app.use(helmet());
 
-/*
- * Express 5 / path-to-regexp không còn chấp nhận
- * app.options("*", ...).
- *
- * cors middleware tự xử lý preflight OPTIONS.
- */
 app.use(cors(corsOptions));
 
 app.use(morgan("dev"));
@@ -91,6 +97,9 @@ const isPlaceholder = (value) => {
     "your-api-key",
     "your-api-secret",
     "your-cloud-name",
+    "cloud_name_thuc_cua_ban",
+    "api_key_thuc_cua_ban",
+    "api_secret_thuc_cua_ban",
   ];
 
   return placeholders.some((placeholder) => normalized.includes(placeholder));
@@ -103,9 +112,6 @@ const configureCloudinary = () => {
 
   const apiSecret = normalizeEnvValue(process.env.CLOUDINARY_API_SECRET);
 
-  /*
-   * Ưu tiên 3 biến riêng.
-   */
   if (
     !isPlaceholder(cloudName) &&
     !isPlaceholder(apiKey) &&
@@ -121,12 +127,6 @@ const configureCloudinary = () => {
     return true;
   }
 
-  /*
-   * Fallback sang CLOUDINARY_URL.
-   *
-   * Cloudinary chính thức hỗ trợ:
-   * CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
-   */
   const cloudinaryUrl = normalizeEnvValue(process.env.CLOUDINARY_URL);
 
   if (
