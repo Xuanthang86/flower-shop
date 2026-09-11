@@ -50,6 +50,28 @@ const ROLE_OPTIONS = [
 const fieldClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100 disabled:bg-gray-50";
 
+const getDisplayEmail = (email) => {
+  const value = String(email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!value) {
+    return "";
+  }
+
+  if (value.includes("@")) {
+    return value;
+  }
+
+  return `${value}${EMAIL_DOMAIN}`;
+};
+
+const getEmailPrefix = (email) => {
+  const normalized = getDisplayEmail(email);
+
+  return normalized.split("@")[0];
+};
+
 const AdminUsersPage = () => {
   const {
     user,
@@ -282,7 +304,7 @@ const AdminUsersPage = () => {
 
     setEditForm({
       name: account.name || "",
-      emailPrefix: String(account.email || "").split("@")[0],
+      emailPrefix: getEmailPrefix(account.email),
       phone: account.phone || "",
       password: "",
       role,
@@ -351,7 +373,9 @@ const AdminUsersPage = () => {
 
     if (
       !window.confirm(
-        `Bạn có chắc muốn xóa tài khoản "${account.name || account.email}"?`
+        `Bạn có chắc muốn xóa tài khoản "${
+          account.name || getDisplayEmail(account.email)
+        }"?`
       )
     ) {
       return;
@@ -765,11 +789,8 @@ const AdminUsersPage = () => {
               <thead className="bg-gray-50">
                 <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-6 py-4">Tài khoản</th>
-
                   <th className="px-6 py-4">Quyền</th>
-
                   <th className="px-6 py-4">Trạng thái</th>
-
                   <th className="px-6 py-4 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -783,7 +804,7 @@ const AdminUsersPage = () => {
                       </div>
 
                       <div className="mt-1 text-sm text-gray-500">
-                        {account.email}
+                        {getDisplayEmail(account.email)}
                       </div>
 
                       {account.phone && (
@@ -913,11 +934,17 @@ const AdminUsersPage = () => {
                     Email
                   </label>
 
-                  <input
-                    value={editForm.emailPrefix}
-                    disabled
-                    className={fieldClass}
-                  />
+                  <div className="flex">
+                    <input
+                      value={editForm.emailPrefix}
+                      disabled
+                      className={`${fieldClass} rounded-r-none`}
+                    />
+
+                    <span className="flex shrink-0 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-4 text-sm text-gray-600">
+                      {EMAIL_DOMAIN}
+                    </span>
+                  </div>
                 </div>
 
                 <div>

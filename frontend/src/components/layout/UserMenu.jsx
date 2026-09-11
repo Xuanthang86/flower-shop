@@ -67,13 +67,6 @@ const UserMenu = () => {
   const goToManagement = () => {
     closeMenu();
 
-    /*
-     * Admin / Manager / Product Manager
-     * đều vào /admin.
-     *
-     * AdminManagementPage sẽ tự đọc
-     * permission và hiển thị module tương ứng.
-     */
     if (
       [ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(user.role)
     ) {
@@ -199,7 +192,6 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-
                 <span>Quản lý</span>
               </button>
             )}
@@ -211,12 +203,11 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-
                 <span>Tùy chỉnh giao diện</span>
               </Link>
             )}
 
-            <div className="my-1 border-t border-gray-100" />
+            <div className="mx-4 my-1 border-t border-gray-100" />
 
             <button
               type="button"

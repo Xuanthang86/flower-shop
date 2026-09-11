@@ -140,12 +140,19 @@ const AdminSubPage = ({ children }) => {
   return (
     <div className="w-full bg-gray-50 pb-1 pt-1">
       {showBackButton && (
-        <div className="mx-auto max-w-7xl px-4">
+        <div className="mx-auto w-full max-w-7xl px-4">
           <AdminManagementBackButton />
         </div>
       )}
 
-      <div className="w-full">{children}</div>
+      {/*
+       * Header và nút Quay lại đều dùng max-w-7xl.
+       *
+       * Một số page cũ có container max-w-5xl.
+       * Wrapper này chỉ mở rộng container chính của page quản lý
+       * lên max-w-7xl, không thay đổi bố cục bên trong.
+       */}
+      <div className="w-full [&_main>div.mx-auto]:!max-w-7xl">{children}</div>
     </div>
   );
 };

@@ -24,6 +24,32 @@ import {
 
 import { uploadImageFile } from "@/services/media";
 
+const DEFAULT_SHOP_INFO_HTML = `
+<h2>Về Flower Shop</h2>
+<p>
+  Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
+  được tuyển chọn và chăm sóc kỹ lưỡng cho nhiều dịp đặc biệt như sinh nhật,
+  khai trương, cưới hỏi, chúc mừng, tri ân và các sự kiện quan trọng.
+</p>
+<p>
+  {{siteName}} luôn hướng tới những sản phẩm hoa tươi chất lượng,
+  cách trình bày tinh tế và dịch vụ hỗ trợ tận tâm.
+</p>
+<p>
+  <strong>Thông tin liên hệ:</strong><br />
+  Địa chỉ: {{address}}<br />
+  Điện thoại: {{phone}}<br />
+  Email: {{email}}<br />
+  Thời gian làm việc: {{workingHours}}
+</p>
+<p>
+  Bạn có thể tham khảo thêm các sản phẩm hoa tại
+  <a href="/products">Danh mục sản phẩm</a>
+  hoặc liên hệ với shop qua trang
+  <a href="/contact">Liên hệ</a>.
+</p>
+`;
+
 const EMPTY_POST = {
   title: "",
   date: new Date().toISOString().slice(0, 10),
@@ -52,11 +78,9 @@ const escapeHtml = (value = "") =>
     .replace(/'/g, "&#039;");
 
 const buildDefaultShopInfo = (settings) => {
-  const template = String(settings?.blog?.defaultShopInfoHtml || "").trim();
-
-  if (!template) {
-    return "";
-  }
+  const template =
+    String(settings?.blog?.defaultShopInfoHtml || "").trim() ||
+    DEFAULT_SHOP_INFO_HTML;
 
   const branding = settings?.branding || {};
 
@@ -76,6 +100,15 @@ const buildDefaultShopInfo = (settings) => {
       escapeHtml(contact.workingHours || "Đang cập nhật")
     );
 };
+
+const wrapDefaultShopInfo = (html) => `
+<div
+  data-flower-shop-default-info="true"
+  style="display:block;width:100%;max-width:100%;"
+>
+  ${html}
+</div>
+`;
 
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
@@ -110,6 +143,10 @@ const AdminBlogManagementPage = () => {
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
@@ -132,7 +169,7 @@ const AdminBlogManagementPage = () => {
     }
 
     editorRef.current.innerHTML = form.content || "";
-  }, [editorOpen, editingPost]);
+  }, [editorOpen, editingPost, form.content]);
 
   const clearMessages = () => {
     setMessage("");
@@ -150,7 +187,7 @@ const AdminBlogManagementPage = () => {
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
-      content: defaultShopInfo,
+      content: wrapDefaultShopInfo(defaultShopInfo),
     });
 
     setEditorOpen(true);
@@ -177,7 +214,11 @@ const AdminBlogManagementPage = () => {
 
     setEditingPost(null);
 
-    setForm(EMPTY_POST);
+    setForm({
+      ...EMPTY_POST,
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 5),
+    });
   };
 
   const executeFormat = (command, value = null) => {
@@ -666,7 +707,7 @@ const AdminBlogManagementPage = () => {
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
-                    className="min-h-[320px] p-5 text-sm leading-7 text-gray-700 outline-none [&_img]:mx-auto [&_img]:my-4 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none"
+                    className="blog-editor-content min-h-[320px] w-full p-5 text-sm leading-7 text-gray-700 outline-none [&_h2]:w-full [&_h3]:w-full [&_p]:w-full [&_div]:w-full [&_img]:mx-auto [&_img]:my-4 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[66.666667%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none"
                     style={{
                       whiteSpace: "pre-wrap",
                     }}
