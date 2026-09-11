@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { FiImage, FiPlus, FiSave, FiTrash2, FiX } from "react-icons/fi";
 
 import {
@@ -18,6 +19,7 @@ const AdminContentManagementPage = () => {
   const [uploading, setUploading] = useState(false);
 
   const [message, setMessage] = useState("");
+
   const [error, setError] = useState("");
 
   const [confirmAnnouncement, setConfirmAnnouncement] = useState(null);
@@ -29,15 +31,23 @@ const AdminContentManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
+
       robots.name = "robots";
+
       document.head.appendChild(robots);
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
-    const refresh = () => setSettings(readSiteSettings());
+    const refresh = () => {
+      setSettings(readSiteSettings());
+    };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
 
@@ -50,43 +60,46 @@ const AdminContentManagementPage = () => {
     };
   }, []);
 
+  const clearMessages = () => {
+    setMessage("");
+    setError("");
+  };
+
+  const saveSettings = (nextSettings, successMessage) => {
+    try {
+      const saved = saveSiteSettings(nextSettings);
+
+      setSettings(saved);
+
+      setMessage(successMessage);
+
+      setError("");
+
+      return true;
+    } catch (saveError) {
+      setError(saveError?.message || "Không thể lưu dữ liệu.");
+
+      setMessage("");
+
+      return false;
+    }
+  };
+
   const updateBranding = (field, value) => {
     setSettings((current) => ({
       ...current,
+
       branding: {
         ...(current.branding || {}),
         [field]: value,
       },
     }));
 
-    setMessage("");
-    setError("");
+    clearMessages();
   };
 
-  const updateSection = (field, value) => {
-    setSettings((current) => ({
-      ...current,
-      sections: {
-        ...(current.sections || {}),
-        [field]: value,
-      },
-    }));
-
-    setMessage("");
-    setError("");
-  };
-
-  const saveImmediately = (nextSettings, successMessage) => {
-    try {
-      const saved = saveSiteSettings(nextSettings);
-
-      setSettings(saved);
-      setMessage(successMessage);
-      setError("");
-    } catch (saveError) {
-      setError(saveError.message || "Không thể lưu dữ liệu.");
-      setMessage("");
-    }
+  const saveBranding = () => {
+    saveSettings(settings, "Đã lưu thông tin Logo & thương hiệu.");
   };
 
   const handleLogoUpload = async (event) => {
@@ -94,33 +107,37 @@ const AdminContentManagementPage = () => {
 
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setUploading(true);
-    setMessage("");
-    setError("");
+    clearMessages();
 
     try {
       const logo = await uploadImageFile(file, {
         folder: "flower-shop/branding",
         maxWidth: 1200,
-        maxHeight: 500,
+        maxHeight: 1200,
         quality: 0.84,
       });
 
       const nextSettings = {
         ...settings,
+
         branding: {
           ...(settings.branding || {}),
           logoImage: logo,
         },
       };
 
-      setSettings(nextSettings);
+      const saved = saveSettings(nextSettings, "Đã tải và lưu Logo.");
 
-      saveImmediately(nextSettings, "Đã tải Logo. Thông tin đã được lưu.");
+      if (!saved) {
+        return;
+      }
     } catch (uploadError) {
-      setError(uploadError.message || "Không thể tải Logo.");
+      setError(uploadError?.message || "Không thể tải Logo.");
     } finally {
       setUploading(false);
     }
@@ -138,18 +155,17 @@ const AdminContentManagementPage = () => {
       };
     });
 
-    setMessage("");
-    setError("");
+    clearMessages();
   };
 
   const addAnnouncement = () => {
     setSettings((current) => ({
       ...current,
+
       announcementMessages: [...(current.announcementMessages || []), ""],
     }));
 
-    setMessage("");
-    setError("");
+    clearMessages();
   };
 
   const askRemoveAnnouncement = (index) => {
@@ -160,10 +176,13 @@ const AdminContentManagementPage = () => {
   };
 
   const removeAnnouncement = () => {
-    if (!confirmAnnouncement) return;
+    if (!confirmAnnouncement) {
+      return;
+    }
 
     const nextSettings = {
       ...settings,
+
       announcementMessages: (settings.announcementMessages || []).filter(
         (_, index) => index !== confirmAnnouncement.index
       ),
@@ -171,14 +190,32 @@ const AdminContentManagementPage = () => {
 
     setConfirmAnnouncement(null);
 
-    saveImmediately(nextSettings, "Đã xóa thanh thông báo.");
+    saveSettings(nextSettings, "Đã xóa thanh thông báo.");
   };
 
-  const handleSave = () => {
-    saveImmediately(settings, "Đã lưu toàn bộ nội dung website.");
+  const saveAnnouncements = () => {
+    saveSettings(settings, "Đã lưu thanh thông báo.");
+  };
+
+  const updateSection = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+
+      sections: {
+        ...(current.sections || {}),
+        [field]: value,
+      },
+    }));
+
+    clearMessages();
+  };
+
+  const saveHomepageContent = () => {
+    saveSettings(settings, "Đã lưu nội dung trang chủ.");
   };
 
   const branding = settings.branding || {};
+
   const sections = settings.sections || {};
 
   const announcementMessages = Array.isArray(settings.announcementMessages)
@@ -186,7 +223,7 @@ const AdminContentManagementPage = () => {
     : [];
 
   return (
-    <main className="min-h-screen bg-gray-50 py-6">
+    <main className="min-h-screen bg-gray-50 py-5">
       <div className="mx-auto max-w-6xl px-4">
         <header className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -215,10 +252,17 @@ const AdminContentManagementPage = () => {
         )}
 
         <div className="space-y-6">
+          {/* LOGO */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">
-              Logo & thương hiệu
-            </h2>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold text-gray-900">
+                Logo & thương hiệu
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                Thông tin này được dùng trực tiếp ở khu vực Logo của website.
+              </p>
+            </div>
 
             <div className="mt-5 grid gap-6 md:grid-cols-[180px_1fr]">
               <div className="flex items-center justify-center">
@@ -229,7 +273,7 @@ const AdminContentManagementPage = () => {
                       alt={
                         branding.logoAlt || branding.siteName || "Flower Shop"
                       }
-                      className="h-24 w-24 rounded-full object-contain"
+                      className="h-28 w-28 rounded-full object-contain"
                     />
                   ) : (
                     <FiImage size={36} className="text-gray-300" />
@@ -282,28 +326,41 @@ const AdminContentManagementPage = () => {
                   />
                 </div>
 
-                <label
-                  htmlFor="site-logo"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-pink-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-pink-700"
-                >
-                  <FiImage />
-                  {uploading ? "Đang tải..." : "Chọn Logo"}
-                </label>
+                <div className="flex flex-wrap gap-3">
+                  <label
+                    htmlFor="site-logo"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-pink-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-pink-700"
+                  >
+                    <FiImage />
 
-                <input
-                  id="site-logo"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  disabled={uploading}
-                  onChange={handleLogoUpload}
-                />
+                    {uploading ? "Đang tải..." : "Chọn Logo"}
+                  </label>
+
+                  <input
+                    id="site-logo"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={handleLogoUpload}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={saveBranding}
+                    className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-pink-600 transition hover:bg-pink-50"
+                  >
+                    <FiSave />
+                    Lưu Logo & thương hiệu
+                  </button>
+                </div>
               </div>
             </div>
           </section>
 
+          {/* ANNOUNCEMENT */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
                   Thanh thông báo
@@ -317,7 +374,7 @@ const AdminContentManagementPage = () => {
               <button
                 type="button"
                 onClick={addAnnouncement}
-                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
               >
                 <FiPlus />
                 Thêm
@@ -347,16 +404,32 @@ const AdminContentManagementPage = () => {
                 </div>
               ))}
             </div>
+
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={saveAnnouncements}
+                className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-6 py-3 text-sm font-semibold text-pink-600 hover:bg-pink-50"
+              >
+                <FiSave />
+                Lưu thanh thông báo
+              </button>
+            </div>
           </section>
 
+          {/* HOMEPAGE */}
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">
               Nội dung trang chủ
             </h2>
 
+            <p className="mt-1 text-sm text-gray-500">
+              Chỉnh sửa nội dung chữ của các section trên trang chủ.
+            </p>
+
             <div className="mt-5 grid gap-5 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tiêu đề Danh mục
                 </label>
 
@@ -370,7 +443,7 @@ const AdminContentManagementPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Mô tả Danh mục
                 </label>
 
@@ -384,7 +457,7 @@ const AdminContentManagementPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tiêu đề Sản phẩm nổi bật
                 </label>
 
@@ -398,7 +471,7 @@ const AdminContentManagementPage = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Mô tả Sản phẩm nổi bật
                 </label>
 
@@ -412,7 +485,7 @@ const AdminContentManagementPage = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-semibold">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Tiêu đề Khách hàng tiêu biểu
                 </label>
 
@@ -425,27 +498,36 @@ const AdminContentManagementPage = () => {
                 />
               </div>
             </div>
-          </section>
 
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
-            >
-              <FiSave />
-              Lưu toàn bộ nội dung
-            </button>
-          </div>
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={saveHomepageContent}
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu nội dung trang chủ
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 
+      {/* DELETE CONFIRMATION */}
       {confirmAnnouncement && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-announcement-title"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">
+                <h2
+                  id="delete-announcement-title"
+                  className="text-lg font-bold text-gray-900"
+                >
                   Xác nhận xóa thông báo
                 </h2>
 
@@ -464,16 +546,17 @@ const AdminContentManagementPage = () => {
                 type="button"
                 onClick={() => setConfirmAnnouncement(null)}
                 className="rounded-full p-2 text-gray-400 hover:bg-gray-100"
+                aria-label="Đóng"
               >
                 <FiX />
               </button>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-center gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmAnnouncement(null)}
-                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Hủy
               </button>
@@ -481,7 +564,7 @@ const AdminContentManagementPage = () => {
               <button
                 type="button"
                 onClick={removeAnnouncement}
-                className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
               >
                 Xóa thông báo
               </button>

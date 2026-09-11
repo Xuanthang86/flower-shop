@@ -85,7 +85,9 @@ const BlogPage = () => {
 
       if (!description) {
         description = document.createElement("meta");
+
         description.name = "description";
+
         document.head.appendChild(description);
       }
 
@@ -97,7 +99,9 @@ const BlogPage = () => {
 
       if (!canonical) {
         canonical = document.createElement("link");
+
         canonical.rel = "canonical";
+
         document.head.appendChild(canonical);
       }
 
@@ -149,7 +153,7 @@ const BlogPage = () => {
                   alt={currentPost.title}
                   loading="eager"
                   decoding="async"
-                  className="block h-auto max-h-[300px] w-1/2 min-w-[240px] rounded-xl object-contain"
+                  className="block h-auto max-h-[260px] w-1/3 min-w-[220px] rounded-xl object-contain"
                 />
               </div>
             )}
@@ -279,6 +283,11 @@ const BlogPage = () => {
                     .blog-detail-content img {
                       width: 100%;
                       max-width: 100%;
+                    }
+
+                    .blog-detail-cover {
+                      width: 66.666667%;
+                      min-width: 220px;
                     }
                   }
                 `}

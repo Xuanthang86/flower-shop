@@ -62,35 +62,27 @@ const UserMenu = () => {
 
   const isCustomer = user.role === ROLES.CUSTOMER;
 
-  const isManager = user.role === ROLES.MANAGER;
-
-  const isProductManager = user.role === ROLES.PRODUCT_MANAGER;
-
   const closeMenu = () => setOpen(false);
 
   const goToManagement = () => {
     closeMenu();
 
-    if (isAdmin) {
+    /*
+     * Admin / Manager / Product Manager
+     * đều vào /admin.
+     *
+     * AdminManagementPage sẽ tự đọc
+     * permission và hiển thị module tương ứng.
+     */
+    if (
+      [ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(user.role)
+    ) {
       navigate("/admin");
       return;
     }
 
-    if (isManager) {
-      navigate("/admin/orders");
-      return;
-    }
-
-    if (isProductManager) {
-      navigate("/admin/products");
-    }
+    navigate("/");
   };
-
-  const managementLabel = isManager
-    ? "Quản lý đơn hàng"
-    : isProductManager
-      ? "Quản lý sản phẩm"
-      : "Quản lý";
 
   const handleLogout = () => {
     closeMenu();
@@ -207,7 +199,8 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-                <span>{managementLabel}</span>
+
+                <span>Quản lý</span>
               </button>
             )}
 
@@ -218,18 +211,20 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
+
                 <span>Tùy chỉnh giao diện</span>
               </Link>
             )}
-          </div>
 
-          <div className="p-2">
+            <div className="my-1 border-t border-gray-100" />
+
             <button
               type="button"
               onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
             >
               <FiLogOut size={18} />
+
               <span>Đăng xuất</span>
             </button>
           </div>

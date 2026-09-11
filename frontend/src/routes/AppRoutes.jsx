@@ -1,6 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { useAuth, PERMISSIONS, ROLES } from "@/context/AuthContext";
+import {
+  MANAGEMENT_PERMISSIONS,
+  useAuth,
+  PERMISSIONS,
+  ROLES,
+} from "@/context/AuthContext";
 
 import MainLayout from "@/components/layout/MainLayout";
 
@@ -45,6 +50,7 @@ const LoadingPage = ({ text }) => (
   <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
     <div className="text-center">
       <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-pink-200 border-t-pink-600" />
+
       <p className="text-sm text-gray-500">{text}</p>
     </div>
   </div>
@@ -121,12 +127,25 @@ const AdminEntry = () => {
 };
 
 const AdminSubPage = ({ children }) => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
-  const showBackButton = user?.role === ROLES.ADMIN;
+  const isAdmin = user?.role === ROLES.ADMIN;
+
+  const accessibleModuleCount = MANAGEMENT_PERMISSIONS.filter((permission) =>
+    hasPermission(permission)
+  ).length;
+
+  /*
+   * Admin luôn có thể quay lại.
+   *
+   * Manager/Product Manager:
+   * - Có từ 2 module trở lên: cần nút quay lại
+   * - Chỉ 1 module: không cần nút quay lại
+   */
+  const showBackButton = isAdmin || accessibleModuleCount > 1;
 
   return (
-    <div className="w-full bg-gray-50 pb-2 pt-2">
+    <div className="w-full bg-gray-50 pb-1 pt-1">
       {showBackButton && (
         <div className="mx-auto max-w-7xl px-4">
           <AdminManagementBackButton />
@@ -295,17 +314,6 @@ const AppRoutes = () => (
         />
 
         <Route
-          path="/admin/appearance"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_APPEARANCE}>
-              <AdminSubPage>
-                <AdminAppearancePage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
-
-        <Route
           path="/admin/contact"
           element={
             <PermissionRoute permission={PERMISSIONS.MANAGE_CONTACT}>
@@ -324,6 +332,17 @@ const AppRoutes = () => (
                 <AdminContentManagementPage />
               </AdminSubPage>
             </PermissionRoute>
+          }
+        />
+
+        <Route
+          path="/admin/appearance"
+          element={
+            <AdminOnlyRoute>
+              <AdminSubPage>
+                <AdminAppearancePage />
+              </AdminSubPage>
+            </AdminOnlyRoute>
           }
         />
 

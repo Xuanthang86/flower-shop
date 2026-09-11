@@ -2,15 +2,32 @@ export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
 
+/*
+ * Phân quyền mặc định theo ROLE.
+ *
+ * Manager:
+ * - Đơn hàng
+ * - Nội dung website
+ * - Bài viết
+ * - Hình ảnh
+ * - Thông tin liên hệ
+ *
+ * Product Manager:
+ * - Đơn hàng
+ * - Sản phẩm
+ *
+ * Không đưa MANAGE_APPEARANCE vào đây.
+ */
 export const DEFAULT_ROLE_PERMISSIONS = {
-  manager: ["view_admin", "manage_orders", "view_reports"],
-
-  product_manager: [
-    "view_admin",
-    "manage_products",
-    "create_products",
-    "update_products",
+  manager: [
+    "manage_orders",
+    "manage_content",
+    "manage_blog",
+    "manage_images",
+    "manage_contact",
   ],
+
+  product_manager: ["manage_orders", "manage_products"],
 };
 
 const DEFAULT_SITE_SETTINGS = {
@@ -69,6 +86,7 @@ const DEFAULT_SITE_SETTINGS = {
     address: "",
     workingHours: "",
     extraItems: [],
+
     style: {
       columns: 2,
       cardRadius: 12,
@@ -101,6 +119,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const normalizeBanner = (banner, index, defaultInterval = 8) => {
   const duration = Number(banner?.duration || defaultInterval || 8);
+
   const priority = Number(banner?.priority || index + 1);
 
   return {
@@ -231,10 +250,12 @@ const mergeSettings = (input = {}) => {
     contact: {
       ...defaults.contact,
       ...(source.contact || {}),
+
       style: {
         ...defaults.contact.style,
         ...(source.contact?.style || {}),
       },
+
       extraItems: Array.isArray(source.contact?.extraItems)
         ? source.contact.extraItems
         : [],
@@ -286,11 +307,16 @@ export const saveSiteSettings = (settings) => {
   try {
     localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
   } catch (error) {
-    console.error("Không thể lưu site settings:", error);
-
-    throw new Error(
-      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy."
+    const storageError = new Error(
+      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy.",
+      {
+        cause: error,
+      }
     );
+
+    console.error("Không thể lưu site settings:", storageError);
+
+    throw storageError;
   }
 
   window.dispatchEvent(new Event(SITE_SETTINGS_UPDATED_EVENT));
