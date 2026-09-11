@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import {
   MANAGEMENT_PERMISSIONS,
@@ -145,213 +145,224 @@ const AdminSubPage = ({ children }) => {
         </div>
       )}
 
-      {/*
-       * Header và nút Quay lại đều dùng max-w-7xl.
-       *
-       * Một số page cũ có container max-w-5xl.
-       * Wrapper này chỉ mở rộng container chính của page quản lý
-       * lên max-w-7xl, không thay đổi bố cục bên trong.
-       */}
       <div className="w-full [&_main>div.mx-auto]:!max-w-7xl">{children}</div>
     </div>
   );
 };
 
-const AppRoutes = () => (
-  <>
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<HomePage />} />
+const AppRoutes = () => {
+  /*
+   * Dùng pathname làm key cho ProductDetailPage.
+   *
+   * Khi chuyển trực tiếp từ:
+   * /products/A
+   * sang:
+   * /products/B
+   *
+   * React sẽ tạo lại instance ProductDetailPage,
+   * tránh giữ state/DOM của sản phẩm trước.
+   */
+  const location = useLocation();
 
-        <Route path="/products" element={<ProductsPage />} />
+  return (
+    <>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<HomePage />} />
 
-        <Route
-          path="/products/category/:categorySlug"
-          element={<ProductsPage />}
-        />
+          <Route path="/products" element={<ProductsPage />} />
 
-        <Route path="/products/:productId" element={<ProductDetailPage />} />
+          <Route
+            path="/products/category/:categorySlug"
+            element={<ProductsPage />}
+          />
 
-        <Route path="/cart" element={<CartPage />} />
+          <Route
+            path="/products/:productId"
+            element={<ProductDetailPage key={location.pathname} />}
+          />
 
-        <Route path="/blog" element={<BlogPage />} />
+          <Route path="/cart" element={<CartPage />} />
 
-        <Route path="/blog/:postId" element={<BlogPage />} />
+          <Route path="/blog" element={<BlogPage />} />
 
-        <Route path="/contact" element={<ContactPage />} />
+          <Route path="/blog/:postId" element={<BlogPage />} />
 
-        <Route path="/login" element={<LoginPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
-        <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        <Route
-          path="/checkout"
-          element={
-            <ProtectedRoute>
-              <CheckoutPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route path="/register" element={<RegisterPage />} />
 
-        <Route
-          path="/order-success"
-          element={
-            <ProtectedRoute>
-              <OrderSuccessPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute>
+                <CheckoutPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/wishlist"
-          element={
-            <ProtectedRoute>
-              <WishlistPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/order-success"
+            element={
+              <ProtectedRoute>
+                <OrderSuccessPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/wishlist"
+            element={
+              <ProtectedRoute>
+                <WishlistPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/change-password"
-          element={
-            <ProtectedRoute>
-              <ChangePasswordPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/orders"
-          element={
-            <ProtectedRoute>
-              <OrdersPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/orders/:orderId"
-          element={
-            <ProtectedRoute>
-              <CustomerOrderDetailPage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route path="/admin" element={<AdminEntry />} />
+          <Route
+            path="/orders/:orderId"
+            element={
+              <ProtectedRoute>
+                <CustomerOrderDetailPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/orders"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
-              <AdminSubPage>
-                <AdminPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route path="/admin" element={<AdminEntry />} />
 
-        <Route
-          path="/admin/orders/:orderId"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
-              <AdminOrderDetailPage />
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/orders"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
+                <AdminSubPage>
+                  <AdminPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/products"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_PRODUCTS}>
-              <AdminSubPage>
-                <AdminProductsPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/orders/:orderId"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_ORDERS}>
+                <AdminOrderDetailPage />
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/users"
-          element={
-            <AdminOnlyRoute>
-              <AdminSubPage>
-                <AdminUsersPage />
-              </AdminSubPage>
-            </AdminOnlyRoute>
-          }
-        />
+          <Route
+            path="/admin/products"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_PRODUCTS}>
+                <AdminSubPage>
+                  <AdminProductsPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/blog"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_BLOG}>
-              <AdminSubPage>
-                <AdminBlogManagementPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminOnlyRoute>
+                <AdminSubPage>
+                  <AdminUsersPage />
+                </AdminSubPage>
+              </AdminOnlyRoute>
+            }
+          />
 
-        <Route
-          path="/admin/images"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_IMAGES}>
-              <AdminSubPage>
-                <AdminImageManagementPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/blog"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_BLOG}>
+                <AdminSubPage>
+                  <AdminBlogManagementPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/contact"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_CONTACT}>
-              <AdminSubPage>
-                <AdminContactManagementPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/images"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_IMAGES}>
+                <AdminSubPage>
+                  <AdminImageManagementPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/content"
-          element={
-            <PermissionRoute permission={PERMISSIONS.MANAGE_CONTENT}>
-              <AdminSubPage>
-                <AdminContentManagementPage />
-              </AdminSubPage>
-            </PermissionRoute>
-          }
-        />
+          <Route
+            path="/admin/contact"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_CONTACT}>
+                <AdminSubPage>
+                  <AdminContactManagementPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route
-          path="/admin/appearance"
-          element={
-            <AdminOnlyRoute>
-              <AdminSubPage>
-                <AdminAppearancePage />
-              </AdminSubPage>
-            </AdminOnlyRoute>
-          }
-        />
+          <Route
+            path="/admin/content"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_CONTENT}>
+                <AdminSubPage>
+                  <AdminContentManagementPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+          <Route
+            path="/admin/appearance"
+            element={
+              <AdminOnlyRoute>
+                <AdminSubPage>
+                  <AdminAppearancePage />
+                </AdminSubPage>
+              </AdminOnlyRoute>
+            }
+          />
 
-    <UnsavedChangesGuard />
-  </>
-);
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+
+      <UnsavedChangesGuard />
+    </>
+  );
+};
 
 export default AppRoutes;
