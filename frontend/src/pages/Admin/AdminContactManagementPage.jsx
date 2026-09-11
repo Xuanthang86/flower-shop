@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   FiEdit2,
   FiInfo,
@@ -17,6 +18,8 @@ import {
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -32,6 +35,7 @@ const ContactIcon = ({ type }) => {
   if (type === "email") return <FiMail />;
   if (type === "address") return <FiMapPin />;
   if (type === "hours") return <FiClock />;
+
   return <FiInfo />;
 };
 
@@ -39,12 +43,12 @@ const AdminContactManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [extraForm, setExtraForm] = useState(EMPTY_EXTRA);
+
   const [editingExtraId, setEditingExtraId] = useState(null);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý thông tin liên hệ | Flower Shop";
@@ -58,16 +62,24 @@ const AdminContactManagementPage = () => {
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
-    const refresh = () => setSettings(readSiteSettings());
+    const refresh = () => {
+      setSettings(readSiteSettings());
+    };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -81,25 +93,23 @@ const AdminContactManagementPage = () => {
   const updateContact = (field, value) => {
     setSettings((current) => ({
       ...current,
+
       contact: {
         ...(current.contact || {}),
         [field]: value,
       },
     }));
-
-    setMessage("");
-    setError("");
   };
 
   const saveContact = () => {
     try {
       const saved = saveSiteSettings(settings);
+
       setSettings(saved);
-      setMessage("Đã lưu thông tin liên hệ.");
-      setError("");
+
+      notifySuccess("Đã lưu thông tin liên hệ.");
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu thông tin liên hệ.");
-      setMessage("");
+      notifyError(saveError?.message || "Không thể lưu thông tin liên hệ.");
     }
   };
 
@@ -113,8 +123,8 @@ const AdminContactManagementPage = () => {
     const value = extraForm.value.trim();
 
     if (!label || !value) {
-      setError("Vui lòng nhập tên và nội dung thông tin liên hệ.");
-      setMessage("");
+      notifyError("Vui lòng nhập tên và nội dung thông tin liên hệ.");
+
       return;
     }
 
@@ -122,9 +132,13 @@ const AdminContactManagementPage = () => {
       id:
         editingExtraId ||
         `contact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+
       label,
+
       value,
+
       type: extraForm.type,
+
       visible: extraForm.visible !== false,
     };
 
@@ -137,6 +151,7 @@ const AdminContactManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         contact: {
           ...(settings.contact || {}),
           extraItems: nextItems,
@@ -144,17 +159,18 @@ const AdminContactManagementPage = () => {
       });
 
       setSettings(saved);
+
+      const wasEditing = Boolean(editingExtraId);
+
       resetExtraForm();
 
-      setMessage(
-        editingExtraId
+      notifySuccess(
+        wasEditing
           ? "Đã cập nhật thông tin liên hệ."
           : "Đã thêm thông tin liên hệ."
       );
-      setError("");
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu thông tin liên hệ.");
-      setMessage("");
+      notifyError(saveError?.message || "Không thể lưu thông tin liên hệ.");
     }
   };
 
@@ -167,19 +183,20 @@ const AdminContactManagementPage = () => {
       type: item.type || "text",
       visible: item.visible !== false,
     });
-
-    setMessage("");
-    setError("");
   };
 
   const deleteExtra = () => {
-    if (!confirmDelete) return;
+    if (!confirmDelete) {
+      return;
+    }
 
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         contact: {
           ...(settings.contact || {}),
+
           extraItems: extraItems.filter(
             (item) => String(item.id) !== String(confirmDelete.id)
           ),
@@ -187,18 +204,20 @@ const AdminContactManagementPage = () => {
       });
 
       setSettings(saved);
+
+      const deletedLabel = confirmDelete.label;
+
       setConfirmDelete(null);
 
       if (String(editingExtraId) === String(confirmDelete.id)) {
         resetExtraForm();
       }
 
-      setMessage("Đã xóa thông tin liên hệ.");
-      setError("");
+      notifySuccess(`Đã xóa thông tin "${deletedLabel}".`);
     } catch (deleteError) {
       setConfirmDelete(null);
-      setError(deleteError.message || "Không thể xóa thông tin liên hệ.");
-      setMessage("");
+
+      notifyError(deleteError?.message || "Không thể xóa thông tin liên hệ.");
     }
   };
 
@@ -206,8 +225,10 @@ const AdminContactManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         contact: {
           ...(settings.contact || {}),
+
           extraItems: extraItems.map((current) =>
             String(current.id) === String(item.id)
               ? {
@@ -221,7 +242,7 @@ const AdminContactManagementPage = () => {
 
       setSettings(saved);
     } catch (toggleError) {
-      setError(toggleError.message || "Không thể cập nhật trạng thái.");
+      notifyError(toggleError?.message || "Không thể cập nhật trạng thái.");
     }
   };
 
@@ -237,18 +258,6 @@ const AdminContactManagementPage = () => {
             Quản lý toàn bộ nội dung hiển thị trên trang Liên hệ.
           </p>
         </header>
-
-        {(message || error) && (
-          <div
-            className={`mb-5 rounded-xl border bg-white p-4 text-sm ${
-              error
-                ? "border-red-100 text-red-600"
-                : "border-green-100 text-green-600"
-            }`}
-          >
-            {error || message}
-          </div>
-        )}
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900">
@@ -394,9 +403,13 @@ const AdminContactManagementPage = () => {
                 className={inputClass}
               >
                 <option value="text">Văn bản</option>
+
                 <option value="phone">Điện thoại</option>
+
                 <option value="email">Email</option>
+
                 <option value="address">Địa chỉ</option>
+
                 <option value="hours">Giờ làm việc</option>
               </select>
 
@@ -407,6 +420,7 @@ const AdminContactManagementPage = () => {
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-pink-600 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-700"
                 >
                   {editingExtraId ? <FiEdit2 /> : <FiPlus />}
+
                   {editingExtraId ? "Cập nhật" : "Thêm"}
                 </button>
 

@@ -11,20 +11,25 @@ import {
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
+import { useNotification } from "@/context/NotificationContext";
+
 const FONT_OPTIONS = [
   {
     value:
       "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     label: "Inter / System UI",
   },
+
   {
     value: "Arial, Helvetica, sans-serif",
     label: "Arial",
   },
+
   {
     value: "Georgia, serif",
     label: "Georgia",
   },
+
   {
     value: "Verdana, sans-serif",
     label: "Verdana",
@@ -35,8 +40,10 @@ const DEFAULT_THEME = {
   primaryColor: "#db2777",
   secondaryColor: "#fce7f3",
   textColor: "#1f2937",
+
   fontFamily:
     "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+
   baseFontSize: 16,
   headerFontSize: 15,
   borderRadius: 12,
@@ -57,8 +64,7 @@ const AdminAppearancePage = () => {
     ...theme,
   }));
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Tùy chỉnh giao diện | Flower Shop";
@@ -67,11 +73,17 @@ const AdminAppearancePage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
+
       robots.name = "robots";
+
       document.head.appendChild(robots);
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
@@ -97,59 +109,51 @@ const AdminAppearancePage = () => {
     };
   }, []);
 
-  const clearMessages = () => {
-    setMessage("");
-    setError("");
-  };
-
   const updateHero = (field, value) => {
     setSettings((current) => ({
       ...current,
+
       hero: {
         ...(current.hero || {}),
         [field]: value,
       },
     }));
-
-    clearMessages();
   };
 
   const updateBlog = (field, value) => {
     setSettings((current) => ({
       ...current,
+
       blog: {
         ...(current.blog || {}),
         [field]: value,
       },
     }));
-
-    clearMessages();
   };
 
   const updateContactStyle = (field, value) => {
     setSettings((current) => ({
       ...current,
+
       contact: {
         ...(current.contact || {}),
+
         style: {
           ...(current.contact?.style || {}),
           [field]: value,
         },
       },
     }));
-
-    clearMessages();
   };
 
   const handleSave = () => {
-    clearMessages();
-
     if (
       !isHex(draftTheme.primaryColor) ||
       !isHex(draftTheme.secondaryColor) ||
       !isHex(draftTheme.textColor)
     ) {
-      setError("Mã màu phải có dạng #RRGGBB.");
+      notifyError("Mã màu phải có dạng #RRGGBB.");
+
       return;
     }
 
@@ -180,17 +184,20 @@ const AdminAppearancePage = () => {
     );
 
     if (baseFontSize < 12 || baseFontSize > 24) {
-      setError("Cỡ chữ cơ bản phải từ 12px đến 24px.");
+      notifyError("Cỡ chữ cơ bản phải từ 12px đến 24px.");
+
       return;
     }
 
     if (headerFontSize < 12 || headerFontSize > 24) {
-      setError("Cỡ chữ Header phải từ 12px đến 24px.");
+      notifyError("Cỡ chữ Header phải từ 12px đến 24px.");
+
       return;
     }
 
     if (borderRadius < 0 || borderRadius > 32) {
-      setError("Bo góc phải từ 0px đến 32px.");
+      notifyError("Bo góc phải từ 0px đến 32px.");
+
       return;
     }
 
@@ -200,43 +207,55 @@ const AdminAppearancePage = () => {
       bannerHeightMobile < 90 ||
       bannerHeightMobile > 220
     ) {
-      setError("Chiều cao Banner nằm ngoài giới hạn cho phép.");
+      notifyError("Chiều cao Banner nằm ngoài giới hạn cho phép.");
+
       return;
     }
 
     if (bannerRadius < 0 || bannerRadius > 32) {
-      setError("Bo góc Banner phải từ 0px đến 32px.");
+      notifyError("Bo góc Banner phải từ 0px đến 32px.");
+
       return;
     }
 
     if (bannerInterval < 5 || bannerInterval > 15) {
-      setError("Thời gian Banner phải từ 5 đến 15 giây.");
+      notifyError("Thời gian Banner phải từ 5 đến 15 giây.");
+
       return;
     }
 
     if (blogColumns < 1 || blogColumns > 4) {
-      setError("Số cột bài viết phải từ 1 đến 4.");
+      notifyError("Số cột bài viết phải từ 1 đến 4.");
+
       return;
     }
 
     if (blogRadius < 0 || blogRadius > 32) {
-      setError("Bo góc bài viết phải từ 0px đến 32px.");
+      notifyError("Bo góc bài viết phải từ 0px đến 32px.");
+
       return;
     }
 
     if (contactColumns < 1 || contactColumns > 4) {
-      setError("Số cột Liên hệ phải từ 1 đến 4.");
+      notifyError("Số cột Liên hệ phải từ 1 đến 4.");
+
       return;
     }
 
     try {
       const nextTheme = {
         primaryColor: draftTheme.primaryColor,
+
         secondaryColor: draftTheme.secondaryColor,
+
         textColor: draftTheme.textColor,
+
         fontFamily: draftTheme.fontFamily,
+
         baseFontSize,
+
         headerFontSize,
+
         borderRadius,
       };
 
@@ -244,34 +263,49 @@ const AdminAppearancePage = () => {
 
       const saved = saveSiteSettings({
         ...settings,
+
         theme: nextTheme,
+
         hero: {
           ...(settings.hero || {}),
+
           bannerHeightDesktop,
+
           bannerHeightMobile,
+
           bannerRadius,
+
           bannerInterval,
         },
+
         blog: {
           ...(settings.blog || {}),
+
           columns: blogColumns,
+
           borderRadius: blogRadius,
         },
+
         contact: {
           ...(settings.contact || {}),
+
           style: {
             ...(settings.contact?.style || {}),
+
             columns: contactColumns,
+
             cardRadius: contactCardRadius,
+
             sectionRadius: contactSectionRadius,
           },
         },
       });
 
       setSettings(saved);
-      setMessage("Đã lưu toàn bộ thiết lập kỹ thuật giao diện.");
+
+      notifySuccess("Đã lưu toàn bộ thiết lập kỹ thuật giao diện.");
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu cấu hình giao diện.");
+      notifyError(saveError?.message || "Không thể lưu cấu hình giao diện.");
     }
   };
 
@@ -296,16 +330,16 @@ const AdminAppearancePage = () => {
         ...(restored.theme || {}),
       });
 
-      setMessage("Đã khôi phục cấu hình mặc định.");
-
-      setError("");
+      notifySuccess("Đã khôi phục cấu hình mặc định.");
     } catch (resetError) {
-      setError(resetError.message || "Không thể khôi phục cấu hình.");
+      notifyError(resetError?.message || "Không thể khôi phục cấu hình.");
     }
   };
 
   const hero = settings.hero || {};
+
   const blog = settings.blog || {};
+
   const contactStyle = settings.contact?.style || {};
 
   return (
@@ -322,18 +356,6 @@ const AdminAppearancePage = () => {
           </p>
         </header>
 
-        {(message || error) && (
-          <div
-            className={`mb-5 rounded-xl border bg-white p-4 text-sm ${
-              error
-                ? "border-red-100 text-red-600"
-                : "border-green-100 text-green-600"
-            }`}
-          >
-            {error || message}
-          </div>
-        )}
-
         <div className="space-y-6">
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">1. Màu sắc & Font chữ</h2>
@@ -341,7 +363,9 @@ const AdminAppearancePage = () => {
             <div className="mt-5 grid gap-5 md:grid-cols-2">
               {[
                 ["primaryColor", "Màu chủ đạo", "#DB2777"],
+
                 ["secondaryColor", "Màu phụ", "#FCE7F3"],
+
                 ["textColor", "Màu chữ", "#1F2937"],
               ].map(([field, label, fallback]) => (
                 <div key={field}>
@@ -358,6 +382,7 @@ const AdminAppearancePage = () => {
                       onChange={(event) =>
                         setDraftTheme((current) => ({
                           ...current,
+
                           [field]: event.target.value,
                         }))
                       }
@@ -370,6 +395,7 @@ const AdminAppearancePage = () => {
                       onChange={(event) =>
                         setDraftTheme((current) => ({
                           ...current,
+
                           [field]: event.target.value,
                         }))
                       }
@@ -389,6 +415,7 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
+
                       fontFamily: event.target.value,
                     }))
                   }
@@ -415,6 +442,7 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
+
                       baseFontSize: event.target.value,
                     }))
                   }
@@ -435,6 +463,7 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
+
                       headerFontSize: event.target.value,
                     }))
                   }
@@ -455,6 +484,7 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
+
                       borderRadius: event.target.value,
                     }))
                   }
@@ -534,13 +564,16 @@ const AdminAppearancePage = () => {
                   }
                   className={inputClass}
                 >
-                  {Array.from({ length: 11 }, (_, index) => index + 5).map(
-                    (seconds) => (
-                      <option key={seconds} value={seconds}>
-                        {seconds} giây
-                      </option>
-                    )
-                  )}
+                  {Array.from(
+                    {
+                      length: 11,
+                    },
+                    (_, index) => index + 5
+                  ).map((seconds) => (
+                    <option key={seconds} value={seconds}>
+                      {seconds} giây
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -563,8 +596,11 @@ const AdminAppearancePage = () => {
                   className={inputClass}
                 >
                   <option value={1}>1 cột</option>
+
                   <option value={2}>2 cột</option>
+
                   <option value={3}>3 cột</option>
+
                   <option value={4}>4 cột</option>
                 </select>
               </div>
@@ -605,8 +641,11 @@ const AdminAppearancePage = () => {
                   className={inputClass}
                 >
                   <option value={1}>1 cột</option>
+
                   <option value={2}>2 cột</option>
+
                   <option value={3}>3 cột</option>
+
                   <option value={4}>4 cột</option>
                 </select>
               </div>
@@ -651,8 +690,8 @@ const AdminAppearancePage = () => {
 
             <p className="mt-4 text-sm text-gray-500">
               Nội dung điện thoại, Email, địa chỉ, giờ làm việc và thông tin bổ
-              sung được quản lý riêng tại
-              <strong> Quản lý thông tin liên hệ</strong>.
+              sung được quản lý riêng tại{" "}
+              <strong>Quản lý thông tin liên hệ</strong>.
             </p>
           </section>
 

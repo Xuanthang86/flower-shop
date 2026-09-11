@@ -4,19 +4,6 @@ export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
 
 /*
  * Phân quyền mặc định theo ROLE.
- *
- * Manager:
- * - Đơn hàng
- * - Nội dung website
- * - Bài viết
- * - Hình ảnh
- * - Thông tin liên hệ
- *
- * Product Manager:
- * - Đơn hàng
- * - Sản phẩm
- *
- * Tùy chỉnh giao diện chỉ dành cho Admin.
  */
 export const DEFAULT_ROLE_PERMISSIONS = {
   manager: [
@@ -30,7 +17,271 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   product_manager: ["manage_orders", "manage_products"],
 };
 
+/*
+ * Nội dung mặc định mới.
+ *
+ * Mục tiêu:
+ * - Không còn vài đoạn <p> đơn điệu.
+ * - Có cấu trúc heading rõ ràng.
+ * - Có phần giới thiệu.
+ * - Có thông tin liên hệ.
+ * - Có liên kết nội bộ.
+ * - Có cấu trúc phù hợp cho nội dung bài viết.
+ */
 const DEFAULT_BLOG_SHOP_INFO_HTML = `
+<section
+  data-flower-shop-default-info="true"
+  style="
+    width:100%;
+    max-width:100%;
+    margin:32px 0 12px;
+    padding:28px;
+    border:1px solid #fce7f3;
+    border-radius:20px;
+    background:linear-gradient(
+      135deg,
+      #fff7fb 0%,
+      #ffffff 55%,
+      #fffafc 100%
+    );
+    box-sizing:border-box;
+  "
+>
+  <header
+    style="
+      margin:0 0 22px;
+      padding:0 0 18px;
+      border-bottom:1px solid #fbcfe8;
+    "
+  >
+    <p
+      style="
+        margin:0 0 8px;
+        color:#db2777;
+        font-size:12px;
+        line-height:18px;
+        font-weight:700;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+      "
+    >
+      Thông tin Shop
+    </p>
+
+    <h2
+      style="
+        margin:0;
+        color:#1f2937;
+        font-size:26px;
+        line-height:34px;
+        font-weight:800;
+      "
+    >
+      Về {{siteName}}
+    </h2>
+
+    <p
+      style="
+        margin:9px 0 0;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      {{tagline}}
+    </p>
+  </header>
+
+  <div
+    style="
+      color:#4b5563;
+      font-size:15px;
+      line-height:27px;
+    "
+  >
+    <p style="margin:0 0 17px;">
+      <strong style="color:#374151;">
+        {{siteName}}
+      </strong>
+      là cửa hàng hoa tươi hướng tới những sản phẩm được
+      tuyển chọn kỹ lưỡng, cách trình bày tinh tế và trải
+      nghiệm mua sắm thuận tiện cho khách hàng.
+    </p>
+
+    <p style="margin:0 0 17px;">
+      Shop cung cấp các sản phẩm hoa phù hợp cho nhiều dịp
+      đặc biệt như sinh nhật, khai trương, cưới hỏi,
+      chúc mừng, tri ân, kỷ niệm và các sự kiện quan trọng.
+    </p>
+
+    <p style="margin:0 0 22px;">
+      Chúng tôi chú trọng chất lượng hoa, hình thức trình bày,
+      khả năng tư vấn và hỗ trợ khách hàng trong suốt quá trình
+      lựa chọn sản phẩm.
+    </p>
+  </div>
+
+  <section
+    style="
+      margin:0 0 22px;
+      padding:20px;
+      border:1px solid #f3f4f6;
+      border-radius:15px;
+      background:#ffffff;
+      box-sizing:border-box;
+    "
+  >
+    <h3
+      style="
+        margin:0 0 14px;
+        color:#374151;
+        font-size:17px;
+        line-height:25px;
+        font-weight:700;
+      "
+    >
+      Thông tin liên hệ
+    </h3>
+
+    <p
+      style="
+        margin:0 0 9px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">
+        Địa chỉ:
+      </strong>
+      {{address}}
+    </p>
+
+    <p
+      style="
+        margin:0 0 9px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">
+        Điện thoại:
+      </strong>
+
+      <a
+        href="tel:{{phone}}"
+        style="
+          color:#db2777;
+          text-decoration:none;
+          font-weight:600;
+        "
+      >
+        {{phone}}
+      </a>
+    </p>
+
+    <p
+      style="
+        margin:0 0 9px;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">
+        Email:
+      </strong>
+
+      <a
+        href="mailto:{{email}}"
+        style="
+          color:#db2777;
+          text-decoration:none;
+          font-weight:600;
+        "
+      >
+        {{email}}
+      </a>
+    </p>
+
+    <p
+      style="
+        margin:0;
+        color:#6b7280;
+        font-size:14px;
+        line-height:23px;
+      "
+    >
+      <strong style="color:#374151;">
+        Thời gian làm việc:
+      </strong>
+      {{workingHours}}
+    </p>
+  </section>
+
+  <section
+    style="
+      margin:0;
+      padding:18px 20px;
+      border-radius:15px;
+      background:#fff;
+    "
+  >
+    <h3
+      style="
+        margin:0 0 12px;
+        color:#374151;
+        font-size:16px;
+        line-height:24px;
+        font-weight:700;
+      "
+    >
+      Khám phá thêm
+    </h3>
+
+    <p
+      style="
+        margin:0;
+        color:#6b7280;
+        font-size:14px;
+        line-height:24px;
+      "
+    >
+      Khám phá thêm các sản phẩm hoa tại
+      <a
+        href="/products"
+        style="
+          color:#db2777;
+          text-decoration:none;
+          font-weight:700;
+        "
+      >
+        danh mục sản phẩm
+      </a>
+      hoặc tìm hiểu thêm thông tin và kết nối với
+      <a
+        href="/contact"
+        style="
+          color:#db2777;
+          text-decoration:none;
+          font-weight:700;
+        "
+      >
+        Flower Shop
+      </a>.
+    </p>
+  </section>
+</section>
+`;
+
+/*
+ * Nội dung mặc định cũ của project.
+ *
+ * Dùng để nhận diện dữ liệu localStorage cũ và tự động
+ * chuyển sang template mới.
+ */
+const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 <h2>Về Flower Shop</h2>
 <p>
   Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
@@ -92,8 +343,11 @@ const DEFAULT_SITE_SETTINGS = {
   sections: {
     categoriesTitle: "Danh mục nổi bật",
     categoriesSubtitle: "Lựa chọn hoa phù hợp với từng dịp đặc biệt",
+
     featuredTitle: "Sản phẩm nổi bật",
+
     featuredSubtitle: "Những sản phẩm mới và được yêu thích nhất.",
+
     customerTitle: "KHÁCH HÀNG TIÊU BIỂU",
   },
 
@@ -105,12 +359,15 @@ const DEFAULT_SITE_SETTINGS = {
 
   contact: {
     title: "Liên hệ",
+
     description:
       "Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp.",
+
     phone: "",
     email: "",
     address: "",
     workingHours: "",
+
     extraItems: [],
 
     style: {
@@ -134,8 +391,10 @@ const DEFAULT_SITE_SETTINGS = {
     primaryColor: "#db2777",
     secondaryColor: "#fce7f3",
     textColor: "#1f2937",
+
     fontFamily:
       "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+
     baseFontSize: 16,
     headerFontSize: 15,
     borderRadius: 12,
@@ -217,13 +476,26 @@ const mergeSettings = (input = {}) => {
     Math.max(5, Number.isFinite(rawInterval) ? rawInterval : 8)
   );
 
+  const sourceBlogHtml = String(source.blog?.defaultShopInfoHtml ?? "").trim();
+
+  /*
+   * Tự động migrate nội dung mặc định cũ.
+   *
+   * Nếu localStorage đang chứa đúng template cũ,
+   * hệ thống thay bằng template mới.
+   *
+   * Nếu người quản trị đã tự chỉnh sửa nội dung,
+   * không ghi đè.
+   */
   const defaultShopInfoHtml =
-    String(
-      source.blog?.defaultShopInfoHtml ?? defaults.blog.defaultShopInfoHtml
-    ).trim() || defaults.blog.defaultShopInfoHtml;
+    !sourceBlogHtml ||
+    sourceBlogHtml === LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML.trim()
+      ? defaults.blog.defaultShopInfoHtml
+      : sourceBlogHtml;
 
   return {
     ...defaults,
+
     ...source,
 
     branding: {

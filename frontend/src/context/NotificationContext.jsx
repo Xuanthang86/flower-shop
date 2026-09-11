@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 
+import { createPortal } from "react-dom";
+
 import { FiAlertCircle, FiCheckCircle, FiInfo, FiX } from "react-icons/fi";
 
 const NotificationContext = createContext(null);
@@ -19,11 +21,13 @@ const notificationConfig = {
     wrapper: "border-green-100 bg-white text-green-700 shadow-2xl",
     iconWrapper: "bg-green-50 text-green-600",
   },
+
   error: {
     icon: FiAlertCircle,
     wrapper: "border-red-100 bg-white text-red-700 shadow-2xl",
     iconWrapper: "bg-red-50 text-red-600",
   },
+
   info: {
     icon: FiInfo,
     wrapper: "border-blue-100 bg-white text-blue-700 shadow-2xl",
@@ -33,6 +37,7 @@ const notificationConfig = {
 
 export const NotificationProvider = ({ children }) => {
   const [notification, setNotification] = useState(null);
+
   const timerRef = useRef(null);
 
   const dismissNotification = useCallback(() => {
@@ -54,10 +59,14 @@ export const NotificationProvider = ({ children }) => {
         window.clearTimeout(timerRef.current);
       }
 
+      const normalizedType = notificationConfig[type] ? type : "success";
+
       setNotification({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+
         message: String(message),
-        type: notificationConfig[type] ? type : "success",
+
+        type: normalizedType,
       });
 
       timerRef.current = window.setTimeout(() => {
@@ -149,12 +158,16 @@ export const NotificationToast = () => {
 
   const Icon = config.icon;
 
-  return (
-    <div className="pointer-events-none fixed inset-0 z-[1000] flex items-center justify-center p-4">
+  const toast = (
+    <div
+      className="pointer-events-none fixed inset-0 z-[99999] flex items-center justify-center p-4"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <div
+        key={notification.id}
         className={`pointer-events-auto flex w-full max-w-md items-center gap-4 rounded-2xl border px-5 py-4 ${config.wrapper}`}
-        role="status"
-        aria-live="polite"
+        role={notification.type === "error" ? "alert" : "status"}
       >
         <div
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${config.iconWrapper}`}
@@ -177,4 +190,6 @@ export const NotificationToast = () => {
       </div>
     </div>
   );
+
+  return createPortal(toast, document.body);
 };

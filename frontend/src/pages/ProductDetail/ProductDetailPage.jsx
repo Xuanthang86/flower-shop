@@ -1,18 +1,3 @@
-/*
-============================================================
-FLOWER SHOP — PRODUCT DETAIL
-============================================================
-
-QUYỀN:
-- Customer: mua hàng + yêu thích.
-- Admin: chỉ quản trị, không mua/yêu thích.
-- Manager: chỉ quản trị, không mua/yêu thích.
-- Product Manager: quản lý sản phẩm, không mua/yêu thích.
-
-Staff không chỉ bị ẩn button mà handler cũng bị chặn.
-============================================================
-*/
-
 import { useEffect, useMemo, useState } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -40,6 +25,38 @@ const STAFF_ROLES = new Set([
   ROLES.MANAGER,
   ROLES.PRODUCT_MANAGER,
 ]);
+
+const ensureMeta = (attribute, value, content) => {
+  let element = document.querySelector(`meta[${attribute}="${value}"]`);
+
+  if (!element) {
+    element = document.createElement("meta");
+
+    element.setAttribute(attribute, value);
+
+    document.head.appendChild(element);
+  }
+
+  element.setAttribute("content", content);
+
+  return element;
+};
+
+const ensureCanonical = (url) => {
+  let link = document.querySelector('link[rel="canonical"]');
+
+  if (!link) {
+    link = document.createElement("link");
+
+    link.setAttribute("rel", "canonical");
+
+    document.head.appendChild(link);
+  }
+
+  link.setAttribute("href", url);
+
+  return link;
+};
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
@@ -88,6 +105,7 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (!user || isStaff || !product) {
       setIsFavorite(false);
+
       return;
     }
 
@@ -113,6 +131,177 @@ const ProductDetailPage = () => {
     });
   }, [productId]);
 
+  /*
+   * SEO metadata + Product JSON-LD.
+   */
+  useEffect(() => {
+    const jsonLdId = "flower-shop-product-jsonld";
+
+    const breadcrumbId = "flower-shop-breadcrumb-jsonld";
+
+    const existingProductSchema = document.getElementById(jsonLdId);
+
+    const existingBreadcrumbSchema = document.getElementById(breadcrumbId);
+
+    if (existingProductSchema) {
+      existingProductSchema.remove();
+    }
+
+    if (existingBreadcrumbSchema) {
+      existingBreadcrumbSchema.remove();
+    }
+
+    const canonicalUrl = `${window.location.origin}/products/${encodeURIComponent(
+      productId
+    )}`;
+
+    if (!product) {
+      document.title = "Không tìm thấy sản phẩm | Flower Shop";
+
+      ensureMeta(
+        "name",
+        "description",
+        "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã được cập nhật."
+      );
+
+      ensureMeta("name", "robots", "noindex,nofollow");
+
+      ensureCanonical(canonicalUrl);
+
+      return;
+    }
+
+    const description = String(
+      product.description || `Khám phá ${product.name} tại Flower Shop.`
+    )
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+
+    document.title = `${product.name} | Flower Shop`;
+
+    ensureMeta("name", "description", description);
+
+    ensureMeta("name", "robots", "index,follow");
+
+    ensureMeta("property", "og:title", `${product.name} | Flower Shop`);
+
+    ensureMeta("property", "og:description", description);
+
+    ensureMeta("property", "og:type", "product");
+
+    if (product.image) {
+      ensureMeta("property", "og:image", product.image);
+    }
+
+    ensureCanonical(canonicalUrl);
+
+    const safeJson = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
+
+    const productSchema = {
+      "@context": "https://schema.org",
+
+      "@type": "Product",
+
+      name: product.name,
+
+      description,
+
+      image: product.image ? [product.image] : undefined,
+
+      sku: String(product.id),
+
+      category: category?.name || product.category || undefined,
+
+      brand: {
+        "@type": "Brand",
+        name: "Flower Shop",
+      },
+
+      offers: {
+        "@type": "Offer",
+
+        url: canonicalUrl,
+
+        priceCurrency: "VND",
+
+        price: Number(product.price || 0),
+
+        availability:
+          Number(product.stock) === 0
+            ? "https://schema.org/OutOfStock"
+            : "https://schema.org/InStock",
+
+        itemCondition: "https://schema.org/NewCondition",
+      },
+    };
+
+    Object.keys(productSchema).forEach((key) => {
+      if (productSchema[key] === undefined) {
+        delete productSchema[key];
+      }
+    });
+
+    const productScript = document.createElement("script");
+
+    productScript.id = jsonLdId;
+
+    productScript.type = "application/ld+json";
+
+    productScript.textContent = safeJson(productSchema);
+
+    document.head.appendChild(productScript);
+
+    const breadcrumbItems = [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Sản phẩm",
+        item: `${window.location.origin}/products`,
+      },
+    ];
+
+    if (category) {
+      breadcrumbItems.push({
+        "@type": "ListItem",
+        position: 2,
+        name: category.name,
+        item: `${window.location.origin}/products?category=${encodeURIComponent(
+          category.slug
+        )}`,
+      });
+    }
+
+    breadcrumbItems.push({
+      "@type": "ListItem",
+      position: breadcrumbItems.length + 1,
+      name: product.name,
+      item: canonicalUrl,
+    });
+
+    const breadcrumbScript = document.createElement("script");
+
+    breadcrumbScript.id = breadcrumbId;
+
+    breadcrumbScript.type = "application/ld+json";
+
+    breadcrumbScript.textContent = safeJson({
+      "@context": "https://schema.org",
+
+      "@type": "BreadcrumbList",
+
+      itemListElement: breadcrumbItems,
+    });
+
+    document.head.appendChild(breadcrumbScript);
+
+    return () => {
+      document.getElementById(jsonLdId)?.remove();
+
+      document.getElementById(breadcrumbId)?.remove();
+    };
+  }, [product, category, productId]);
+
   const relatedProducts = useMemo(() => {
     if (!product) {
       return [];
@@ -133,7 +322,7 @@ const ProductDetailPage = () => {
 
         return Number(b.salesCount || 0) - Number(a.salesCount || 0);
       })
-      .slice(0, 4);
+      .slice(0, 8);
   }, [product, products]);
 
   const formatPrice = (value) =>
@@ -273,12 +462,15 @@ const ProductDetailPage = () => {
           Quay lại sản phẩm
         </Link>
 
-        <div className="mb-5 flex items-center gap-2 text-xs text-gray-400 md:text-sm">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-5 flex items-center gap-2 text-xs text-gray-400 md:text-sm"
+        >
           <Link to="/products" className="hover:text-pink-600">
             Sản phẩm
           </Link>
 
-          <span>/</span>
+          <span aria-hidden="true">/</span>
 
           {category && (
             <>
@@ -289,12 +481,12 @@ const ProductDetailPage = () => {
                 {category.name}
               </Link>
 
-              <span>/</span>
+              <span aria-hidden="true">/</span>
             </>
           )}
 
           <span className="line-clamp-1 text-gray-500">{product.name}</span>
-        </div>
+        </nav>
 
         <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
           <div className="grid md:grid-cols-[0.9fr_1.1fr]">
@@ -303,6 +495,8 @@ const ProductDetailPage = () => {
                 <img
                   src={product.image}
                   alt={product.name}
+                  width="800"
+                  height="800"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -415,15 +609,18 @@ const ProductDetailPage = () => {
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+        <section className="mt-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
           <h2 className="text-xl font-bold text-gray-800">Mô tả sản phẩm</h2>
 
           <p className="mt-4 leading-7 text-gray-600">{product.description}</p>
-        </div>
+        </section>
 
         {relatedProducts.length > 0 && (
-          <div className="mt-10">
-            <h2 className="mb-5 text-xl font-bold text-gray-800 md:text-2xl">
+          <section aria-labelledby="related-products-heading" className="mt-10">
+            <h2
+              id="related-products-heading"
+              className="mb-5 text-xl font-bold text-gray-800 md:text-2xl"
+            >
               Sản phẩm liên quan
             </h2>
 
@@ -433,11 +630,16 @@ const ProductDetailPage = () => {
                   key={item.id}
                   className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
                 >
-                  <Link to={`/products/${item.id}`}>
+                  <Link
+                    to={`/products/${item.id}`}
+                    aria-label={`Xem ${item.name}`}
+                  >
                     <div className="aspect-square overflow-hidden bg-gray-100">
                       <img
                         src={item.image}
                         alt={item.name}
+                        width="600"
+                        height="600"
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover transition duration-500 hover:scale-105"
@@ -459,7 +661,7 @@ const ProductDetailPage = () => {
                 </article>
               ))}
             </div>
-          </div>
+          </section>
         )}
       </div>
     </section>
