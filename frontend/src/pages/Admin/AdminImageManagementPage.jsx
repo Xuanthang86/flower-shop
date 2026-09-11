@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  FiEye,
-  FiEyeOff,
-  FiImage,
-  FiSave,
-  FiTrash2,
-  FiUpload,
-} from "react-icons/fi";
+import { FiEye, FiEyeOff, FiSave, FiTrash2, FiUpload } from "react-icons/fi";
 
 import {
   readSiteSettings,
@@ -23,12 +16,11 @@ const STANDARD_WIDTH = 1600;
 const STANDARD_HEIGHT = 700;
 
 /*
- * Hero hiện tại đang dùng khung desktop:
- * 1280 x 300
+ * Hero hiện tại của project đang sử dụng khung:
+ * desktop: 1280 x 300
  *
- * Không thay đổi Hero để tránh ảnh hưởng giao diện khách hàng.
- * Vì vậy banner upload mới sẽ được chuẩn hóa về tỷ lệ này
- * trước khi đưa lên kho ảnh.
+ * Không thay đổi Hero vì giao diện hiện tại đã được chấp nhận.
+ * Banner upload mới được chuẩn hóa về cùng tỷ lệ hiển thị.
  */
 const DISPLAY_WIDTH = 1600;
 const DISPLAY_HEIGHT = 375;
@@ -80,7 +72,9 @@ const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
     (banner) => String(banner.id) === String(bannerId)
   );
 
-  if (targetIndex < 0) return sorted;
+  if (targetIndex < 0) {
+    return sorted;
+  }
 
   const [target] = sorted.splice(targetIndex, 1);
 
@@ -98,19 +92,19 @@ const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
 };
 
 /*
- * Tạo bản banner có tỷ lệ phù hợp với Hero hiện tại
- * nhưng không crop mất nội dung ảnh nguồn.
+ * Chuẩn hóa banner upload về tỷ lệ của Hero hiện tại.
  *
- * Ví dụ:
- * - ảnh nguồn 1600 x 700
- * - tỷ lệ nguồn = 2.286
- * - tỷ lệ hiển thị = 4.267
+ * Mục tiêu:
+ * - Không crop nội dung chính.
+ * - Không kéo méo nội dung chính.
+ * - Không để khoảng trắng hai bên.
  *
- * Ảnh nguồn sẽ được scale để toàn bộ nội dung vẫn nhìn thấy.
- * Phần diện tích còn thiếu được tạo bằng nền mờ từ chính ảnh.
+ * Với ảnh 1600x700:
+ * - ảnh chính được contain vào khung 1600x375;
+ * - phần còn lại được lấp bằng nền mở rộng từ chính ảnh nguồn;
+ * - nền được làm mờ để không cạnh tranh với nội dung chính.
  *
- * Như vậy Hero vẫn có thể tiếp tục dùng object-cover,
- * nhưng không làm mất nội dung quan trọng của banner.
+ * Đây là giải pháp phù hợp khi Hero hiện tại phải giữ nguyên tỷ lệ.
  */
 const prepareBannerFileForDisplay = async (file) =>
   new Promise((resolve, reject) => {
@@ -142,10 +136,6 @@ const prepareBannerFileForDisplay = async (file) =>
 
         const sourceRatio = sourceWidth / sourceHeight;
 
-        /*
-         * Nếu ảnh đã gần đúng tỷ lệ hiển thị,
-         * không cần xử lý thêm.
-         */
         if (Math.abs(sourceRatio - DISPLAY_RATIO) < 0.02) {
           resolve(file);
           return;
@@ -164,16 +154,9 @@ const prepareBannerFileForDisplay = async (file) =>
         }
 
         /*
-         * Bước 1:
-         * Tạo nền mờ từ chính ảnh nguồn.
-         *
-         * Điều này giúp banner không xuất hiện dải trắng
-         * gây cảm giác ảnh bị ghép hoặc lỗi bố cục.
+         * Lớp nền:
+         * scale kiểu cover để luôn phủ kín toàn bộ canvas.
          */
-        context.save();
-
-        context.filter = "blur(28px)";
-
         const backgroundScale = Math.max(
           DISPLAY_WIDTH / sourceWidth,
           DISPLAY_HEIGHT / sourceHeight
@@ -183,8 +166,12 @@ const prepareBannerFileForDisplay = async (file) =>
         const backgroundHeight = sourceHeight * backgroundScale;
 
         const backgroundX = (DISPLAY_WIDTH - backgroundWidth) / 2;
-
         const backgroundY = (DISPLAY_HEIGHT - backgroundHeight) / 2;
+
+        context.save();
+
+        context.filter = "blur(24px) saturate(1.08)";
+        context.globalAlpha = 0.9;
 
         context.drawImage(
           image,
@@ -197,17 +184,16 @@ const prepareBannerFileForDisplay = async (file) =>
         context.restore();
 
         /*
-         * Làm nền tối nhẹ để phần ảnh chính nổi bật hơn.
+         * Một lớp phủ rất nhẹ để nền không lấn nội dung.
+         * Không dùng màu trắng đậm vì sẽ tạo cảm giác
+         * hai bên bị trống.
          */
-        context.fillStyle = "rgba(255,255,255,0.12)";
+        context.fillStyle = "rgba(255,255,255,0.04)";
         context.fillRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
         /*
-         * Bước 2:
-         * Scale ảnh nguồn theo kiểu contain.
-         *
-         * Không crop.
-         * Không kéo méo.
+         * Ảnh chính:
+         * contain để bảo toàn toàn bộ nội dung.
          */
         const scale = Math.min(
           DISPLAY_WIDTH / sourceWidth,
@@ -218,7 +204,6 @@ const prepareBannerFileForDisplay = async (file) =>
         const renderedHeight = sourceHeight * scale;
 
         const renderedX = (DISPLAY_WIDTH - renderedWidth) / 2;
-
         const renderedY = (DISPLAY_HEIGHT - renderedHeight) / 2;
 
         context.drawImage(
@@ -236,9 +221,7 @@ const prepareBannerFileForDisplay = async (file) =>
               return;
             }
 
-            const extensionName = "banner-display-ready.webp";
-
-            const preparedFile = new File([blob], extensionName, {
+            const preparedFile = new File([blob], "banner-display-ready.webp", {
               type: "image/webp",
               lastModified: Date.now(),
             });
@@ -246,7 +229,7 @@ const prepareBannerFileForDisplay = async (file) =>
             resolve(preparedFile);
           },
           "image/webp",
-          0.88
+          0.9
         );
       };
 
@@ -286,9 +269,7 @@ const AdminImageManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-
       robots.name = "robots";
-
       document.head.appendChild(robots);
     }
 
@@ -301,20 +282,14 @@ const AdminImageManagementPage = () => {
     const refreshProducts = () => setProducts(readProducts());
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
-
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
     window.addEventListener("storage", refreshSettings);
-
     window.addEventListener("storage", refreshProducts);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
-
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
       window.removeEventListener("storage", refreshSettings);
-
       window.removeEventListener("storage", refreshProducts);
     };
   }, []);
@@ -336,25 +311,20 @@ const AdminImageManagementPage = () => {
 
   const closeMessage = () => {
     setMessage("");
-
     setError("");
   };
 
   const saveBanners = (nextBanners) => {
     const normalized = [...nextBanners].map((banner, index) => ({
       ...banner,
-
       priority: index + 1,
-
       duration: Math.min(15, Math.max(5, Number(banner.duration || 8))),
     }));
 
     const saved = saveSiteSettings({
       ...settings,
-
       hero: {
         ...(settings.hero || {}),
-
         banners: normalized,
       },
     });
@@ -367,10 +337,11 @@ const AdminImageManagementPage = () => {
 
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setBusy(true);
-
     closeMessage();
 
     try {
@@ -380,12 +351,9 @@ const AdminImageManagementPage = () => {
 
       const imageUrl = await uploadImageFile(preparedFile, {
         folder: "flower-shop/banners",
-
         maxWidth: DISPLAY_WIDTH,
-
         maxHeight: DISPLAY_HEIGHT,
-
-        quality: 0.88,
+        quality: 0.9,
       });
 
       const nextPriority = banners.length + 1;
@@ -424,16 +392,16 @@ const AdminImageManagementPage = () => {
 
       if (isStandard) {
         setMessage(
-          `Đã thêm banner thành công. Kích thước nguồn ${dimensions.width} × ${dimensions.height}px đúng kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Hệ thống đã tự căn toàn bộ nội dung để banner hiển thị đầy đủ trong khung hiện tại.`
+          `Đã thêm banner thành công. Kích thước nguồn ${dimensions.width} × ${dimensions.height}px đúng kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Hệ thống đã tự căn toàn bộ nội dung để hiển thị đầy đủ trong khung banner hiện tại.`
         );
       } else {
         setMessage(
-          `Đã thêm banner thành công. Kích thước ảnh nguồn là ${dimensions.width} × ${dimensions.height}px, khác kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Banner vẫn được chấp nhận và hệ thống đã tự căn toàn bộ nội dung để hạn chế cắt ảnh khi hiển thị.`
+          `Đã thêm banner thành công. Kích thước ảnh nguồn là ${dimensions.width} × ${dimensions.height}px, khác kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Banner vẫn được chấp nhận và hệ thống đã tự căn toàn bộ nội dung để hạn chế tối đa việc cắt ảnh và khoảng trống hai bên.`
         );
       }
     } catch (uploadError) {
       setError(
-        uploadError.message || "Không thể tải banner lên kho ảnh dùng chung."
+        uploadError?.message || "Không thể tải banner lên kho ảnh dùng chung."
       );
     } finally {
       setBusy(false);
@@ -441,7 +409,9 @@ const AdminImageManagementPage = () => {
   };
 
   const handleDeleteBanner = () => {
-    if (!deleteBanner) return;
+    if (!deleteBanner) {
+      return;
+    }
 
     try {
       saveBanners(
@@ -451,11 +421,9 @@ const AdminImageManagementPage = () => {
       );
 
       setDeleteBanner(null);
-
       setMessage("Đã xóa banner.");
     } catch (deleteError) {
       setDeleteBanner(null);
-
       setError(deleteError.message || "Không thể xóa banner.");
     }
   };
@@ -550,8 +518,8 @@ const AdminImageManagementPage = () => {
               Kích thước chuẩn khuyến nghị: <strong>1600 × 700 px</strong>.
               Banner khác kích thước vẫn được upload, hệ thống chỉ thông báo để
               người quản trị biết. Khi upload, hệ thống tự căn toàn bộ nội dung
-              ảnh vào khung banner hiện tại, hạn chế tối đa việc bị cắt nội
-              dung.
+              ảnh vào khung banner hiện tại, hạn chế tối đa việc bị cắt nội dung
+              và khoảng trống hai bên.
             </div>
 
             {banners.length === 0 ? (

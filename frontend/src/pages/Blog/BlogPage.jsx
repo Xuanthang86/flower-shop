@@ -198,11 +198,11 @@ const BlogPage = () => {
     const coverImage = getCoverImage(currentPost);
 
     return (
-      <section className="min-h-screen bg-gray-50 py-8 md:py-12">
+      <section className="min-h-screen bg-gray-50 py-8 md:py-10">
         <article className="mx-auto max-w-4xl px-4">
           <Link
             to="/blog"
-            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-pink-100 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 shadow-sm hover:bg-pink-50"
+            className="mb-5 inline-flex items-center gap-2 rounded-xl border border-pink-100 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 shadow-sm hover:bg-pink-50"
           >
             <FiArrowLeft />
             Tất cả bài viết
@@ -222,7 +222,7 @@ const BlogPage = () => {
             )}
 
             <div className="p-6 md:p-10">
-              <div className="mb-4 flex flex-wrap items-center gap-4 text-sm text-gray-400">
+              <div className="mb-3 flex flex-wrap items-center gap-4 text-sm text-gray-400">
                 {currentPost.date && (
                   <span className="inline-flex items-center gap-2">
                     <FiCalendar size={15} />
@@ -245,25 +245,25 @@ const BlogPage = () => {
                   .blog-detail-content {
                     color: #374151;
                     font-size: 16px;
-                    line-height: 1.9;
+                    line-height: 1.75;
                     overflow-wrap: anywhere;
                   }
 
-                  .blog-detail-content p {
-                    margin: 0 0 1.5rem;
+                  .blog-detail-content > p {
+                    margin: 0 0 1rem;
                   }
 
                   .blog-detail-content h2 {
-                    margin: 2rem 0 1rem;
-                    font-size: 1.65rem;
+                    margin: 1.4rem 0 .65rem;
+                    font-size: 1.55rem;
                     line-height: 1.35;
                     font-weight: 700;
                     color: #111827;
                   }
 
                   .blog-detail-content h3 {
-                    margin: 1.5rem 0 .75rem;
-                    font-size: 1.3rem;
+                    margin: 1.1rem 0 .5rem;
+                    font-size: 1.2rem;
                     line-height: 1.4;
                     font-weight: 700;
                     color: #1f2937;
@@ -271,7 +271,7 @@ const BlogPage = () => {
 
                   .blog-detail-content ul,
                   .blog-detail-content ol {
-                    margin: 1rem 0 1.5rem;
+                    margin: .75rem 0 1rem;
                     padding-left: 1.5rem;
                   }
 
@@ -284,15 +284,70 @@ const BlogPage = () => {
                   }
 
                   .blog-detail-content li {
-                    margin-bottom: .5rem;
+                    margin-bottom: .35rem;
                   }
 
                   .blog-detail-content blockquote {
-                    margin: 1.5rem 0;
-                    padding: 1rem 1.25rem;
+                    margin: 1rem 0;
+                    padding: .85rem 1rem;
                     border-left: 4px solid #db2777;
                     background: #fdf2f8;
                     border-radius: .75rem;
+                  }
+
+                  /*
+                   * Default shop information:
+                   * compact hơn template cũ,
+                   * không để khoảng cách quá lớn.
+                   */
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"] {
+                    margin: 8px 0 0 !important;
+                    padding: 16px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    header {
+                    margin: 0 0 10px !important;
+                    padding: 0 0 8px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    p {
+                    margin-top: 0 !important;
+                    margin-bottom: 7px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    section {
+                    margin-top: 0 !important;
+                    margin-bottom: 10px !important;
+                    padding: 11px 13px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    section:last-child {
+                    margin-bottom: 0 !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    h2 {
+                    margin: 0 !important;
+                    font-size: 21px !important;
+                    line-height: 28px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    h3 {
+                    margin: 0 0 6px !important;
+                    font-size: 15px !important;
+                    line-height: 22px !important;
                   }
 
                   .blog-detail-content img {
@@ -301,7 +356,7 @@ const BlogPage = () => {
                     max-width: 66.666667%;
                     max-height: 420px;
                     height: auto;
-                    margin: 1.5rem auto;
+                    margin: 1rem auto;
                     border: 0;
                     border-radius: .75rem;
                     object-fit: contain;
@@ -326,14 +381,14 @@ const BlogPage = () => {
 
                   .blog-detail-content table {
                     width: 100%;
-                    margin: 1.5rem 0;
+                    margin: 1rem 0;
                     border-collapse: collapse;
                   }
 
                   .blog-detail-content th,
                   .blog-detail-content td {
                     border: 1px solid #e5e7eb;
-                    padding: .75rem;
+                    padding: .65rem;
                     text-align: left;
                   }
 
@@ -347,17 +402,12 @@ const BlogPage = () => {
                       width: 100%;
                       max-width: 100%;
                     }
-
-                    .blog-detail-cover {
-                      width: 66.666667%;
-                      min-width: 220px;
-                    }
                   }
                 `}
               </style>
 
               <div
-                className="blog-detail-content mt-8"
+                className="blog-detail-content mt-6"
                 dangerouslySetInnerHTML={{
                   __html: normalizeBlogContent(currentPost.content),
                 }}
