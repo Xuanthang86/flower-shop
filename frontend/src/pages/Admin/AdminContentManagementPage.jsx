@@ -1,11 +1,26 @@
-import { useEffect, useState } from "react";
-
-import { FiImage, FiPlus, FiSave, FiTrash2, FiX } from "react-icons/fi";
+import { useEffect, useRef, useState } from "react";
 
 import {
+  FiAlignCenter,
+  FiAlignLeft,
+  FiBold,
+  FiImage,
+  FiItalic,
+  FiLink,
+  FiList,
+  FiPlus,
+  FiSave,
+  FiTrash2,
+  FiUnderline,
+  FiX,
+} from "react-icons/fi";
+
+import {
+  buildDefaultBlogShopInfoHtml,
   readSiteSettings,
   saveSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
+  DEFAULT_BLOG_SHOP_INFO_HTML,
 } from "@/services/siteSettings";
 
 import { uploadImageFile } from "@/services/media";
@@ -15,12 +30,55 @@ import { useNotification } from "@/context/NotificationProvider";
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
+const stripDefaultMarkerStyles = (html = "") => {
+  const value = String(html || "");
+
+  if (!value.trim()) {
+    return "";
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="default-blog-editor-root">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("default-blog-editor-root");
+
+    if (!root) {
+      return value;
+    }
+
+    const defaultBlock = root.querySelector(
+      '[data-flower-shop-default-info="true"]'
+    );
+
+    if (!defaultBlock) {
+      return root.innerHTML.trim();
+    }
+
+    defaultBlock.setAttribute("data-flower-shop-default-info", "true");
+
+    defaultBlock.querySelectorAll("[style]").forEach((element) => {
+      element.removeAttribute("style");
+    });
+
+    return defaultBlock.outerHTML.trim();
+  } catch {
+    return value;
+  }
+};
+
 const AdminContentManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [uploading, setUploading] = useState(false);
 
   const [confirmAnnouncement, setConfirmAnnouncement] = useState(null);
+
+  const blogEditorRef = useRef(null);
 
   const { notifySuccess, notifyError } = useNotification();
 
@@ -31,9 +89,7 @@ const AdminContentManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-
       robots.name = "robots";
-
       document.head.appendChild(robots);
     }
 
@@ -59,6 +115,19 @@ const AdminContentManagementPage = () => {
       window.removeEventListener("storage", refresh);
     };
   }, []);
+
+  useEffect(() => {
+    const editor = blogEditorRef.current;
+
+    if (!editor || !editor.isConnected) {
+      return;
+    }
+
+    const html =
+      settings.blog?.defaultShopInfoHtml || DEFAULT_BLOG_SHOP_INFO_HTML;
+
+    editor.innerHTML = html;
+  }, [settings.blog?.defaultShopInfoHtml]);
 
   const saveSettings = (nextSettings, successMessage) => {
     try {
@@ -192,25 +261,61 @@ const AdminContentManagementPage = () => {
     saveSettings(settings, "Đã lưu nội dung trang chủ.");
   };
 
-  const updateBlogShopInfo = (value) => {
+  const syncBlogEditor = () => {
+    const editor = blogEditorRef.current;
+
+    if (!editor || !editor.isConnected) {
+      return;
+    }
+
     setSettings((current) => ({
       ...current,
 
       blog: {
         ...(current.blog || {}),
-        defaultShopInfoHtml: value,
+        defaultShopInfoHtml: stripDefaultMarkerStyles(editor.innerHTML || ""),
       },
     }));
   };
 
-  const saveBlogShopInfo = () => {
-    saveSettings(settings, "Đã lưu thông tin Shop mặc định cho bài viết.");
+  const executeBlogFormat = (command, value = null) => {
+    const editor = blogEditorRef.current;
+
+    if (!editor || !editor.isConnected) {
+      return;
+    }
+
+    editor.focus();
+
+    document.execCommand(command, false, value);
+
+    syncBlogEditor();
+  };
+
+  const createBlogLink = () => {
+    const url = window.prompt("Nhập liên kết:");
+
+    if (!url) {
+      return;
+    }
+
+    executeBlogFormat("createLink", url);
+  };
+
+  const resetBlogEditor = () => {
+    const editor = blogEditorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    editor.innerHTML = DEFAULT_BLOG_SHOP_INFO_HTML;
+
+    syncBlogEditor();
   };
 
   const branding = settings.branding || {};
-
   const sections = settings.sections || {};
-
   const blog = settings.blog || {};
 
   const announcementMessages = Array.isArray(settings.announcementMessages)
@@ -495,37 +600,179 @@ const AdminContentManagementPage = () => {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                Nội dung này sẽ tự động được chèn vào bài viết mới. Bạn có thể
-                chỉnh sửa nội dung HTML để bổ sung thông tin thương hiệu, liên
-                hệ và liên kết nội bộ phục vụ SEO.
+                Đây là nội dung được hiển thị tự động ở cuối mỗi bài viết. Nội
+                dung được quản lý riêng, còn màu sắc, font chữ, khoảng cách và
+                bo góc được quản lý tại Tùy chỉnh giao diện.
               </p>
 
               <p className="mt-2 rounded-xl bg-pink-50 p-3 text-xs leading-5 text-pink-700">
-                Có thể sử dụng các biến:{" "}
-                <strong>
+                Có thể sử dụng các biến:
+                <strong className="ml-1">
                   {
-                    "{{siteName}} {{address}} {{phone}} {{email}} {{workingHours}}"
+                    "{{siteName}} {{tagline}} {{address}} {{phone}} {{email}} {{workingHours}}"
                   }
                 </strong>
-                . Khi tạo bài viết, hệ thống sẽ tự thay bằng thông tin hiện tại
-                của Shop.
+                . Hệ thống sẽ tự thay bằng thông tin hiện tại của Shop.
               </p>
             </div>
 
-            <div className="mt-5">
-              <textarea
-                value={blog.defaultShopInfoHtml || ""}
-                onChange={(event) => updateBlogShopInfo(event.target.value)}
-                rows={14}
-                className={`${inputClass} font-mono text-xs leading-6`}
-                aria-label="Thông tin Shop mặc định trong bài viết"
+            <div className="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-gray-50 p-2">
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("bold");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="In đậm"
+                  aria-label="In đậm"
+                >
+                  <FiBold />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("italic");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="In nghiêng"
+                  aria-label="In nghiêng"
+                >
+                  <FiItalic />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("underline");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="Gạch chân"
+                  aria-label="Gạch chân"
+                >
+                  <FiUnderline />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("justifyLeft");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="Căn trái"
+                  aria-label="Căn trái"
+                >
+                  <FiAlignLeft />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("justifyCenter");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="Căn giữa"
+                  aria-label="Căn giữa"
+                >
+                  <FiAlignCenter />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    executeBlogFormat("insertUnorderedList");
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="Danh sách"
+                  aria-label="Danh sách"
+                >
+                  <FiList />
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    createBlogLink();
+                  }}
+                  className="rounded-lg p-2.5 hover:bg-white"
+                  title="Chèn liên kết"
+                  aria-label="Chèn liên kết"
+                >
+                  <FiLink />
+                </button>
+
+                <select
+                  defaultValue=""
+                  onChange={(event) =>
+                    executeBlogFormat("formatBlock", event.target.value)
+                  }
+                  className="rounded-lg border-0 bg-transparent px-2 text-sm outline-none"
+                  aria-label="Định dạng nội dung"
+                >
+                  <option value="">Đoạn văn</option>
+                  <option value="h2">Tiêu đề H2</option>
+                  <option value="h3">Tiêu đề H3</option>
+                  <option value="p">Đoạn văn</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={resetBlogEditor}
+                  className="ml-auto rounded-lg px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-white"
+                >
+                  Khôi phục nội dung mặc định
+                </button>
+              </div>
+
+              <div
+                ref={blogEditorRef}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-label="Nội dung Shop mặc định trong bài viết"
+                onInput={syncBlogEditor}
+                className="min-h-[300px] w-full overflow-x-auto p-5 text-sm leading-7 text-gray-700 outline-none [&_a]:font-semibold [&_a]:text-pink-600 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_p]:my-1.5"
               />
             </div>
 
             <div className="mt-5 flex justify-center">
               <button
                 type="button"
-                onClick={saveBlogShopInfo}
+                onClick={() => {
+                  syncBlogEditor();
+
+                  const next = {
+                    ...settings,
+                  };
+
+                  setTimeout(() => {
+                    const current = readSiteSettings();
+
+                    saveSettings(
+                      {
+                        ...current,
+                        blog: {
+                          ...(current.blog || {}),
+                          defaultShopInfoHtml: blogEditorRef.current
+                            ? stripDefaultMarkerStyles(
+                                blogEditorRef.current.innerHTML
+                              )
+                            : next.blog?.defaultShopInfoHtml ||
+                              DEFAULT_BLOG_SHOP_INFO_HTML,
+                        },
+                      },
+                      "Đã lưu thông tin Shop mặc định cho bài viết."
+                    );
+                  }, 0);
+                }}
                 className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
               >
                 <FiSave />

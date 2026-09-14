@@ -14,252 +14,101 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   product_manager: ["manage_orders", "manage_products"],
 };
 
+/*
+ * Nội dung mặc định của Shop.
+ *
+ * QUAN TRỌNG:
+ * - File này chỉ chứa nội dung mặc định.
+ * - Không đặt CSS giao diện tại đây.
+ * - Giao diện được quản lý bằng blog.defaultShopInfoStyle
+ *   trong Tùy chỉnh giao diện.
+ *
+ * Có thể sử dụng:
+ * {{siteName}}
+ * {{tagline}}
+ * {{address}}
+ * {{phone}}
+ * {{email}}
+ * {{workingHours}}
+ */
 export const DEFAULT_BLOG_SHOP_INFO_HTML = `
-<section
-  data-flower-shop-default-info="true"
-  style="
-    width:100%;
-    max-width:100%;
-    margin:8px 0 0;
-    padding:14px;
-    border:1px solid #fce7f3;
-    border-radius:14px;
-    background:linear-gradient(
-      135deg,
-      #fff7fb 0%,
-      #ffffff 55%,
-      #fffafc 100%
-    );
-    box-sizing:border-box;
-  "
->
-  <header
-    style="
-      margin:0 0 8px;
-      padding:0 0 7px;
-      border-bottom:1px solid #fbcfe8;
-    "
-  >
-    <p
-      style="
-        margin:0 0 4px;
-        color:#db2777;
-        font-size:11px;
-        line-height:16px;
-        font-weight:700;
-        letter-spacing:.08em;
-        text-transform:uppercase;
-      "
-    >
-      Thông tin Shop
-    </p>
+<section data-flower-shop-default-info="true">
+  <header>
+    <p>Thông tin Shop</p>
 
-    <h2
-      style="
-        margin:0;
-        color:#1f2937;
-        font-size:19px;
-        line-height:25px;
-        font-weight:800;
-      "
-    >
-      Về {{siteName}}
-    </h2>
+    <h2>Về {{siteName}}</h2>
 
-    <p
-      style="
-        margin:4px 0 0;
-        color:#6b7280;
-        font-size:13px;
-        line-height:19px;
-      "
-    >
-      {{tagline}}
-    </p>
+    <p>{{tagline}}</p>
   </header>
 
-  <div
-    style="
-      color:#4b5563;
-      font-size:14px;
-      line-height:21px;
-    "
-  >
-    <p style="margin:0 0 7px;">
-      <strong style="color:#374151;">
-        {{siteName}}
-      </strong>
-      là cửa hàng hoa tươi hướng tới những sản phẩm được
-      tuyển chọn kỹ lưỡng, cách trình bày tinh tế và trải
-      nghiệm mua sắm thuận tiện cho khách hàng.
+  <div>
+    <p>
+      <strong>{{siteName}}</strong> là cửa hàng hoa tươi hướng tới những sản phẩm
+      được tuyển chọn kỹ lưỡng, cách trình bày tinh tế và trải nghiệm mua sắm
+      thuận tiện cho khách hàng.
     </p>
 
-    <p style="margin:0 0 7px;">
-      Shop cung cấp các sản phẩm hoa phù hợp cho nhiều dịp
-      đặc biệt như sinh nhật, khai trương, cưới hỏi,
-      chúc mừng, tri ân, kỷ niệm và các sự kiện quan trọng.
+    <p>
+      Shop cung cấp các sản phẩm hoa phù hợp cho nhiều dịp đặc biệt như sinh nhật,
+      khai trương, cưới hỏi, chúc mừng, tri ân, kỷ niệm và các sự kiện quan trọng.
     </p>
 
-    <p style="margin:0 0 8px;">
-      Chúng tôi chú trọng chất lượng hoa, hình thức trình bày,
-      khả năng tư vấn và hỗ trợ khách hàng trong suốt quá trình
-      lựa chọn sản phẩm.
+    <p>
+      Chúng tôi chú trọng chất lượng hoa, hình thức trình bày, khả năng tư vấn
+      và hỗ trợ khách hàng trong suốt quá trình lựa chọn sản phẩm.
     </p>
   </div>
 
-  <section
-    style="
-      margin:0 0 8px;
-      padding:9px 11px;
-      border:1px solid #f3f4f6;
-      border-radius:11px;
-      background:#ffffff;
-      box-sizing:border-box;
-    "
-  >
-    <h3
-      style="
-        margin:0 0 5px;
-        color:#374151;
-        font-size:15px;
-        line-height:20px;
-        font-weight:700;
-      "
-    >
-      Thông tin liên hệ
-    </h3>
+  <section>
+    <h3>Thông tin liên hệ</h3>
 
-    <p
-      style="
-        margin:0 0 5px;
-        color:#6b7280;
-        font-size:13px;
-        line-height:20px;
-      "
-    >
-      <strong style="color:#374151;">
-        Địa chỉ:
-      </strong>
+    <p>
+      <strong>Địa chỉ:</strong>
       {{address}}
     </p>
 
-    <p
-      style="
-        margin:0 0 5px;
-        color:#6b7280;
-        font-size:13px;
-        line-height:20px;
-      "
-    >
-      <strong style="color:#374151;">
-        Điện thoại:
-      </strong>
-
-      <a
-        href="tel:{{phone}}"
-        style="
-          color:#db2777;
-          text-decoration:none;
-          font-weight:600;
-        "
-      >
-        {{phone}}
-      </a>
+    <p>
+      <strong>Điện thoại:</strong>
+      <a href="tel:{{phone}}">{{phone}}</a>
     </p>
 
-    <p
-      style="
-        margin:0 0 5px;
-        color:#6b7280;
-        font-size:13px;
-        line-height:20px;
-      "
-    >
-      <strong style="color:#374151;">
-        Email:
-      </strong>
-
-      <a
-        href="mailto:{{email}}"
-        style="
-          color:#db2777;
-          text-decoration:none;
-          font-weight:600;
-        "
-      >
-        {{email}}
-      </a>
+    <p>
+      <strong>Email:</strong>
+      <a href="mailto:{{email}}">{{email}}</a>
     </p>
 
-    <p
-      style="
-        margin:0;
-        color:#6b7280;
-        font-size:13px;
-        line-height:20px;
-      "
-    >
-      <strong style="color:#374151;">
-        Thời gian làm việc:
-      </strong>
+    <p>
+      <strong>Thời gian làm việc:</strong>
       {{workingHours}}
     </p>
   </section>
 
-  <section
-    style="
-      margin:0;
-      padding:9px 11px;
-      border-radius:11px;
-      background:#fff;
-    "
-  >
-    <h3
-      style="
-        margin:0 0 5px;
-        color:#374151;
-        font-size:15px;
-        line-height:20px;
-        font-weight:700;
-      "
-    >
-      Khám phá thêm
-    </h3>
+  <section>
+    <h3>Khám phá thêm</h3>
 
-    <p
-      style="
-        margin:0;
-        color:#6b7280;
-        font-size:13px;
-        line-height:20px;
-      "
-    >
+    <p>
       Khám phá thêm các sản phẩm hoa tại
-      <a
-        href="/products"
-        style="
-          color:#db2777;
-          text-decoration:none;
-          font-weight:700;
-        "
-      >
-        danh mục sản phẩm
-      </a>
+      <a href="/products">danh mục sản phẩm</a>
       hoặc tìm hiểu thêm thông tin và kết nối với
-      <a
-        href="/contact"
-        style="
-          color:#db2777;
-          text-decoration:none;
-          font-weight:700;
-        "
-      >
-        Flower Shop
-      </a>.
+      <a href="/contact">Flower Shop</a>.
     </p>
   </section>
 </section>
 `;
+
+export const DEFAULT_BLOG_SHOP_INFO_STYLE = {
+  backgroundColor: "#fff7fb",
+  borderColor: "#fce7f3",
+  accentColor: "#db2777",
+  headingColor: "#1f2937",
+  textColor: "#4b5563",
+  borderRadius: 14,
+  padding: 14,
+  headingFontSize: 19,
+  subHeadingFontSize: 15,
+  bodyFontSize: 14,
+  lineHeight: 1.5,
+};
 
 const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 <h2>Về Flower Shop</h2>
@@ -287,10 +136,20 @@ const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 </p>
 `;
 
+const clone = (value) => JSON.parse(JSON.stringify(value));
+
 const normalizeHtmlForComparison = (value) =>
   String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 const isLegacyDefaultBlogShopInfo = (value) => {
   const normalized = normalizeHtmlForComparison(value);
@@ -307,39 +166,89 @@ const isLegacyDefaultBlogShopInfo = (value) => {
     return true;
   }
 
-  const isOldAdminBlogTemplate =
-    normalized.includes('data-flower-shop-default-info="true"') &&
-    normalized.includes("Hoa tươi tinh tế cho những khoảnh khắc đáng nhớ.") &&
-    normalized.includes("Bạn có thể tham khảo thêm:") &&
-    normalized.includes("Xem danh mục sản phẩm");
-
-  if (isOldAdminBlogTemplate) {
-    return true;
-  }
-
-  return (
-    normalized.includes("<h2>Về Flower Shop</h2>") &&
+  if (
+    normalized.includes("Về Flower Shop") &&
     normalized.includes("Thông tin liên hệ") &&
     normalized.includes("Danh mục sản phẩm") &&
     normalized.includes("/contact")
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+const isBuiltInDefaultBlogShopInfo = (value) => {
+  const normalized = normalizeHtmlForComparison(value);
+
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    normalized.includes('data-flower-shop-default-info="true"') &&
+    normalized.includes("Về {{siteName}}") &&
+    normalized.includes("Thông tin liên hệ") &&
+    normalized.includes("Khám phá thêm")
   );
 };
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const sanitizeDefaultShopInfoTemplate = (value) => {
+  const source = String(value || "").trim();
 
-const escapeHtml = (value = "") =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+  if (!source) {
+    return DEFAULT_BLOG_SHOP_INFO_HTML;
+  }
 
-const buildDefaultBlogShopInfoHtml = (template, settings) => {
+  if (
+    isLegacyDefaultBlogShopInfo(source) ||
+    isBuiltInDefaultBlogShopInfo(source)
+  ) {
+    return DEFAULT_BLOG_SHOP_INFO_HTML;
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="blog-template-root">${source}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("blog-template-root");
+
+    if (!root) {
+      return DEFAULT_BLOG_SHOP_INFO_HTML;
+    }
+
+    const defaultBlock =
+      root.querySelector('[data-flower-shop-default-info="true"]') || root;
+
+    defaultBlock.setAttribute("data-flower-shop-default-info", "true");
+
+    /*
+     * Style giao diện không được lưu trong nội dung.
+     * Nội dung do người quản lý nhập vẫn được giữ lại.
+     */
+    defaultBlock.querySelectorAll("[style]").forEach((element) => {
+      element.removeAttribute("style");
+    });
+
+    return defaultBlock.outerHTML.trim();
+  } catch {
+    return DEFAULT_BLOG_SHOP_INFO_HTML;
+  }
+};
+
+export const buildDefaultBlogShopInfoHtml = (settings) => {
+  const template =
+    String(settings?.blog?.defaultShopInfoHtml || "").trim() ||
+    DEFAULT_BLOG_SHOP_INFO_HTML;
+
   const branding = settings?.branding || {};
   const contact = settings?.contact || {};
 
-  return String(template || "")
+  return template
     .replace(
       /\{\{siteName\}\}/g,
       escapeHtml(branding.siteName || "Flower Shop")
@@ -354,7 +263,7 @@ const buildDefaultBlogShopInfoHtml = (template, settings) => {
     );
 };
 
-const removeDefaultShopInfoFromContent = (content = "") => {
+export const removeDefaultShopInfoFromContent = (content = "") => {
   const value = String(content || "").trim();
 
   if (!value) {
@@ -364,10 +273,6 @@ const removeDefaultShopInfoFromContent = (content = "") => {
   try {
     if (isLegacyDefaultBlogShopInfo(value)) {
       return "";
-    }
-
-    if (!value.includes('data-flower-shop-default-info="true"')) {
-      return value;
     }
 
     const parser = new DOMParser();
@@ -393,6 +298,24 @@ const removeDefaultShopInfoFromContent = (content = "") => {
   }
 };
 
+export const normalizeBlogPostContent = (content = "") =>
+  removeDefaultShopInfoFromContent(content);
+
+export const composeBlogPostContent = (content, settings) => {
+  const articleContent = normalizeBlogPostContent(content);
+  const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
+
+  if (!defaultShopInfo) {
+    return articleContent;
+  }
+
+  if (!articleContent) {
+    return defaultShopInfo;
+  }
+
+  return `${articleContent}${defaultShopInfo}`;
+};
+
 const normalizeStoredBlogPosts = (posts) => {
   if (!Array.isArray(posts)) {
     return [];
@@ -404,8 +327,7 @@ const normalizeStoredBlogPosts = (posts) => {
     }
 
     const originalContent = String(post.content || "");
-
-    const cleanedContent = removeDefaultShopInfoFromContent(originalContent);
+    const cleanedContent = normalizeBlogPostContent(originalContent);
 
     if (cleanedContent === originalContent) {
       return post;
@@ -454,11 +376,8 @@ export const DEFAULT_SITE_SETTINGS = {
   sections: {
     categoriesTitle: "Danh mục nổi bật",
     categoriesSubtitle: "Lựa chọn hoa phù hợp với từng dịp đặc biệt",
-
     featuredTitle: "Sản phẩm nổi bật",
-
     featuredSubtitle: "Những sản phẩm mới và được yêu thích nhất.",
-
     customerTitle: "KHÁCH HÀNG TIÊU BIỂU",
   },
 
@@ -496,6 +415,7 @@ export const DEFAULT_SITE_SETTINGS = {
     columns: 3,
     borderRadius: 16,
     defaultShopInfoHtml: DEFAULT_BLOG_SHOP_INFO_HTML,
+    defaultShopInfoStyle: DEFAULT_BLOG_SHOP_INFO_STYLE,
   },
 
   theme: {
@@ -514,7 +434,6 @@ export const DEFAULT_SITE_SETTINGS = {
 
 const normalizeBanner = (banner, index, defaultInterval = 8) => {
   const duration = Number(banner?.duration || defaultInterval || 8);
-
   const priority = Number(banner?.priority || index + 1);
 
   return {
@@ -571,6 +490,71 @@ const normalizeRolePermissions = (input) => {
   };
 };
 
+const normalizeBlogStyle = (style) => {
+  const source = style && typeof style === "object" ? style : {};
+
+  const defaults = DEFAULT_BLOG_SHOP_INFO_STYLE;
+
+  const number = (value, fallback, min, max) => {
+    const parsed = Number(value);
+
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  return {
+    backgroundColor:
+      typeof source.backgroundColor === "string"
+        ? source.backgroundColor
+        : defaults.backgroundColor,
+
+    borderColor:
+      typeof source.borderColor === "string"
+        ? source.borderColor
+        : defaults.borderColor,
+
+    accentColor:
+      typeof source.accentColor === "string"
+        ? source.accentColor
+        : defaults.accentColor,
+
+    headingColor:
+      typeof source.headingColor === "string"
+        ? source.headingColor
+        : defaults.headingColor,
+
+    textColor:
+      typeof source.textColor === "string"
+        ? source.textColor
+        : defaults.textColor,
+
+    borderRadius: number(source.borderRadius, defaults.borderRadius, 0, 32),
+
+    padding: number(source.padding, defaults.padding, 8, 32),
+
+    headingFontSize: number(
+      source.headingFontSize,
+      defaults.headingFontSize,
+      14,
+      32
+    ),
+
+    subHeadingFontSize: number(
+      source.subHeadingFontSize,
+      defaults.subHeadingFontSize,
+      12,
+      24
+    ),
+
+    bodyFontSize: number(source.bodyFontSize, defaults.bodyFontSize, 12, 20),
+
+    lineHeight: number(source.lineHeight, defaults.lineHeight, 1.2, 2),
+  };
+};
+
 const mergeSettings = (input = {}) => {
   const source = input && typeof input === "object" ? input : {};
 
@@ -582,14 +566,19 @@ const mergeSettings = (input = {}) => {
 
   const bannerInterval = Math.min(
     15,
-    Math.max(5, Number.isFinite(rawInterval) ? rawInterval : 8)
+    Math.max(
+      5,
+      Number.isFinite(rawInterval) ? rawInterval : defaults.hero.bannerInterval
+    )
   );
 
   const sourceBlogHtml = String(source.blog?.defaultShopInfoHtml ?? "").trim();
 
-  const defaultShopInfoHtml = isLegacyDefaultBlogShopInfo(sourceBlogHtml)
-    ? defaults.blog.defaultShopInfoHtml
-    : sourceBlogHtml;
+  const defaultShopInfoHtml =
+    isLegacyDefaultBlogShopInfo(sourceBlogHtml) ||
+    isBuiltInDefaultBlogShopInfo(sourceBlogHtml)
+      ? defaults.blog.defaultShopInfoHtml
+      : sanitizeDefaultShopInfoTemplate(sourceBlogHtml);
 
   const branding = {
     ...defaults.branding,
@@ -616,7 +605,6 @@ const mergeSettings = (input = {}) => {
 
   return {
     ...defaults,
-
     ...source,
 
     branding,
@@ -674,7 +662,11 @@ const mergeSettings = (input = {}) => {
     blog: {
       ...defaults.blog,
       ...(source.blog || {}),
+
       defaultShopInfoHtml,
+      defaultShopInfoStyle: normalizeBlogStyle(
+        source.blog?.defaultShopInfoStyle
+      ),
     },
 
     theme: {
@@ -693,14 +685,8 @@ const mergeSettings = (input = {}) => {
       : [],
 
     /*
-     * Quan trọng:
-     * blogPosts chỉ lưu nội dung bài viết thật.
-     *
-     * Default shop information không được
-     * nhân vào từng bài viết nữa.
-     *
-     * BlogPage sẽ render default template
-     * tập trung từ settings.blog.defaultShopInfoHtml.
+     * Chỉ lưu nội dung bài viết thật.
+     * Không lưu thông tin Shop mặc định trong từng bài.
      */
     blogPosts: normalizedBlogPosts,
   };
@@ -746,8 +732,14 @@ export const readSiteSettings = () => {
 export const saveSiteSettings = (settings) => {
   const normalized = mergeSettings(settings);
 
+  const serialized = JSON.stringify(normalized);
+
   try {
-    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+    const currentRaw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
+
+    if (currentRaw !== serialized) {
+      localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, serialized);
+    }
   } catch (error) {
     const storageError = new Error(
       "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy.",

@@ -17,10 +17,11 @@ import {
 } from "react-icons/fi";
 
 import {
+  buildDefaultBlogShopInfoHtml,
+  normalizeBlogPostContent,
   readSiteSettings,
   saveSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
-  DEFAULT_BLOG_SHOP_INFO_HTML,
 } from "@/services/siteSettings";
 
 import { uploadImageFile } from "@/services/media";
@@ -46,14 +47,6 @@ const stripHtml = (html = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const escapeHtml = (value = "") =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
 const formatPostDate = (value) => {
   const raw = String(value || "").slice(0, 10);
 
@@ -68,223 +61,20 @@ const formatPostDate = (value) => {
   return `${day}/${month}/${year}`;
 };
 
-const buildDefaultShopInfo = (settings) => {
-  const template =
-    String(settings?.blog?.defaultShopInfoHtml || "").trim() ||
-    DEFAULT_BLOG_SHOP_INFO_HTML;
-
-  const branding = settings?.branding || {};
-  const contact = settings?.contact || {};
-
-  return template
-    .replace(
-      /\{\{siteName\}\}/g,
-      escapeHtml(branding.siteName || "Flower Shop")
-    )
-    .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
-    .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
-    .replace(/\{\{phone\}\}/g, escapeHtml(contact.phone || "Đang cập nhật"))
-    .replace(/\{\{email\}\}/g, escapeHtml(contact.email || "Đang cập nhật"))
-    .replace(
-      /\{\{workingHours\}\}/g,
-      escapeHtml(contact.workingHours || "Đang cập nhật")
-    );
-};
-
-const compactDefaultShopInfoHtml = (html) => {
-  const value = String(html || "").trim();
-
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const parsed = parser.parseFromString(
-      `<div id="flower-shop-default-root">${value}</div>`,
-      "text/html"
-    );
-
-    const root = parsed.getElementById("flower-shop-default-root");
-
-    const defaultBlock = root?.querySelector(
-      '[data-flower-shop-default-info="true"]'
-    );
-
-    if (!root || !defaultBlock) {
-      return value;
-    }
-
-    defaultBlock.style.margin = "8px 0 0";
-    defaultBlock.style.padding = "14px";
-
-    const header = defaultBlock.querySelector("header");
-
-    if (header) {
-      header.style.margin = "0 0 8px";
-      header.style.padding = "0 0 7px";
-    }
-
-    defaultBlock.querySelectorAll("header ~ div > p").forEach((paragraph) => {
-      paragraph.style.margin = "0 0 7px";
-    });
-
-    defaultBlock
-      .querySelectorAll(":scope > section")
-      .forEach((section, index, sections) => {
-        section.style.margin = index === sections.length - 1 ? "0" : "0 0 8px";
-
-        section.style.padding = "9px 11px";
-      });
-
-    defaultBlock.querySelectorAll("h2").forEach((heading) => {
-      heading.style.margin = "0";
-      heading.style.fontSize = "19px";
-      heading.style.lineHeight = "25px";
-    });
-
-    defaultBlock.querySelectorAll("h3").forEach((heading) => {
-      heading.style.margin = "0 0 5px";
-      heading.style.fontSize = "15px";
-      heading.style.lineHeight = "20px";
-    });
-
-    defaultBlock.querySelectorAll("section p").forEach((paragraph) => {
-      paragraph.style.margin = "0 0 5px";
-    });
-
-    return defaultBlock.outerHTML;
-  } catch {
-    return value;
-  }
-};
-
-const buildRenderedDefaultTemplate = (settings) =>
-  compactDefaultShopInfoHtml(buildDefaultShopInfo(settings));
-
-const hasDefaultShopInfo = (content = "") =>
-  String(content || "").includes('data-flower-shop-default-info="true"');
-
-const removeDefaultShopInfo = (content = "") => {
-  const value = String(content || "").trim();
-
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const document = parser.parseFromString(
-      `<div id="flower-shop-content-root">${value}</div>`,
-      "text/html"
-    );
-
-    const root = document.getElementById("flower-shop-content-root");
-
-    if (!root) {
-      return value;
-    }
-
-    root
-      .querySelectorAll('[data-flower-shop-default-info="true"]')
-      .forEach((element) => element.remove());
-
-    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
-  } catch {
-    return value;
-  }
-};
-
-const isLegacyDefaultBlogShopInfo = (value) => {
-  const normalized = String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!normalized) {
-    return true;
-  }
-
-  const signals = [
-    "<h2>Về Flower Shop</h2>",
-    "Thông tin liên hệ",
-    "Danh mục sản phẩm",
-    "/contact",
-  ];
-
-  const matchedSignals = signals.filter((signal) =>
-    normalized.includes(signal)
-  ).length;
-
-  return (
-    matchedSignals >= 3 &&
-    !normalized.includes('data-flower-shop-default-info="true"')
-  );
-};
-
-const normalizeStoredContent = (content = "") => {
-  const value = String(content || "").trim();
-
-  if (!value || isLegacyDefaultBlogShopInfo(value)) {
-    return "";
-  }
-
-  return removeDefaultShopInfo(value);
-};
-
-const buildEditorContent = (content, settings) => {
-  const cleanedContent = normalizeStoredContent(content);
-
-  const defaultInfo = buildRenderedDefaultTemplate(settings);
-
-  if (!cleanedContent) {
-    return `
-      <p class="blog-editor-writing-area">
-        <br />
-      </p>
-      ${defaultInfo}
-    `;
-  }
-
-  return `
-    ${cleanedContent}
-    ${defaultInfo}
-  `;
-};
-
-const normalizeEditorContent = (content = "") => {
-  const value = String(content || "");
-
-  if (!value.trim()) {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const parsedDocument = parser.parseFromString(
-      `<div id="flower-shop-editor-root">${value}</div>`,
-      "text/html"
-    );
-
-    const root = parsedDocument.getElementById("flower-shop-editor-root");
-
-    if (!root) {
-      return value;
-    }
-
-    root
-      .querySelectorAll('[data-flower-shop-default-info="true"]')
-      .forEach((element) => {
-        element.setAttribute("contenteditable", "false");
-      });
-
-    return root.innerHTML;
-  } catch {
-    return value;
-  }
-};
+const getBlogStyle = (settings) =>
+  settings?.blog?.defaultShopInfoStyle || {
+    backgroundColor: "#fff7fb",
+    borderColor: "#fce7f3",
+    accentColor: "#db2777",
+    headingColor: "#1f2937",
+    textColor: "#4b5563",
+    borderRadius: 14,
+    padding: 14,
+    headingFontSize: 19,
+    subHeadingFontSize: 15,
+    bodyFontSize: 14,
+    lineHeight: 1.5,
+  };
 
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
@@ -329,10 +119,12 @@ const AdminBlogManagementPage = () => {
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -348,9 +140,8 @@ const AdminBlogManagementPage = () => {
       return;
     }
 
-    const editorContent = buildEditorContent(form.content, settings);
-
-    editor.innerHTML = normalizeEditorContent(editorContent);
+    editor.innerHTML =
+      normalizeBlogPostContent(form.content || "") || "<p><br /></p>";
 
     window.requestAnimationFrame(() => {
       const currentEditor = editorRef.current;
@@ -358,10 +149,6 @@ const AdminBlogManagementPage = () => {
       if (!currentEditor || !currentEditor.isConnected) {
         return;
       }
-
-      const editableArea = currentEditor.querySelector(
-        ".blog-editor-writing-area"
-      );
 
       currentEditor.focus();
 
@@ -373,13 +160,9 @@ const AdminBlogManagementPage = () => {
 
       const range = document.createRange();
 
-      if (editableArea) {
-        range.selectNodeContents(editableArea);
-        range.collapse(true);
-      } else {
-        range.selectNodeContents(currentEditor);
-        range.collapse(false);
-      }
+      range.selectNodeContents(currentEditor);
+
+      range.collapse(false);
 
       selection.removeAllRanges();
       selection.addRange(range);
@@ -397,8 +180,11 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       ...EMPTY_POST,
+
       date: new Date().toISOString().slice(0, 10),
+
       time: new Date().toTimeString().slice(0, 5),
+
       content: "",
     });
 
@@ -416,10 +202,14 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       title: post.title || "",
+
       date: post.date || new Date().toISOString().slice(0, 10),
+
       time: post.time || "08:00",
+
       image: post.image || "",
-      content: normalizeStoredContent(post.content || ""),
+
+      content: normalizeBlogPostContent(post.content || ""),
     });
 
     selectionRef.current = null;
@@ -436,7 +226,9 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       ...EMPTY_POST,
+
       date: new Date().toISOString().slice(0, 10),
+
       time: new Date().toTimeString().slice(0, 5),
     });
   };
@@ -458,17 +250,6 @@ const AdminBlogManagementPage = () => {
     const range = selection.getRangeAt(0);
 
     if (!editor.contains(range.commonAncestorContainer)) {
-      return;
-    }
-
-    const defaultBlock =
-      range.commonAncestorContainer.nodeType === 1
-        ? range.commonAncestorContainer.closest?.('[contenteditable="false"]')
-        : range.commonAncestorContainer.parentElement?.closest?.(
-            '[contenteditable="false"]'
-          );
-
-    if (defaultBlock) {
       return;
     }
 
@@ -502,15 +283,8 @@ const AdminBlogManagementPage = () => {
 
     const range = document.createRange();
 
-    const editableArea = editor.querySelector(".blog-editor-writing-area");
-
-    if (editableArea) {
-      range.selectNodeContents(editableArea);
-      range.collapse(false);
-    } else {
-      range.selectNodeContents(editor);
-      range.collapse(false);
-    }
+    range.selectNodeContents(editor);
+    range.collapse(false);
 
     selection.removeAllRanges();
     selection.addRange(range);
@@ -527,7 +301,7 @@ const AdminBlogManagementPage = () => {
       return;
     }
 
-    const content = editor.innerHTML || "";
+    const content = normalizeBlogPostContent(editor.innerHTML || "");
 
     setForm((current) => ({
       ...current,
@@ -570,7 +344,9 @@ const AdminBlogManagementPage = () => {
       return;
     }
 
-    const content = event.currentTarget.innerHTML || "";
+    const content = normalizeBlogPostContent(
+      event.currentTarget.innerHTML || ""
+    );
 
     setForm((current) => ({
       ...current,
@@ -641,6 +417,7 @@ const AdminBlogManagementPage = () => {
 
       if (!editor || !editor.isConnected) {
         notifyError("Trình soạn thảo chưa sẵn sàng.");
+
         return;
       }
 
@@ -652,6 +429,7 @@ const AdminBlogManagementPage = () => {
 
       if (!selection || selection.rangeCount === 0) {
         notifyError("Không xác định được vị trí chèn ảnh.");
+
         return;
       }
 
@@ -659,6 +437,7 @@ const AdminBlogManagementPage = () => {
 
       if (!editor.contains(range.commonAncestorContainer)) {
         notifyError("Không xác định được vị trí chèn ảnh.");
+
         return;
       }
 
@@ -668,15 +447,23 @@ const AdminBlogManagementPage = () => {
       imageElement.alt = "Hình ảnh trong bài viết";
       imageElement.loading = "lazy";
       imageElement.decoding = "async";
+
       imageElement.style.display = "block";
+
       imageElement.style.maxWidth = "80%";
+
       imageElement.style.height = "auto";
+
       imageElement.style.margin = "12px auto";
+
       imageElement.style.borderRadius = "12px";
 
       range.deleteContents();
+
       range.insertNode(imageElement);
+
       range.setStartAfter(imageElement);
+
       range.collapse(true);
 
       selection.removeAllRanges();
@@ -700,18 +487,18 @@ const AdminBlogManagementPage = () => {
     const editor = editorRef.current;
 
     let content = editor?.isConnected
-      ? editor.innerHTML?.trim() || form.content.trim()
-      : form.content.trim();
-
-    content = normalizeStoredContent(content);
+      ? normalizeBlogPostContent(editor.innerHTML || "")
+      : normalizeBlogPostContent(form.content);
 
     if (!title) {
       notifyError("Vui lòng nhập tiêu đề bài viết.");
+
       return;
     }
 
-    if (!content) {
+    if (!stripHtml(content)) {
       notifyError("Vui lòng nhập nội dung bài viết.");
+
       return;
     }
 
@@ -767,6 +554,7 @@ const AdminBlogManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         blogPosts: (settings.blogPosts || []).filter(
           (item) => String(item.id) !== String(confirmDelete.id)
         ),
@@ -786,21 +574,35 @@ const AdminBlogManagementPage = () => {
 
   const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
 
+  const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
+
+  const blogStyle = getBlogStyle(settings);
+
   const toolbar = [
     ["bold", <FiBold />, "In đậm"],
+
     ["italic", <FiItalic />, "In nghiêng"],
+
     ["underline", <FiUnderline />, "Gạch chân"],
+
     ["justifyLeft", <FiAlignLeft />, "Căn trái"],
+
     ["justifyCenter", <FiAlignCenter />, "Căn giữa"],
+
     ["justifyRight", <FiAlignRight />, "Căn phải"],
+
     ["justifyFull", <FiAlignJustify />, "Căn đều"],
+
     ["insertUnorderedList", <FiList />, "Danh sách"],
+
     [
       "insertOrderedList",
       <span className="text-xs font-bold">1.</span>,
       "Danh sách số",
     ],
+
     ["undo", <span className="text-lg leading-none">↶</span>, "Hoàn tác"],
+
     ["redo", <span className="text-lg leading-none">↷</span>, "Làm lại"],
   ];
 
@@ -857,7 +659,8 @@ const AdminBlogManagementPage = () => {
                 </p>
 
                 <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
-                  {stripHtml(post.content) || "Nội dung đang được cập nhật."}
+                  {stripHtml(normalizeBlogPostContent(post.content)) ||
+                    "Nội dung đang được cập nhật."}
                 </p>
 
                 <div className="mt-4 flex gap-2">
@@ -1002,9 +805,8 @@ const AdminBlogManagementPage = () => {
                   </label>
 
                   <p className="mb-2 text-xs text-gray-500">
-                    Nhập nội dung bài viết tại phần đầu. Thông tin Flower Shop
-                    mặc định ở cuối bài được đồng bộ tự động và không cần nhập
-                    lại.
+                    Nhập nội dung bài viết tại phần dưới. Thông tin Shop mặc
+                    định được quản lý riêng và tự động hiển thị ở cuối bài.
                   </p>
 
                   <div className="overflow-hidden rounded-xl border border-gray-100">
@@ -1038,8 +840,11 @@ const AdminBlogManagementPage = () => {
                         aria-label="Định dạng đoạn văn"
                       >
                         <option value="">Đoạn văn</option>
+
                         <option value="h2">Tiêu đề H2</option>
+
                         <option value="h3">Tiêu đề H3</option>
+
                         <option value="p">Đoạn văn</option>
                       </select>
 
@@ -1097,13 +902,50 @@ const AdminBlogManagementPage = () => {
                       ref={editorRef}
                       contentEditable
                       suppressContentEditableWarning
+                      role="textbox"
+                      aria-label="Nội dung bài viết"
                       onInput={handleEditorInput}
                       onMouseUp={handleEditorSelection}
                       onKeyUp={handleEditorSelection}
                       onSelect={handleEditorSelection}
-                      className="blog-editor-content min-h-[320px] w-full overflow-x-hidden p-5 text-sm leading-7 text-gray-700 outline-none [&_a]:font-semibold [&_a]:text-pink-600 [&_div]:w-full [&_h2]:w-full [&_h3]:w-full [&_img]:mx-auto [&_img]:my-3 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[80%] [&_img]:rounded-lg [&_img]:border-0 [&_img]:shadow-none [&_p]:w-full"
+                      className="min-h-[320px] w-full overflow-x-auto p-5 text-sm leading-7 text-gray-700 outline-none [&_a]:font-semibold [&_a]:text-pink-600 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_img]:mx-auto [&_img]:my-3 [&_img]:block [&_img]:max-h-[360px] [&_img]:max-w-[80%] [&_img]:rounded-lg [&_p]:my-1.5"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800">
+                        Thông tin Shop mặc định
+                      </h3>
+
+                      <p className="mt-1 text-xs text-gray-500">
+                        Đây là nội dung tự động đồng bộ từ Quản lý nội dung
+                        website. Không chỉnh sửa tại đây.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className="blog-default-shop-preview overflow-hidden"
+                    style={{
+                      backgroundColor: blogStyle.backgroundColor,
+                      borderColor: blogStyle.borderColor,
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      borderRadius: `${blogStyle.borderRadius}px`,
+                      padding: `${blogStyle.padding}px`,
+                    }}
+                  >
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: defaultShopInfo,
+                      }}
                       style={{
-                        whiteSpace: "pre-wrap",
+                        color: blogStyle.textColor,
+                        fontSize: `${blogStyle.bodyFontSize}px`,
+                        lineHeight: blogStyle.lineHeight,
                       }}
                     />
                   </div>

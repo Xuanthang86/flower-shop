@@ -5,9 +5,11 @@ import { Link, useParams } from "react-router-dom";
 import { FiArrowLeft, FiArrowRight, FiCalendar, FiClock } from "react-icons/fi";
 
 import {
+  buildDefaultBlogShopInfoHtml,
+  composeBlogPostContent,
+  normalizeBlogPostContent,
   readSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
-  DEFAULT_BLOG_SHOP_INFO_HTML,
 } from "@/services/siteSettings";
 
 const stripHtml = (html = "") =>
@@ -27,139 +29,8 @@ const getFirstImageFromHtml = (html = "") => {
 const getCoverImage = (post) =>
   post?.image || getFirstImageFromHtml(post?.content);
 
-const escapeHtml = (value = "") =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
-const buildDefaultShopInfo = (settings) => {
-  const template =
-    String(settings?.blog?.defaultShopInfoHtml || "").trim() ||
-    DEFAULT_BLOG_SHOP_INFO_HTML;
-
-  const branding = settings?.branding || {};
-  const contact = settings?.contact || {};
-
-  return template
-    .replace(
-      /\{\{siteName\}\}/g,
-      escapeHtml(branding.siteName || "Flower Shop")
-    )
-    .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
-    .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
-    .replace(/\{\{phone\}\}/g, escapeHtml(contact.phone || "Đang cập nhật"))
-    .replace(/\{\{email\}\}/g, escapeHtml(contact.email || "Đang cập nhật"))
-    .replace(
-      /\{\{workingHours\}\}/g,
-      escapeHtml(contact.workingHours || "Đang cập nhật")
-    );
-};
-
-const compactDefaultShopInfoHtml = (html) => {
-  const value = String(html || "").trim();
-
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const document = parser.parseFromString(
-      `<div id="flower-shop-default-display">${value}</div>`,
-      "text/html"
-    );
-
-    const root = document.getElementById("flower-shop-default-display");
-
-    const defaultBlock = root?.querySelector(
-      '[data-flower-shop-default-info="true"]'
-    );
-
-    if (!root || !defaultBlock) {
-      return value;
-    }
-
-    defaultBlock.style.margin = "8px 0 0";
-    defaultBlock.style.padding = "14px";
-
-    const header = defaultBlock.querySelector("header");
-
-    if (header) {
-      header.style.margin = "0 0 8px";
-      header.style.padding = "0 0 7px";
-    }
-
-    defaultBlock.querySelectorAll("header ~ div > p").forEach((paragraph) => {
-      paragraph.style.margin = "0 0 7px";
-    });
-
-    defaultBlock
-      .querySelectorAll(":scope > section")
-      .forEach((section, index, sections) => {
-        section.style.margin = index === sections.length - 1 ? "0" : "0 0 8px";
-
-        section.style.padding = "9px 11px";
-      });
-
-    defaultBlock.querySelectorAll("h2").forEach((heading) => {
-      heading.style.margin = "0";
-      heading.style.fontSize = "19px";
-      heading.style.lineHeight = "25px";
-    });
-
-    defaultBlock.querySelectorAll("h3").forEach((heading) => {
-      heading.style.margin = "0 0 5px";
-      heading.style.fontSize = "15px";
-      heading.style.lineHeight = "20px";
-    });
-
-    defaultBlock.querySelectorAll("section p").forEach((paragraph) => {
-      paragraph.style.margin = "0 0 5px";
-    });
-
-    return defaultBlock.outerHTML;
-  } catch {
-    return value;
-  }
-};
-
-const removeDefaultShopInfo = (content = "") => {
-  const value = String(content || "").trim();
-
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const document = parser.parseFromString(
-      `<div id="flower-shop-content">${value}</div>`,
-      "text/html"
-    );
-
-    const root = document.getElementById("flower-shop-content");
-
-    if (!root) {
-      return value;
-    }
-
-    root
-      .querySelectorAll('[data-flower-shop-default-info="true"]')
-      .forEach((element) => element.remove());
-
-    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
-  } catch {
-    return value;
-  }
-};
-
 const normalizeBlogContent = (content = "") => {
-  const value = removeDefaultShopInfo(content);
+  const value = normalizeBlogPostContent(content);
 
   if (!value) {
     return "";
@@ -189,7 +60,9 @@ const BlogPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   useEffect(() => {
-    const refresh = () => setSettings(readSiteSettings());
+    const refresh = () => {
+      setSettings(readSiteSettings());
+    };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
 
@@ -210,8 +83,14 @@ const BlogPage = () => {
   );
 
   const renderedDefaultTemplate = useMemo(
-    () => compactDefaultShopInfoHtml(buildDefaultShopInfo(settings)),
+    () => buildDefaultBlogShopInfoHtml(settings),
     [settings]
+  );
+
+  const composedCurrentContent = useMemo(
+    () =>
+      currentPost ? composeBlogPostContent(currentPost.content, settings) : "",
+    [currentPost, settings]
   );
 
   useEffect(() => {
@@ -237,8 +116,10 @@ const BlogPage = () => {
       }
 
       description.content =
-        stripHtml(currentPost.content).slice(0, 155) ||
-        `Bài viết từ ${siteName}.`;
+        stripHtml(normalizeBlogPostContent(currentPost.content)).slice(
+          0,
+          155
+        ) || `Bài viết từ ${siteName}.`;
 
       let canonical = document.querySelector('link[rel="canonical"]');
 
@@ -256,31 +137,50 @@ const BlogPage = () => {
 
       const schema = {
         "@context": "https://schema.org",
+
         "@type": "BlogPosting",
+
         headline: currentPost.title,
-        description: stripHtml(currentPost.content).slice(0, 300),
+
+        description: stripHtml(
+          normalizeBlogPostContent(currentPost.content)
+        ).slice(0, 300),
+
         url: canonical.href,
+
         mainEntityOfPage: {
           "@type": "WebPage",
+
           "@id": canonical.href,
         },
+
         datePublished: currentPost.date
           ? `${currentPost.date}T${currentPost.time || "08:00"}:00`
           : undefined,
+
         dateModified: currentPost.updatedAt || undefined,
+
         image: coverImage ? [coverImage] : undefined,
+
         author: {
           "@type": "Organization",
+
           name: siteName,
+
           url: window.location.origin,
         },
+
         publisher: {
           "@type": "Organization",
+
           name: siteName,
+
           url: window.location.origin,
+
           logo: settings.branding?.logoImage
             ? {
                 "@type": "ImageObject",
+
                 url: settings.branding.logoImage,
               }
             : undefined,
@@ -336,6 +236,20 @@ const BlogPage = () => {
 
     const articleContent = normalizeBlogContent(currentPost.content);
 
+    const blogStyle = settings.blog?.defaultShopInfoStyle || {
+      backgroundColor: "#fff7fb",
+      borderColor: "#fce7f3",
+      accentColor: "#db2777",
+      headingColor: "#1f2937",
+      textColor: "#4b5563",
+      borderRadius: 14,
+      padding: 14,
+      headingFontSize: 19,
+      subHeadingFontSize: 15,
+      bodyFontSize: 14,
+      lineHeight: 1.5,
+    };
+
     return (
       <section className="min-h-screen bg-gray-50 py-8 md:py-10">
         <article className="mx-auto max-w-4xl px-4">
@@ -365,12 +279,14 @@ const BlogPage = () => {
                 {currentPost.date && (
                   <span className="inline-flex items-center gap-2">
                     <FiCalendar size={15} />
+
                     {currentPost.date}
                   </span>
                 )}
 
                 <span className="inline-flex items-center gap-2">
                   <FiClock size={15} />
+
                   {currentPost.time || "08:00"}
                 </span>
               </div>
@@ -389,71 +305,125 @@ const BlogPage = () => {
                   }
 
                   .blog-detail-content > p {
-                    margin: 0 0 .65rem;
+                    margin: .4rem 0 !important;
+                  }
+
+                  .blog-detail-content > p:first-child {
+                    margin-top: .65rem !important;
                   }
 
                   .blog-detail-content > p:last-child {
-                    margin-bottom: 0;
+                    margin-bottom: 0 !important;
                   }
 
                   .blog-detail-content h2 {
-                    margin: 1rem 0 .4rem;
-                    font-size: 1.45rem;
+                    margin: .9rem 0 .35rem !important;
+                    font-size: 1.4rem;
                     line-height: 1.3;
                     font-weight: 700;
                     color: #111827;
                   }
 
                   .blog-detail-content h3 {
-                    margin: .8rem 0 .35rem;
-                    font-size: 1.15rem;
-                    line-height: 1.35;
+                    margin: .7rem 0 .3rem !important;
+                    font-size: 1.12rem;
+                    line-height: 1.3;
                     font-weight: 700;
                     color: #1f2937;
                   }
 
                   .blog-detail-content ul,
                   .blog-detail-content ol {
-                    margin: .5rem 0 .65rem;
-                    padding-left: 1.35rem;
+                    margin: .35rem 0 .5rem !important;
+                    padding-left: 1.3rem;
                   }
 
                   .blog-detail-content li {
-                    margin-bottom: .2rem;
+                    margin: 0 0 .12rem !important;
                   }
 
                   .blog-detail-content blockquote {
-                    margin: .75rem 0;
-                    padding: .7rem .9rem;
+                    margin: .55rem 0 !important;
+                    padding: .6rem .8rem;
                     border-left: 4px solid #db2777;
                     background: #fdf2f8;
-                    border-radius: .65rem;
+                    border-radius: .6rem;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"] {
-                    margin: 8px 0 0 !important;
-                    padding: 14px !important;
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    margin: .85rem 0 0 !important;
+                    padding: ${blogStyle.padding}px !important;
+                    border: 1px solid ${blogStyle.borderColor};
+                    border-radius: ${blogStyle.borderRadius}px;
+                    background: ${blogStyle.backgroundColor};
+                    color: ${blogStyle.textColor};
+                    font-size: ${blogStyle.bodyFontSize}px;
+                    line-height: ${blogStyle.lineHeight};
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     header {
-                    margin: 0 0 8px !important;
-                    padding: 0 0 7px !important;
+                    margin: 0 0 .55rem !important;
+                    padding: 0 0 .45rem !important;
+                    border-bottom: 1px solid ${blogStyle.borderColor};
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
-                    p {
-                    margin: 0 0 5px !important;
+                    header p:first-child {
+                    margin: 0 0 .2rem !important;
+                    color: ${blogStyle.accentColor};
+                    font-size: 11px !important;
+                    line-height: 1.35 !important;
+                    font-weight: 700;
+                    letter-spacing: .08em;
+                    text-transform: uppercase;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    header h2 {
+                    margin: 0 !important;
+                    color: ${blogStyle.headingColor};
+                    font-size: ${blogStyle.headingFontSize}px !important;
+                    line-height: 1.25 !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    header p:last-child {
+                    margin: .2rem 0 0 !important;
+                    color: ${blogStyle.textColor};
+                    font-size: 12px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    > div {
+                    color: ${blogStyle.textColor};
+                    font-size: ${blogStyle.bodyFontSize}px;
+                    line-height: ${blogStyle.lineHeight};
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    > div > p {
+                    margin: 0 0 .45rem !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     section {
-                    margin: 0 0 8px !important;
-                    padding: 9px 11px !important;
+                    margin: 0 0 .45rem !important;
+                    padding: .55rem .7rem !important;
+                    border: 1px solid #f3f4f6;
+                    border-radius: .65rem;
+                    background: #fff;
                   }
 
                   .blog-detail-content
@@ -464,18 +434,32 @@ const BlogPage = () => {
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
-                    h2 {
-                    margin: 0 !important;
-                    font-size: 19px !important;
-                    line-height: 25px !important;
+                    section h3 {
+                    margin: 0 0 .25rem !important;
+                    color: ${blogStyle.headingColor};
+                    font-size: ${blogStyle.subHeadingFontSize}px !important;
+                    line-height: 1.3 !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
-                    h3 {
-                    margin: 0 0 5px !important;
-                    font-size: 15px !important;
-                    line-height: 20px !important;
+                    section p {
+                    margin: 0 0 .25rem !important;
+                    font-size: ${blogStyle.bodyFontSize}px !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    section p:last-child {
+                    margin-bottom: 0 !important;
+                  }
+
+                  .blog-detail-content
+                    [data-flower-shop-default-info="true"]
+                    a {
+                    color: ${blogStyle.accentColor};
+                    font-weight: 600;
+                    text-decoration: none;
                   }
 
                   .blog-detail-content img {
@@ -484,7 +468,7 @@ const BlogPage = () => {
                     max-width: 66.666667%;
                     max-height: 420px;
                     height: auto;
-                    margin: .75rem auto;
+                    margin: .65rem auto;
                     border: 0;
                     border-radius: .75rem;
                     object-fit: contain;
@@ -509,14 +493,14 @@ const BlogPage = () => {
 
                   .blog-detail-content table {
                     width: 100%;
-                    margin: .75rem 0;
+                    margin: .65rem 0;
                     border-collapse: collapse;
                   }
 
                   .blog-detail-content th,
                   .blog-detail-content td {
                     border: 1px solid #e5e7eb;
-                    padding: .5rem;
+                    padding: .45rem;
                     text-align: left;
                   }
 
@@ -537,10 +521,12 @@ const BlogPage = () => {
               <div
                 className="blog-detail-content mt-4"
                 dangerouslySetInnerHTML={{
-                  __html: `
-                    ${articleContent}
-                    ${renderedDefaultTemplate}
-                  `,
+                  __html:
+                    composedCurrentContent ||
+                    `
+                      ${articleContent}
+                      ${renderedDefaultTemplate}
+                    `,
                 }}
               />
             </div>
@@ -573,7 +559,7 @@ const BlogPage = () => {
               const coverImage = getCoverImage(post);
 
               const excerpt =
-                stripHtml(post.content) ||
+                stripHtml(normalizeBlogPostContent(post.content)) ||
                 "Khám phá bài viết mới từ Flower Shop.";
 
               return (

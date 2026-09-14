@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { FiSave, FiRotateCcw } from "react-icons/fi";
+import { FiRotateCcw, FiSave } from "react-icons/fi";
 
 import { useTheme } from "@/context/ThemeProvider";
 
@@ -9,6 +9,7 @@ import {
   saveSiteSettings,
   resetSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
+  DEFAULT_BLOG_SHOP_INFO_STYLE,
 } from "@/services/siteSettings";
 
 import { useNotification } from "@/context/NotificationProvider";
@@ -73,9 +74,7 @@ const AdminAppearancePage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
-
       robots.name = "robots";
-
       document.head.appendChild(robots);
     }
 
@@ -131,6 +130,23 @@ const AdminAppearancePage = () => {
     }));
   };
 
+  const updateBlogStyle = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+
+      blog: {
+        ...(current.blog || {}),
+
+        defaultShopInfoStyle: {
+          ...(current.blog?.defaultShopInfoStyle ||
+            DEFAULT_BLOG_SHOP_INFO_STYLE),
+
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   const updateContactStyle = (field, value) => {
     setSettings((current) => ({
       ...current,
@@ -182,6 +198,9 @@ const AdminAppearancePage = () => {
     const contactSectionRadius = Number(
       settings.contact?.style?.sectionRadius || 16
     );
+
+    const blogStyle =
+      settings.blog?.defaultShopInfoStyle || DEFAULT_BLOG_SHOP_INFO_STYLE;
 
     if (baseFontSize < 12 || baseFontSize > 24) {
       notifyError("Cỡ chữ cơ bản phải từ 12px đến 24px.");
@@ -284,6 +303,8 @@ const AdminAppearancePage = () => {
           columns: blogColumns,
 
           borderRadius: blogRadius,
+
+          defaultShopInfoStyle: blogStyle,
         },
 
         contact: {
@@ -303,7 +324,7 @@ const AdminAppearancePage = () => {
 
       setSettings(saved);
 
-      notifySuccess("Đã lưu toàn bộ thiết lập kỹ thuật giao diện.");
+      notifySuccess("Đã lưu toàn bộ thiết lập giao diện.");
     } catch (saveError) {
       notifyError(saveError?.message || "Không thể lưu cấu hình giao diện.");
     }
@@ -337,10 +358,10 @@ const AdminAppearancePage = () => {
   };
 
   const hero = settings.hero || {};
-
   const blog = settings.blog || {};
-
   const contactStyle = settings.contact?.style || {};
+
+  const blogStyle = blog.defaultShopInfoStyle || DEFAULT_BLOG_SHOP_INFO_STYLE;
 
   return (
     <main className="min-h-screen bg-gray-50 py-8">
@@ -415,7 +436,6 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-
                       fontFamily: event.target.value,
                     }))
                   }
@@ -442,7 +462,6 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-
                       baseFontSize: event.target.value,
                     }))
                   }
@@ -463,7 +482,6 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-
                       headerFontSize: event.target.value,
                     }))
                   }
@@ -484,7 +502,6 @@ const AdminAppearancePage = () => {
                   onChange={(event) =>
                     setDraftTheme((current) => ({
                       ...current,
-
                       borderRadius: event.target.value,
                     }))
                   }
@@ -693,6 +710,204 @@ const AdminAppearancePage = () => {
               sung được quản lý riêng tại{" "}
               <strong>Quản lý thông tin liên hệ</strong>.
             </p>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold">
+              5. Giao diện Thông tin Shop mặc định trong bài viết
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-500">
+              Phần này chỉ điều chỉnh giao diện. Nội dung được chỉnh sửa tại
+              Quản lý nội dung website.
+            </p>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              {[
+                ["backgroundColor", "Màu nền", "#FFF7FB"],
+                ["borderColor", "Màu viền", "#FCE7F3"],
+                ["accentColor", "Màu nhấn", "#DB2777"],
+                ["headingColor", "Màu tiêu đề", "#1F2937"],
+                ["textColor", "Màu nội dung", "#4B5563"],
+              ].map(([field, label, fallback]) => (
+                <div key={field}>
+                  <label className="mb-2 block text-sm font-semibold">
+                    {label}
+                  </label>
+
+                  <div className="flex gap-3">
+                    <input
+                      type="color"
+                      value={
+                        isHex(blogStyle[field]) ? blogStyle[field] : fallback
+                      }
+                      onChange={(event) =>
+                        updateBlogStyle(field, event.target.value)
+                      }
+                      className="h-12 w-14 cursor-pointer rounded-lg border p-1"
+                    />
+
+                    <input
+                      type="text"
+                      value={blogStyle[field] || ""}
+                      onChange={(event) =>
+                        updateBlogStyle(field, event.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Bo góc
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="32"
+                  value={blogStyle.borderRadius}
+                  onChange={(event) =>
+                    updateBlogStyle("borderRadius", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Khoảng cách bên trong
+                </label>
+
+                <input
+                  type="number"
+                  min="8"
+                  max="32"
+                  value={blogStyle.padding}
+                  onChange={(event) =>
+                    updateBlogStyle("padding", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Cỡ tiêu đề chính
+                </label>
+
+                <input
+                  type="number"
+                  min="14"
+                  max="32"
+                  value={blogStyle.headingFontSize}
+                  onChange={(event) =>
+                    updateBlogStyle(
+                      "headingFontSize",
+                      Number(event.target.value)
+                    )
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Cỡ tiêu đề phụ
+                </label>
+
+                <input
+                  type="number"
+                  min="12"
+                  max="24"
+                  value={blogStyle.subHeadingFontSize}
+                  onChange={(event) =>
+                    updateBlogStyle(
+                      "subHeadingFontSize",
+                      Number(event.target.value)
+                    )
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Cỡ chữ nội dung
+                </label>
+
+                <input
+                  type="number"
+                  min="12"
+                  max="20"
+                  value={blogStyle.bodyFontSize}
+                  onChange={(event) =>
+                    updateBlogStyle("bodyFontSize", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Line-height
+                </label>
+
+                <input
+                  type="number"
+                  min="1.2"
+                  max="2"
+                  step="0.1"
+                  value={blogStyle.lineHeight}
+                  onChange={(event) =>
+                    updateBlogStyle("lineHeight", Number(event.target.value))
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div
+              className="mt-6 overflow-hidden rounded-xl border p-4"
+              style={{
+                backgroundColor: blogStyle.backgroundColor,
+                borderColor: blogStyle.borderColor,
+                borderRadius: `${blogStyle.borderRadius}px`,
+              }}
+            >
+              <p
+                className="font-bold"
+                style={{
+                  color: blogStyle.accentColor,
+                }}
+              >
+                Xem trước giao diện
+              </p>
+
+              <h3
+                className="mt-1 font-bold"
+                style={{
+                  color: blogStyle.headingColor,
+                  fontSize: `${blogStyle.headingFontSize}px`,
+                }}
+              >
+                Thông tin Shop
+              </h3>
+
+              <p
+                className="mt-2"
+                style={{
+                  color: blogStyle.textColor,
+                  fontSize: `${blogStyle.bodyFontSize}px`,
+                  lineHeight: blogStyle.lineHeight,
+                }}
+              >
+                Giao diện này được áp dụng tự động cho phần thông tin Shop mặc
+                định ở cuối bài viết.
+              </p>
+            </div>
           </section>
 
           <div className="flex flex-col justify-end gap-3 sm:flex-row">
