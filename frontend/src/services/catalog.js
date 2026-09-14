@@ -152,20 +152,6 @@ const readJson = (key) => {
   }
 };
 
-const writeJson = (key, value) => {
-  try {
-    const serialized = JSON.stringify(value);
-
-    localStorage.setItem(key, serialized);
-
-    return true;
-  } catch (error) {
-    console.error(`Không thể lưu dữ liệu ${key}:`, error);
-
-    return false;
-  }
-};
-
 const isQuotaExceededError = (error) => {
   if (!error) {
     return false;
@@ -181,7 +167,10 @@ const isQuotaExceededError = (error) => {
     Number(error.code) === 22 ||
     Number(error.code) === 1014 ||
     message.includes("quota") ||
-    message.includes("storage")
+    message.includes("storage") ||
+    message.includes("exceeded") ||
+    message.includes("full") ||
+    message.includes("maximum size")
   );
 };
 
@@ -206,11 +195,12 @@ const getStorageWriteErrorMessage = (error, entityLabel = "dữ liệu") => {
     );
   }
 
+  const message = String(error?.message || "").toLowerCase();
+
   if (
     name === "typeerror" ||
-    String(error?.message || "")
-      .toLowerCase()
-      .includes("circular")
+    message.includes("circular") ||
+    message.includes("cyclic")
   ) {
     return (
       `Không thể lưu ${entityLabel} vì dữ liệu chứa cấu trúc ` +
@@ -224,24 +214,55 @@ const getStorageWriteErrorMessage = (error, entityLabel = "dữ liệu") => {
   );
 };
 
-const writeJsonOrThrow = (key, value, entityLabel) => {
+const createStorageWriteError = (error, entityLabel) => {
+  const wrappedError = new Error(
+    getStorageWriteErrorMessage(error, entityLabel)
+  );
+
+  /*
+   * Gắn lỗi gốc một cách tương thích với các môi trường trình duyệt
+   * không hỗ trợ đầy đủ Error(message, { cause }).
+   */
+  wrappedError.cause = error;
+
+  return wrappedError;
+};
+
+const writeJson = (key, value, entityLabel = "dữ liệu") => {
   let serialized;
 
   try {
     serialized = JSON.stringify(value);
   } catch (error) {
-    throw new Error(getStorageWriteErrorMessage(error, entityLabel));
+    console.error(`Không thể chuyển dữ liệu ${key} thành JSON:`, error);
+
+    throw createStorageWriteError(error, entityLabel);
   }
 
   try {
     localStorage.setItem(key, serialized);
+
+    return true;
   } catch (error) {
     console.error(`Không thể lưu dữ liệu ${key}:`, error);
 
-    throw new Error(getStorageWriteErrorMessage(error, entityLabel));
+    throw createStorageWriteError(error, entityLabel);
   }
+};
 
-  return true;
+const writeJsonSafely = (key, value, entityLabel = "dữ liệu") => {
+  try {
+    return writeJson(key, value, entityLabel);
+  } catch (error) {
+    /*
+     * Việc ghi cache/seed trong quá trình đọc không được làm hỏng
+     * toàn bộ giao diện. Các thao tác save chính thức vẫn dùng
+     * writeJson và sẽ throw lỗi để UI hiển thị chính xác.
+     */
+    console.error(`Không thể ghi dữ liệu phụ trợ ${key}:`, error);
+
+    return false;
+  }
 };
 
 export const readProducts = () => {
@@ -250,7 +271,7 @@ export const readProducts = () => {
   if (!Array.isArray(stored)) {
     const seeded = normalizeProducts(defaultProducts);
 
-    writeJson(PRODUCT_STORAGE_KEY, seeded);
+    writeJsonSafely(PRODUCT_STORAGE_KEY, seeded, "danh sách sản phẩm mặc định");
 
     return seeded;
   }
@@ -258,9 +279,15 @@ export const readProducts = () => {
   const normalized = normalizeProducts(stored, defaultProducts);
 
   /*
-  Chỉ ghi lại khi normalize thành công.
-  */
-  writeJson(PRODUCT_STORAGE_KEY, normalized);
+   * Chỉ cố gắng ghi lại dữ liệu sau khi normalize thành công.
+   * Nếu localStorage đã đầy, vẫn trả về dữ liệu đã đọc được thay vì
+   * làm trang bị blank page hoặc crash trong quá trình khởi tạo.
+   */
+  writeJsonSafely(
+    PRODUCT_STORAGE_KEY,
+    normalized,
+    "danh sách sản phẩm đã chuẩn hóa"
+  );
 
   return normalized;
 };
@@ -268,7 +295,7 @@ export const readProducts = () => {
 export const saveProducts = (products) => {
   const normalized = normalizeProducts(products, defaultProducts);
 
-  writeJsonOrThrow(PRODUCT_STORAGE_KEY, normalized, "danh sách sản phẩm");
+  writeJson(PRODUCT_STORAGE_KEY, normalized, "danh sách sản phẩm");
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -330,7 +357,7 @@ export const readCategories = () => {
 
   const seeded = normalizeCategories(DEFAULT_PRODUCT_CATEGORIES);
 
-  writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, seeded);
+  writeJsonSafely(PRODUCT_CATEGORIES_STORAGE_KEY, seeded, "danh mục mặc định");
 
   return seeded;
 };
@@ -338,7 +365,7 @@ export const readCategories = () => {
 export const saveCategories = (categories) => {
   const normalized = normalizeCategories(categories);
 
-  writeJsonOrThrow(PRODUCT_CATEGORIES_STORAGE_KEY, normalized, "danh mục");
+  writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, normalized, "danh mục");
 
   window.dispatchEvent(new Event(CATEGORY_UPDATED_EVENT));
 
