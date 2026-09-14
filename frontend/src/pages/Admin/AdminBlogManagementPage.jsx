@@ -91,12 +91,6 @@ const buildDefaultShopInfo = (settings) => {
     );
 };
 
-/*
- * Giảm khoảng cách của template mặc định nhưng vẫn sử dụng
- * template trung tâm từ siteSettings.
- *
- * Không thay đổi nội dung tùy chỉnh của quản trị viên.
- */
 const compactDefaultShopInfoHtml = (html) => {
   const value = String(html || "").trim();
 
@@ -123,46 +117,41 @@ const compactDefaultShopInfoHtml = (html) => {
     }
 
     defaultBlock.style.margin = "8px 0 0";
-    defaultBlock.style.padding = "16px";
+    defaultBlock.style.padding = "14px";
 
     const header = defaultBlock.querySelector("header");
 
     if (header) {
-      header.style.margin = "0 0 10px";
-      header.style.padding = "0 0 8px";
+      header.style.margin = "0 0 8px";
+      header.style.padding = "0 0 7px";
     }
 
-    const bodyParagraphs = defaultBlock.querySelectorAll("header ~ div > p");
-
-    bodyParagraphs.forEach((paragraph) => {
-      paragraph.style.margin = "0 0 8px";
+    defaultBlock.querySelectorAll("header ~ div > p").forEach((paragraph) => {
+      paragraph.style.margin = "0 0 7px";
     });
 
-    const innerSections = defaultBlock.querySelectorAll(":scope > section");
+    defaultBlock
+      .querySelectorAll(":scope > section")
+      .forEach((section, index, sections) => {
+        section.style.margin = index === sections.length - 1 ? "0" : "0 0 8px";
 
-    innerSections.forEach((section, index) => {
-      section.style.margin =
-        index === innerSections.length - 1 ? "0" : "0 0 10px";
-
-      section.style.padding = "11px 13px";
-    });
+        section.style.padding = "9px 11px";
+      });
 
     defaultBlock.querySelectorAll("h2").forEach((heading) => {
       heading.style.margin = "0";
-      heading.style.fontSize = "21px";
-      heading.style.lineHeight = "28px";
+      heading.style.fontSize = "19px";
+      heading.style.lineHeight = "25px";
     });
 
     defaultBlock.querySelectorAll("h3").forEach((heading) => {
-      heading.style.margin = "0 0 6px";
+      heading.style.margin = "0 0 5px";
       heading.style.fontSize = "15px";
-      heading.style.lineHeight = "22px";
+      heading.style.lineHeight = "20px";
     });
 
     defaultBlock.querySelectorAll("section p").forEach((paragraph) => {
-      if (!paragraph.style.margin) {
-        paragraph.style.margin = "0 0 6px";
-      }
+      paragraph.style.margin = "0 0 5px";
     });
 
     return defaultBlock.outerHTML;
@@ -173,6 +162,96 @@ const compactDefaultShopInfoHtml = (html) => {
 
 const buildRenderedDefaultTemplate = (settings) =>
   compactDefaultShopInfoHtml(buildDefaultShopInfo(settings));
+
+const hasDefaultShopInfo = (content = "") =>
+  String(content || "").includes('data-flower-shop-default-info="true"');
+
+const removeDefaultShopInfo = (content = "") => {
+  const value = String(content || "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="flower-shop-content-root">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("flower-shop-content-root");
+
+    if (!root) {
+      return value;
+    }
+
+    root
+      .querySelectorAll('[data-flower-shop-default-info="true"]')
+      .forEach((element) => element.remove());
+
+    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
+  } catch {
+    return value;
+  }
+};
+
+const isLegacyDefaultBlogShopInfo = (value) => {
+  const normalized = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return true;
+  }
+
+  const signals = [
+    "<h2>Về Flower Shop</h2>",
+    "Thông tin liên hệ",
+    "Danh mục sản phẩm",
+    "/contact",
+  ];
+
+  const matchedSignals = signals.filter((signal) =>
+    normalized.includes(signal)
+  ).length;
+
+  return (
+    matchedSignals >= 3 &&
+    !normalized.includes('data-flower-shop-default-info="true"')
+  );
+};
+
+const normalizeStoredContent = (content = "") => {
+  const value = String(content || "").trim();
+
+  if (!value || isLegacyDefaultBlogShopInfo(value)) {
+    return "";
+  }
+
+  return removeDefaultShopInfo(value);
+};
+
+const buildEditorContent = (content, settings) => {
+  const cleanedContent = normalizeStoredContent(content);
+
+  const defaultInfo = buildRenderedDefaultTemplate(settings);
+
+  if (!cleanedContent) {
+    return `
+      <p class="blog-editor-writing-area">
+        <br />
+      </p>
+      ${defaultInfo}
+    `;
+  }
+
+  return `
+    ${cleanedContent}
+    ${defaultInfo}
+  `;
+};
 
 const normalizeEditorContent = (content = "") => {
   const value = String(content || "");
@@ -207,133 +286,6 @@ const normalizeEditorContent = (content = "") => {
   }
 };
 
-const hasDefaultShopInfo = (content = "") =>
-  String(content || "").includes('data-flower-shop-default-info="true"');
-
-const buildEditorContentWithDefault = (content, settings) => {
-  const current = String(content || "").trim();
-
-  if (hasDefaultShopInfo(current)) {
-    return normalizeEditorContent(current);
-  }
-
-  const defaultInfo = buildRenderedDefaultTemplate(settings);
-
-  if (!current) {
-    return defaultInfo;
-  }
-
-  return `
-    ${current}
-    <p><br /></p>
-    ${defaultInfo}
-  `;
-};
-
-const isLegacyDefaultBlogShopInfo = (value) => {
-  const normalized = String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!normalized) {
-    return true;
-  }
-
-  const legacySignals = [
-    "<h2>Về Flower Shop</h2>",
-    "Thông tin liên hệ",
-    "Danh mục sản phẩm",
-    "/contact",
-  ];
-
-  const matchedSignals = legacySignals.filter((signal) =>
-    normalized.includes(signal)
-  ).length;
-
-  return (
-    matchedSignals >= 3 &&
-    !normalized.includes('data-flower-shop-default-info="true"')
-  );
-};
-
-/*
- * Đồng bộ default block:
- *
- * 1. Bài viết có default block -> thay block cũ bằng block mới.
- * 2. Bài viết là template cũ -> thay toàn bộ content.
- * 3. Bài viết có nội dung riêng nhưng chưa có default block
- *    -> giữ nguyên nội dung riêng và bổ sung default block.
- */
-const migrateBlogPostContent = (content, renderedDefaultTemplate) => {
-  const value = String(content || "").trim();
-
-  if (!value) {
-    return renderedDefaultTemplate;
-  }
-
-  if (isLegacyDefaultBlogShopInfo(value)) {
-    return renderedDefaultTemplate;
-  }
-
-  try {
-    const parser = new DOMParser();
-
-    const parsedDocument = parser.parseFromString(
-      `<div id="flower-shop-migration-root">${value}</div>`,
-      "text/html"
-    );
-
-    const root = parsedDocument.getElementById("flower-shop-migration-root");
-
-    const defaultBlock = root?.querySelector(
-      '[data-flower-shop-default-info="true"]'
-    );
-
-    if (root && defaultBlock) {
-      defaultBlock.outerHTML = renderedDefaultTemplate;
-
-      return root.innerHTML;
-    }
-  } catch {
-    // fallback bên dưới
-  }
-
-  return `
-    ${value}
-    <p><br /></p>
-    ${renderedDefaultTemplate}
-  `;
-};
-
-const migrateBlogPosts = (posts, renderedDefaultTemplate) => {
-  if (!Array.isArray(posts)) {
-    return [];
-  }
-
-  return posts.map((post) => {
-    if (!post || typeof post !== "object") {
-      return post;
-    }
-
-    const content = String(post.content || "");
-
-    const migratedContent = migrateBlogPostContent(
-      content,
-      renderedDefaultTemplate
-    );
-
-    if (migratedContent === content) {
-      return post;
-    }
-
-    return {
-      ...post,
-      content: migratedContent,
-      updatedAt: new Date().toISOString(),
-    };
-  });
-};
-
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
@@ -352,8 +304,6 @@ const AdminBlogManagementPage = () => {
   const selectionRef = useRef(null);
 
   const { notifySuccess, notifyError } = useNotification();
-
-  const renderedDefaultTemplate = buildRenderedDefaultTemplate(settings);
 
   useEffect(() => {
     document.title = "Quản lý bài viết | Flower Shop";
@@ -379,68 +329,14 @@ const AdminBlogManagementPage = () => {
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  /*
-   * Đồng bộ thật dữ liệu bài viết cũ.
-   *
-   * Sau khi migrate:
-   * - saveSiteSettings lưu vào localStorage;
-   * - dispatch event;
-   * - settings được refresh;
-   * - lần sau migrate không tạo thay đổi nữa.
-   */
-  useEffect(() => {
-    const currentPosts = Array.isArray(settings.blogPosts)
-      ? settings.blogPosts
-      : [];
-
-    if (!currentPosts.length) {
-      return;
-    }
-
-    const migratedPosts = migrateBlogPosts(
-      currentPosts,
-      renderedDefaultTemplate
-    );
-
-    const hasChanged =
-      migratedPosts.length !== currentPosts.length ||
-      migratedPosts.some(
-        (post, index) => post?.content !== currentPosts[index]?.content
-      );
-
-    if (!hasChanged) {
-      return;
-    }
-
-    try {
-      const saved = saveSiteSettings({
-        ...settings,
-        blogPosts: migratedPosts,
-      });
-
-      setSettings(saved);
-    } catch (migrationError) {
-      notifyError(
-        migrationError?.message ||
-          "Không thể đồng bộ nội dung mặc định cho bài viết."
-      );
-    }
-  }, [settings, renderedDefaultTemplate, notifyError]);
-
-  /*
-   * Chỉ đồng bộ DOM sau khi editor thực sự mount.
-   * Không đọc editorRef.current bên trong functional updater.
-   */
   useEffect(() => {
     if (!editorOpen) {
       return;
@@ -452,49 +348,44 @@ const AdminBlogManagementPage = () => {
       return;
     }
 
-    const normalizedContent = editingPost
-      ? normalizeEditorContent(form.content || "")
-      : buildEditorContentWithDefault(form.content, settings);
+    const editorContent = buildEditorContent(form.content, settings);
 
-    editor.innerHTML = normalizedContent;
+    editor.innerHTML = normalizeEditorContent(editorContent);
 
-    if (!editingPost) {
-      window.requestAnimationFrame(() => {
-        const currentEditor = editorRef.current;
+    window.requestAnimationFrame(() => {
+      const currentEditor = editorRef.current;
 
-        if (!currentEditor || !currentEditor.isConnected) {
-          return;
-        }
+      if (!currentEditor || !currentEditor.isConnected) {
+        return;
+      }
 
-        const firstEditableParagraph = currentEditor.querySelector(
-          ':scope > p:not([contenteditable="false"])'
-        );
+      const editableArea = currentEditor.querySelector(
+        ".blog-editor-writing-area"
+      );
 
-        currentEditor.focus();
+      currentEditor.focus();
 
-        const selection = window.getSelection();
+      const selection = window.getSelection();
 
-        if (!selection) {
-          return;
-        }
+      if (!selection) {
+        return;
+      }
 
-        const range = document.createRange();
+      const range = document.createRange();
 
-        if (firstEditableParagraph) {
-          range.selectNodeContents(firstEditableParagraph);
+      if (editableArea) {
+        range.selectNodeContents(editableArea);
+        range.collapse(true);
+      } else {
+        range.selectNodeContents(currentEditor);
+        range.collapse(false);
+      }
 
-          range.collapse(true);
-        } else {
-          range.selectNodeContents(currentEditor);
-          range.collapse(false);
-        }
+      selection.removeAllRanges();
+      selection.addRange(range);
 
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        selectionRef.current = range.cloneRange();
-      });
-    }
+      selectionRef.current = range.cloneRange();
+    });
   }, [editorOpen, editingPost]);
 
   const openCreate = () => {
@@ -508,7 +399,7 @@ const AdminBlogManagementPage = () => {
       ...EMPTY_POST,
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
-      content: buildEditorContentWithDefault("", latestSettings),
+      content: "",
     });
 
     selectionRef.current = null;
@@ -519,10 +410,7 @@ const AdminBlogManagementPage = () => {
   const openEdit = (post) => {
     const latestSettings = readSiteSettings();
 
-    const content = migrateBlogPostContent(
-      post.content || "",
-      buildRenderedDefaultTemplate(latestSettings)
-    );
+    setSettings(latestSettings);
 
     setEditingPost(post);
 
@@ -531,7 +419,7 @@ const AdminBlogManagementPage = () => {
       date: post.date || new Date().toISOString().slice(0, 10),
       time: post.time || "08:00",
       image: post.image || "",
-      content,
+      content: normalizeStoredContent(post.content || ""),
     });
 
     selectionRef.current = null;
@@ -614,8 +502,15 @@ const AdminBlogManagementPage = () => {
 
     const range = document.createRange();
 
-    range.selectNodeContents(editor);
-    range.collapse(false);
+    const editableArea = editor.querySelector(".blog-editor-writing-area");
+
+    if (editableArea) {
+      range.selectNodeContents(editableArea);
+      range.collapse(false);
+    } else {
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
 
     selection.removeAllRanges();
     selection.addRange(range);
@@ -746,7 +641,6 @@ const AdminBlogManagementPage = () => {
 
       if (!editor || !editor.isConnected) {
         notifyError("Trình soạn thảo chưa sẵn sàng.");
-
         return;
       }
 
@@ -758,7 +652,6 @@ const AdminBlogManagementPage = () => {
 
       if (!selection || selection.rangeCount === 0) {
         notifyError("Không xác định được vị trí chèn ảnh.");
-
         return;
       }
 
@@ -766,7 +659,6 @@ const AdminBlogManagementPage = () => {
 
       if (!editor.contains(range.commonAncestorContainer)) {
         notifyError("Không xác định được vị trí chèn ảnh.");
-
         return;
       }
 
@@ -811,19 +703,15 @@ const AdminBlogManagementPage = () => {
       ? editor.innerHTML?.trim() || form.content.trim()
       : form.content.trim();
 
+    content = normalizeStoredContent(content);
+
     if (!title) {
       notifyError("Vui lòng nhập tiêu đề bài viết.");
       return;
     }
 
-    content = migrateBlogPostContent(
-      content,
-      buildRenderedDefaultTemplate(settings)
-    );
-
-    if (!content || content === "<br>" || content === "<div><br></div>") {
+    if (!content) {
       notifyError("Vui lòng nhập nội dung bài viết.");
-
       return;
     }
 
@@ -1113,6 +1001,12 @@ const AdminBlogManagementPage = () => {
                     Nội dung bài viết
                   </label>
 
+                  <p className="mb-2 text-xs text-gray-500">
+                    Nhập nội dung bài viết tại phần đầu. Thông tin Flower Shop
+                    mặc định ở cuối bài được đồng bộ tự động và không cần nhập
+                    lại.
+                  </p>
+
                   <div className="overflow-hidden rounded-xl border border-gray-100">
                     <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-gray-50 p-2">
                       {toolbar.map(([command, icon, title]) => (
@@ -1144,11 +1038,8 @@ const AdminBlogManagementPage = () => {
                         aria-label="Định dạng đoạn văn"
                       >
                         <option value="">Đoạn văn</option>
-
                         <option value="h2">Tiêu đề H2</option>
-
                         <option value="h3">Tiêu đề H3</option>
-
                         <option value="p">Đoạn văn</option>
                       </select>
 

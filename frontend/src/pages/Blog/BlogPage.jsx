@@ -7,6 +7,7 @@ import { FiArrowLeft, FiArrowRight, FiCalendar, FiClock } from "react-icons/fi";
 import {
   readSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
+  DEFAULT_BLOG_SHOP_INFO_HTML,
 } from "@/services/siteSettings";
 
 const stripHtml = (html = "") =>
@@ -26,11 +27,142 @@ const getFirstImageFromHtml = (html = "") => {
 const getCoverImage = (post) =>
   post?.image || getFirstImageFromHtml(post?.content);
 
-const normalizeBlogContent = (content = "") => {
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const buildDefaultShopInfo = (settings) => {
+  const template =
+    String(settings?.blog?.defaultShopInfoHtml || "").trim() ||
+    DEFAULT_BLOG_SHOP_INFO_HTML;
+
+  const branding = settings?.branding || {};
+  const contact = settings?.contact || {};
+
+  return template
+    .replace(
+      /\{\{siteName\}\}/g,
+      escapeHtml(branding.siteName || "Flower Shop")
+    )
+    .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
+    .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
+    .replace(/\{\{phone\}\}/g, escapeHtml(contact.phone || "Đang cập nhật"))
+    .replace(/\{\{email\}\}/g, escapeHtml(contact.email || "Đang cập nhật"))
+    .replace(
+      /\{\{workingHours\}\}/g,
+      escapeHtml(contact.workingHours || "Đang cập nhật")
+    );
+};
+
+const compactDefaultShopInfoHtml = (html) => {
+  const value = String(html || "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="flower-shop-default-display">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("flower-shop-default-display");
+
+    const defaultBlock = root?.querySelector(
+      '[data-flower-shop-default-info="true"]'
+    );
+
+    if (!root || !defaultBlock) {
+      return value;
+    }
+
+    defaultBlock.style.margin = "8px 0 0";
+    defaultBlock.style.padding = "14px";
+
+    const header = defaultBlock.querySelector("header");
+
+    if (header) {
+      header.style.margin = "0 0 8px";
+      header.style.padding = "0 0 7px";
+    }
+
+    defaultBlock.querySelectorAll("header ~ div > p").forEach((paragraph) => {
+      paragraph.style.margin = "0 0 7px";
+    });
+
+    defaultBlock
+      .querySelectorAll(":scope > section")
+      .forEach((section, index, sections) => {
+        section.style.margin = index === sections.length - 1 ? "0" : "0 0 8px";
+
+        section.style.padding = "9px 11px";
+      });
+
+    defaultBlock.querySelectorAll("h2").forEach((heading) => {
+      heading.style.margin = "0";
+      heading.style.fontSize = "19px";
+      heading.style.lineHeight = "25px";
+    });
+
+    defaultBlock.querySelectorAll("h3").forEach((heading) => {
+      heading.style.margin = "0 0 5px";
+      heading.style.fontSize = "15px";
+      heading.style.lineHeight = "20px";
+    });
+
+    defaultBlock.querySelectorAll("section p").forEach((paragraph) => {
+      paragraph.style.margin = "0 0 5px";
+    });
+
+    return defaultBlock.outerHTML;
+  } catch {
+    return value;
+  }
+};
+
+const removeDefaultShopInfo = (content = "") => {
   const value = String(content || "").trim();
 
   if (!value) {
-    return "<p>Nội dung bài viết đang được cập nhật.</p>";
+    return "";
+  }
+
+  try {
+    const parser = new DOMParser();
+
+    const document = parser.parseFromString(
+      `<div id="flower-shop-content">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("flower-shop-content");
+
+    if (!root) {
+      return value;
+    }
+
+    root
+      .querySelectorAll('[data-flower-shop-default-info="true"]')
+      .forEach((element) => element.remove());
+
+    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
+  } catch {
+    return value;
+  }
+};
+
+const normalizeBlogContent = (content = "") => {
+  const value = removeDefaultShopInfo(content);
+
+  if (!value) {
+    return "";
   }
 
   const hasHtmlTag =
@@ -75,6 +207,11 @@ const BlogPage = () => {
   const currentPost = useMemo(
     () => posts.find((post) => String(post.id) === String(postId)),
     [posts, postId]
+  );
+
+  const renderedDefaultTemplate = useMemo(
+    () => compactDefaultShopInfoHtml(buildDefaultShopInfo(settings)),
+    [settings]
   );
 
   useEffect(() => {
@@ -197,6 +334,8 @@ const BlogPage = () => {
 
     const coverImage = getCoverImage(currentPost);
 
+    const articleContent = normalizeBlogContent(currentPost.content);
+
     return (
       <section className="min-h-screen bg-gray-50 py-8 md:py-10">
         <article className="mx-auto max-w-4xl px-4">
@@ -245,87 +384,76 @@ const BlogPage = () => {
                   .blog-detail-content {
                     color: #374151;
                     font-size: 16px;
-                    line-height: 1.75;
+                    line-height: 1.6;
                     overflow-wrap: anywhere;
                   }
 
                   .blog-detail-content > p {
-                    margin: 0 0 1rem;
+                    margin: 0 0 .65rem;
+                  }
+
+                  .blog-detail-content > p:last-child {
+                    margin-bottom: 0;
                   }
 
                   .blog-detail-content h2 {
-                    margin: 1.4rem 0 .65rem;
-                    font-size: 1.55rem;
-                    line-height: 1.35;
+                    margin: 1rem 0 .4rem;
+                    font-size: 1.45rem;
+                    line-height: 1.3;
                     font-weight: 700;
                     color: #111827;
                   }
 
                   .blog-detail-content h3 {
-                    margin: 1.1rem 0 .5rem;
-                    font-size: 1.2rem;
-                    line-height: 1.4;
+                    margin: .8rem 0 .35rem;
+                    font-size: 1.15rem;
+                    line-height: 1.35;
                     font-weight: 700;
                     color: #1f2937;
                   }
 
                   .blog-detail-content ul,
                   .blog-detail-content ol {
-                    margin: .75rem 0 1rem;
-                    padding-left: 1.5rem;
-                  }
-
-                  .blog-detail-content ul {
-                    list-style: disc;
-                  }
-
-                  .blog-detail-content ol {
-                    list-style: decimal;
+                    margin: .5rem 0 .65rem;
+                    padding-left: 1.35rem;
                   }
 
                   .blog-detail-content li {
-                    margin-bottom: .35rem;
+                    margin-bottom: .2rem;
                   }
 
                   .blog-detail-content blockquote {
-                    margin: 1rem 0;
-                    padding: .85rem 1rem;
+                    margin: .75rem 0;
+                    padding: .7rem .9rem;
                     border-left: 4px solid #db2777;
                     background: #fdf2f8;
-                    border-radius: .75rem;
+                    border-radius: .65rem;
                   }
 
-                  /*
-                   * Default shop information:
-                   * compact hơn template cũ,
-                   * không để khoảng cách quá lớn.
-                   */
                   .blog-detail-content
                     [data-flower-shop-default-info="true"] {
                     margin: 8px 0 0 !important;
-                    padding: 16px !important;
+                    padding: 14px !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     header {
-                    margin: 0 0 10px !important;
-                    padding: 0 0 8px !important;
+                    margin: 0 0 8px !important;
+                    padding: 0 0 7px !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     p {
-                    margin-top: 0 !important;
-                    margin-bottom: 7px !important;
+                    margin: 0 0 5px !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     section {
-                    margin-top: 0 !important;
-                    margin-bottom: 10px !important;
-                    padding: 11px 13px !important;
+                    margin: 0 0 8px !important;
+                    padding: 9px 11px !important;
                   }
 
                   .blog-detail-content
@@ -338,16 +466,16 @@ const BlogPage = () => {
                     [data-flower-shop-default-info="true"]
                     h2 {
                     margin: 0 !important;
-                    font-size: 21px !important;
-                    line-height: 28px !important;
+                    font-size: 19px !important;
+                    line-height: 25px !important;
                   }
 
                   .blog-detail-content
                     [data-flower-shop-default-info="true"]
                     h3 {
-                    margin: 0 0 6px !important;
+                    margin: 0 0 5px !important;
                     font-size: 15px !important;
-                    line-height: 22px !important;
+                    line-height: 20px !important;
                   }
 
                   .blog-detail-content img {
@@ -356,7 +484,7 @@ const BlogPage = () => {
                     max-width: 66.666667%;
                     max-height: 420px;
                     height: auto;
-                    margin: 1rem auto;
+                    margin: .75rem auto;
                     border: 0;
                     border-radius: .75rem;
                     object-fit: contain;
@@ -381,14 +509,14 @@ const BlogPage = () => {
 
                   .blog-detail-content table {
                     width: 100%;
-                    margin: 1rem 0;
+                    margin: .75rem 0;
                     border-collapse: collapse;
                   }
 
                   .blog-detail-content th,
                   .blog-detail-content td {
                     border: 1px solid #e5e7eb;
-                    padding: .65rem;
+                    padding: .5rem;
                     text-align: left;
                   }
 
@@ -407,9 +535,12 @@ const BlogPage = () => {
               </style>
 
               <div
-                className="blog-detail-content mt-6"
+                className="blog-detail-content mt-4"
                 dangerouslySetInnerHTML={{
-                  __html: normalizeBlogContent(currentPost.content),
+                  __html: `
+                    ${articleContent}
+                    ${renderedDefaultTemplate}
+                  `,
                 }}
               />
             </div>
@@ -441,7 +572,9 @@ const BlogPage = () => {
             {posts.map((post) => {
               const coverImage = getCoverImage(post);
 
-              const excerpt = stripHtml(post.content);
+              const excerpt =
+                stripHtml(post.content) ||
+                "Khám phá bài viết mới từ Flower Shop.";
 
               return (
                 <Link
@@ -486,7 +619,7 @@ const BlogPage = () => {
                       </h2>
 
                       <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-500">
-                        {excerpt || "Khám phá bài viết mới từ Flower Shop."}
+                        {excerpt}
                       </p>
 
                       <div className="mt-auto pt-5">

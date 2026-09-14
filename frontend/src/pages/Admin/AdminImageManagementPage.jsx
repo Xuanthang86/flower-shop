@@ -15,18 +15,6 @@ import { getImageDimensions, uploadImageFile } from "@/services/media";
 const STANDARD_WIDTH = 1600;
 const STANDARD_HEIGHT = 700;
 
-/*
- * Hero hiện tại của project đang sử dụng khung:
- * desktop: 1280 x 300
- *
- * Không thay đổi Hero vì giao diện hiện tại đã được chấp nhận.
- * Banner upload mới được chuẩn hóa về cùng tỷ lệ hiển thị.
- */
-const DISPLAY_WIDTH = 1600;
-const DISPLAY_HEIGHT = 375;
-
-const DISPLAY_RATIO = DISPLAY_WIDTH / DISPLAY_HEIGHT;
-
 const MessageModal = ({ message, error, onClose }) => {
   if (!message && !error) return null;
 
@@ -91,162 +79,6 @@ const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
   }));
 };
 
-/*
- * Chuẩn hóa banner upload về tỷ lệ của Hero hiện tại.
- *
- * Mục tiêu:
- * - Không crop nội dung chính.
- * - Không kéo méo nội dung chính.
- * - Không để khoảng trắng hai bên.
- *
- * Với ảnh 1600x700:
- * - ảnh chính được contain vào khung 1600x375;
- * - phần còn lại được lấp bằng nền mở rộng từ chính ảnh nguồn;
- * - nền được làm mờ để không cạnh tranh với nội dung chính.
- *
- * Đây là giải pháp phù hợp khi Hero hiện tại phải giữ nguyên tỷ lệ.
- */
-const prepareBannerFileForDisplay = async (file) =>
-  new Promise((resolve, reject) => {
-    if (!file?.type?.startsWith("image/")) {
-      reject(new Error("Vui lòng chọn đúng file hình ảnh."));
-      return;
-    }
-
-    if (file.size > 15 * 1024 * 1024) {
-      reject(
-        new Error("File hình ảnh quá lớn. Vui lòng chọn file không quá 15MB.")
-      );
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const image = new Image();
-
-      image.onload = () => {
-        const sourceWidth = image.naturalWidth;
-        const sourceHeight = image.naturalHeight;
-
-        if (!sourceWidth || !sourceHeight) {
-          reject(new Error("Không thể xác định kích thước hình ảnh."));
-          return;
-        }
-
-        const sourceRatio = sourceWidth / sourceHeight;
-
-        if (Math.abs(sourceRatio - DISPLAY_RATIO) < 0.02) {
-          resolve(file);
-          return;
-        }
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = DISPLAY_WIDTH;
-        canvas.height = DISPLAY_HEIGHT;
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-          reject(new Error("Không thể xử lý hình ảnh trên trình duyệt."));
-          return;
-        }
-
-        /*
-         * Lớp nền:
-         * scale kiểu cover để luôn phủ kín toàn bộ canvas.
-         */
-        const backgroundScale = Math.max(
-          DISPLAY_WIDTH / sourceWidth,
-          DISPLAY_HEIGHT / sourceHeight
-        );
-
-        const backgroundWidth = sourceWidth * backgroundScale;
-        const backgroundHeight = sourceHeight * backgroundScale;
-
-        const backgroundX = (DISPLAY_WIDTH - backgroundWidth) / 2;
-        const backgroundY = (DISPLAY_HEIGHT - backgroundHeight) / 2;
-
-        context.save();
-
-        context.filter = "blur(24px) saturate(1.08)";
-        context.globalAlpha = 0.9;
-
-        context.drawImage(
-          image,
-          backgroundX,
-          backgroundY,
-          backgroundWidth,
-          backgroundHeight
-        );
-
-        context.restore();
-
-        /*
-         * Một lớp phủ rất nhẹ để nền không lấn nội dung.
-         * Không dùng màu trắng đậm vì sẽ tạo cảm giác
-         * hai bên bị trống.
-         */
-        context.fillStyle = "rgba(255,255,255,0.04)";
-        context.fillRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-        /*
-         * Ảnh chính:
-         * contain để bảo toàn toàn bộ nội dung.
-         */
-        const scale = Math.min(
-          DISPLAY_WIDTH / sourceWidth,
-          DISPLAY_HEIGHT / sourceHeight
-        );
-
-        const renderedWidth = sourceWidth * scale;
-        const renderedHeight = sourceHeight * scale;
-
-        const renderedX = (DISPLAY_WIDTH - renderedWidth) / 2;
-        const renderedY = (DISPLAY_HEIGHT - renderedHeight) / 2;
-
-        context.drawImage(
-          image,
-          renderedX,
-          renderedY,
-          renderedWidth,
-          renderedHeight
-        );
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Không thể tạo ảnh banner đã chuẩn hóa."));
-              return;
-            }
-
-            const preparedFile = new File([blob], "banner-display-ready.webp", {
-              type: "image/webp",
-              lastModified: Date.now(),
-            });
-
-            resolve(preparedFile);
-          },
-          "image/webp",
-          0.9
-        );
-      };
-
-      image.onerror = () => {
-        reject(new Error("Không thể đọc hình ảnh banner."));
-      };
-
-      image.src = String(reader.result || "");
-    };
-
-    reader.onerror = () => {
-      reject(new Error("Không thể đọc file hình ảnh."));
-    };
-
-    reader.readAsDataURL(file);
-  });
-
 const AdminImageManagementPage = () => {
   const [activeTab, setActiveTab] = useState("banners");
 
@@ -274,6 +106,10 @@ const AdminImageManagementPage = () => {
     }
 
     robots.content = "noindex,nofollow";
+
+    return () => {
+      robots.content = "index,follow";
+    };
   }, []);
 
   useEffect(() => {
@@ -347,12 +183,10 @@ const AdminImageManagementPage = () => {
     try {
       const dimensions = await getImageDimensions(file);
 
-      const preparedFile = await prepareBannerFileForDisplay(file);
-
-      const imageUrl = await uploadImageFile(preparedFile, {
+      const imageUrl = await uploadImageFile(file, {
         folder: "flower-shop/banners",
-        maxWidth: DISPLAY_WIDTH,
-        maxHeight: DISPLAY_HEIGHT,
+        maxWidth: STANDARD_WIDTH,
+        maxHeight: STANDARD_HEIGHT,
         quality: 0.9,
       });
 
@@ -379,9 +213,9 @@ const AdminImageManagementPage = () => {
 
         sourceHeight: dimensions.height,
 
-        displayWidth: DISPLAY_WIDTH,
+        displayWidth: dimensions.width,
 
-        displayHeight: DISPLAY_HEIGHT,
+        displayHeight: dimensions.height,
       };
 
       saveBanners([...banners, banner]);
@@ -392,11 +226,11 @@ const AdminImageManagementPage = () => {
 
       if (isStandard) {
         setMessage(
-          `Đã thêm banner thành công. Kích thước nguồn ${dimensions.width} × ${dimensions.height}px đúng kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Hệ thống đã tự căn toàn bộ nội dung để hiển thị đầy đủ trong khung banner hiện tại.`
+          `Đã thêm banner thành công. Ảnh nguồn ${dimensions.width} × ${dimensions.height}px đúng kích thước khuyến nghị ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Hệ thống giữ nguyên tỷ lệ ảnh, không kéo méo nội dung.`
         );
       } else {
         setMessage(
-          `Đã thêm banner thành công. Kích thước ảnh nguồn là ${dimensions.width} × ${dimensions.height}px, khác kích thước chuẩn ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Banner vẫn được chấp nhận và hệ thống đã tự căn toàn bộ nội dung để hạn chế tối đa việc cắt ảnh và khoảng trống hai bên.`
+          `Đã thêm banner thành công. Ảnh nguồn ${dimensions.width} × ${dimensions.height}px khác kích thước khuyến nghị ${STANDARD_WIDTH} × ${STANDARD_HEIGHT}px. Hệ thống giữ nguyên tỷ lệ ảnh và không kéo méo nội dung.`
         );
       }
     } catch (uploadError) {
@@ -515,11 +349,9 @@ const AdminImageManagementPage = () => {
             </div>
 
             <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-600">
-              Kích thước chuẩn khuyến nghị: <strong>1600 × 700 px</strong>.
-              Banner khác kích thước vẫn được upload, hệ thống chỉ thông báo để
-              người quản trị biết. Khi upload, hệ thống tự căn toàn bộ nội dung
-              ảnh vào khung banner hiện tại, hạn chế tối đa việc bị cắt nội dung
-              và khoảng trống hai bên.
+              Kích thước nguồn khuyến nghị: <strong>1600 × 700 px</strong>. Hệ
+              thống giữ nguyên tỷ lệ ảnh nguồn và không kéo méo nội dung. Banner
+              khác kích thước vẫn được upload.
             </div>
 
             {banners.length === 0 ? (
@@ -533,11 +365,13 @@ const AdminImageManagementPage = () => {
                     key={banner.id}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white"
                   >
-                    <div className="relative flex h-28 items-center justify-center overflow-hidden bg-gray-50 p-2">
+                    <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gray-50 p-2">
                       <img
                         src={banner.image}
                         alt={banner.alt || `Banner ${index + 1}`}
-                        className="max-h-full max-w-full object-contain"
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full rounded-lg object-contain"
                       />
 
                       <span className="absolute left-2 top-2 rounded-md bg-gray-900/80 px-2 py-1 text-[10px] font-bold text-white">

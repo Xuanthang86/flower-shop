@@ -387,7 +387,7 @@ const AdminContentManagementPage = () => {
               <button
                 type="button"
                 onClick={saveAnnouncements}
-                className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-6 py-3 text-sm font-semibold text-pink-600 hover:bg-pink-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
               >
                 <FiSave />
                 Lưu thanh thông báo

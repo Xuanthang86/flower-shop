@@ -2,9 +2,6 @@ export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
 
-/*
- * Phân quyền mặc định theo ROLE.
- */
 export const DEFAULT_ROLE_PERMISSIONS = {
   manager: [
     "manage_orders",
@@ -17,32 +14,16 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   product_manager: ["manage_orders", "manage_products"],
 };
 
-/*
- * Template mặc định mới.
- *
- * Đã giảm khoảng cách:
- * - padding ngoài
- * - margin giữa các block
- * - line-height
- * - khoảng cách heading
- *
- * Đồng thời vẫn giữ:
- * - heading
- * - giới thiệu
- * - thông tin liên hệ
- * - liên kết nội bộ
- * - semantic HTML
- */
 export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 <section
   data-flower-shop-default-info="true"
   style="
     width:100%;
     max-width:100%;
-    margin:20px 0 8px;
-    padding:22px;
+    margin:8px 0 0;
+    padding:14px;
     border:1px solid #fce7f3;
-    border-radius:18px;
+    border-radius:14px;
     background:linear-gradient(
       135deg,
       #fff7fb 0%,
@@ -54,17 +35,17 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 >
   <header
     style="
-      margin:0 0 16px;
-      padding:0 0 14px;
+      margin:0 0 8px;
+      padding:0 0 7px;
       border-bottom:1px solid #fbcfe8;
     "
   >
     <p
       style="
-        margin:0 0 6px;
+        margin:0 0 4px;
         color:#db2777;
-        font-size:12px;
-        line-height:18px;
+        font-size:11px;
+        line-height:16px;
         font-weight:700;
         letter-spacing:.08em;
         text-transform:uppercase;
@@ -77,8 +58,8 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       style="
         margin:0;
         color:#1f2937;
-        font-size:24px;
-        line-height:31px;
+        font-size:19px;
+        line-height:25px;
         font-weight:800;
       "
     >
@@ -87,10 +68,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:7px 0 0;
+        margin:4px 0 0;
         color:#6b7280;
-        font-size:14px;
-        line-height:21px;
+        font-size:13px;
+        line-height:19px;
       "
     >
       {{tagline}}
@@ -100,11 +81,11 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
   <div
     style="
       color:#4b5563;
-      font-size:15px;
-      line-height:24px;
+      font-size:14px;
+      line-height:21px;
     "
   >
-    <p style="margin:0 0 13px;">
+    <p style="margin:0 0 7px;">
       <strong style="color:#374151;">
         {{siteName}}
       </strong>
@@ -113,13 +94,13 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       nghiệm mua sắm thuận tiện cho khách hàng.
     </p>
 
-    <p style="margin:0 0 13px;">
+    <p style="margin:0 0 7px;">
       Shop cung cấp các sản phẩm hoa phù hợp cho nhiều dịp
       đặc biệt như sinh nhật, khai trương, cưới hỏi,
       chúc mừng, tri ân, kỷ niệm và các sự kiện quan trọng.
     </p>
 
-    <p style="margin:0 0 17px;">
+    <p style="margin:0 0 8px;">
       Chúng tôi chú trọng chất lượng hoa, hình thức trình bày,
       khả năng tư vấn và hỗ trợ khách hàng trong suốt quá trình
       lựa chọn sản phẩm.
@@ -128,20 +109,20 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
   <section
     style="
-      margin:0 0 17px;
-      padding:16px;
+      margin:0 0 8px;
+      padding:9px 11px;
       border:1px solid #f3f4f6;
-      border-radius:14px;
+      border-radius:11px;
       background:#ffffff;
       box-sizing:border-box;
     "
   >
     <h3
       style="
-        margin:0 0 10px;
+        margin:0 0 5px;
         color:#374151;
-        font-size:16px;
-        line-height:24px;
+        font-size:15px;
+        line-height:20px;
         font-weight:700;
       "
     >
@@ -150,10 +131,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 7px;
+        margin:0 0 5px;
         color:#6b7280;
-        font-size:14px;
-        line-height:22px;
+        font-size:13px;
+        line-height:20px;
       "
     >
       <strong style="color:#374151;">
@@ -164,10 +145,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 7px;
+        margin:0 0 5px;
         color:#6b7280;
-        font-size:14px;
-        line-height:22px;
+        font-size:13px;
+        line-height:20px;
       "
     >
       <strong style="color:#374151;">
@@ -188,10 +169,10 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 
     <p
       style="
-        margin:0 0 7px;
+        margin:0 0 5px;
         color:#6b7280;
-        font-size:14px;
-        line-height:22px;
+        font-size:13px;
+        line-height:20px;
       "
     >
       <strong style="color:#374151;">
@@ -214,8 +195,8 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       style="
         margin:0;
         color:#6b7280;
-        font-size:14px;
-        line-height:22px;
+        font-size:13px;
+        line-height:20px;
       "
     >
       <strong style="color:#374151;">
@@ -228,17 +209,17 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
   <section
     style="
       margin:0;
-      padding:14px 16px;
-      border-radius:14px;
+      padding:9px 11px;
+      border-radius:11px;
       background:#fff;
     "
   >
     <h3
       style="
-        margin:0 0 8px;
+        margin:0 0 5px;
         color:#374151;
-        font-size:16px;
-        line-height:23px;
+        font-size:15px;
+        line-height:20px;
         font-weight:700;
       "
     >
@@ -249,8 +230,8 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
       style="
         margin:0;
         color:#6b7280;
-        font-size:14px;
-        line-height:23px;
+        font-size:13px;
+        line-height:20px;
       "
     >
       Khám phá thêm các sản phẩm hoa tại
@@ -280,9 +261,6 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
 </section>
 `;
 
-/*
- * Template mặc định cũ.
- */
 const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 <h2>Về Flower Shop</h2>
 <p>
@@ -309,21 +287,11 @@ const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 </p>
 `;
 
-/*
- * Chuẩn hóa HTML trước khi so sánh.
- */
 const normalizeHtmlForComparison = (value) =>
   String(value || "")
     .replace(/\s+/g, " ")
     .trim();
 
-/*
- * Nhận diện các template mặc định cũ.
- *
- * Không dùng việc "content có HTML" làm điều kiện,
- * mà chỉ migrate khi có dấu hiệu rõ ràng của template
- * mặc định do hệ thống sinh ra.
- */
 const isLegacyDefaultBlogShopInfo = (value) => {
   const normalized = normalizeHtmlForComparison(value);
 
@@ -349,14 +317,15 @@ const isLegacyDefaultBlogShopInfo = (value) => {
     return true;
   }
 
-  const isVeryOldSimpleTemplate =
+  return (
     normalized.includes("<h2>Về Flower Shop</h2>") &&
     normalized.includes("Thông tin liên hệ") &&
     normalized.includes("Danh mục sản phẩm") &&
-    normalized.includes("/contact");
-
-  return isVeryOldSimpleTemplate;
+    normalized.includes("/contact")
+  );
 };
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const escapeHtml = (value = "") =>
   String(value)
@@ -366,9 +335,6 @@ const escapeHtml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-/*
- * Render template mặc định với dữ liệu shop hiện tại.
- */
 const buildDefaultBlogShopInfoHtml = (template, settings) => {
   const branding = settings?.branding || {};
   const contact = settings?.contact || {};
@@ -388,62 +354,46 @@ const buildDefaultBlogShopInfoHtml = (template, settings) => {
     );
 };
 
-/*
- * Thay template cũ bên trong content bài viết.
- *
- * Chỉ tác động tới:
- * - toàn bộ content nếu content chính là template cũ;
- * - block có data-flower-shop-default-info="true"
- *   nếu block đó đúng là template cũ.
- *
- * Không tự ý thay đổi bài viết có nội dung riêng.
- */
-const migrateLegacyBlogPostContent = (content, renderedDefaultTemplate) => {
+const removeDefaultShopInfoFromContent = (content = "") => {
   const value = String(content || "").trim();
 
   if (!value) {
-    return value;
-  }
-
-  if (isLegacyDefaultBlogShopInfo(value)) {
-    return renderedDefaultTemplate;
-  }
-
-  if (!value.includes('data-flower-shop-default-info="true"')) {
-    return value;
+    return "";
   }
 
   try {
-    const parser = new DOMParser();
+    if (isLegacyDefaultBlogShopInfo(value)) {
+      return "";
+    }
 
-    const document = parser.parseFromString(
-      `<div id="flower-shop-migration-root">${value}</div>`,
-      "text/html"
-    );
-
-    const root = document.getElementById("flower-shop-migration-root");
-
-    const defaultBlock = root?.querySelector(
-      '[data-flower-shop-default-info="true"]'
-    );
-
-    if (
-      !root ||
-      !defaultBlock ||
-      !isLegacyDefaultBlogShopInfo(defaultBlock.outerHTML)
-    ) {
+    if (!value.includes('data-flower-shop-default-info="true"')) {
       return value;
     }
 
-    defaultBlock.outerHTML = renderedDefaultTemplate;
+    const parser = new DOMParser();
 
-    return root.innerHTML;
+    const document = parser.parseFromString(
+      `<div id="blog-storage-root">${value}</div>`,
+      "text/html"
+    );
+
+    const root = document.getElementById("blog-storage-root");
+
+    if (!root) {
+      return value;
+    }
+
+    root
+      .querySelectorAll('[data-flower-shop-default-info="true"]')
+      .forEach((element) => element.remove());
+
+    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
   } catch {
     return value;
   }
 };
 
-const migrateLegacyBlogPosts = (posts, renderedDefaultTemplate) => {
+const normalizeStoredBlogPosts = (posts) => {
   if (!Array.isArray(posts)) {
     return [];
   }
@@ -453,21 +403,17 @@ const migrateLegacyBlogPosts = (posts, renderedDefaultTemplate) => {
       return post;
     }
 
-    const content = String(post.content || "");
+    const originalContent = String(post.content || "");
 
-    const migratedContent = migrateLegacyBlogPostContent(
-      content,
-      renderedDefaultTemplate
-    );
+    const cleanedContent = removeDefaultShopInfoFromContent(originalContent);
 
-    if (migratedContent === content) {
+    if (cleanedContent === originalContent) {
       return post;
     }
 
     return {
       ...post,
-      content: migratedContent,
-      updatedAt: new Date().toISOString(),
+      content: cleanedContent,
     };
   });
 };
@@ -566,8 +512,6 @@ export const DEFAULT_SITE_SETTINGS = {
   },
 };
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
-
 const normalizeBanner = (banner, index, defaultInterval = 8) => {
   const duration = Number(banner?.duration || defaultInterval || 8);
 
@@ -655,6 +599,7 @@ const mergeSettings = (input = {}) => {
   const contact = {
     ...defaults.contact,
     ...(source.contact || {}),
+
     style: {
       ...defaults.contact.style,
       ...(source.contact?.style || {}),
@@ -665,17 +610,8 @@ const mergeSettings = (input = {}) => {
       : [],
   };
 
-  const renderedDefaultTemplate = buildDefaultBlogShopInfoHtml(
-    defaultShopInfoHtml,
-    {
-      branding,
-      contact,
-    }
-  );
-
-  const migratedBlogPosts = migrateLegacyBlogPosts(
-    Array.isArray(source.blogPosts) ? source.blogPosts : [],
-    renderedDefaultTemplate
+  const normalizedBlogPosts = normalizeStoredBlogPosts(
+    Array.isArray(source.blogPosts) ? source.blogPosts : []
   );
 
   return {
@@ -757,12 +693,16 @@ const mergeSettings = (input = {}) => {
       : [],
 
     /*
-     * Đây là phần quan trọng:
-     * các bài viết cũ được tạo từ template
-     * mặc định sẽ được migrate ngay khi
-     * siteSettings được đọc.
+     * Quan trọng:
+     * blogPosts chỉ lưu nội dung bài viết thật.
+     *
+     * Default shop information không được
+     * nhân vào từng bài viết nữa.
+     *
+     * BlogPage sẽ render default template
+     * tập trung từ settings.blog.defaultShopInfoHtml.
      */
-    blogPosts: migratedBlogPosts,
+    blogPosts: normalizedBlogPosts,
   };
 };
 
@@ -782,13 +722,6 @@ export const readSiteSettings = () => {
 
     const normalized = mergeSettings(parsed);
 
-    /*
-     * Nếu mergeSettings đã migrate dữ liệu
-     * hoặc bổ sung default mới, lưu lại ngay.
-     *
-     * Không dispatch event tại đây vì hàm read
-     * có thể được gọi trong quá trình render.
-     */
     const normalizedRaw = JSON.stringify(normalized);
 
     if (normalizedRaw !== raw) {
@@ -796,7 +729,7 @@ export const readSiteSettings = () => {
         localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, normalizedRaw);
       } catch (storageError) {
         console.warn(
-          "Không thể lưu dữ liệu site settings sau migration:",
+          "Không thể lưu dữ liệu site settings sau khi chuẩn hóa:",
           storageError
         );
       }
