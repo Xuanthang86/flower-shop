@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import PasswordInput from "@/components/auth/PasswordInput";
 
+const EMAIL_DOMAIN = "@flowershop.vn";
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -11,7 +13,7 @@ const LoginPage = () => {
   const { login } = useAuth();
 
   const [formData, setFormData] = useState({
-    email: "",
+    emailPrefix: "",
     password: "",
   });
 
@@ -31,29 +33,52 @@ const LoginPage = () => {
     }
   };
 
+  const handleEmailPrefixChange = (event) => {
+    const value = event.target.value;
+
+    setFormData((currentData) => ({
+      ...currentData,
+      emailPrefix: value,
+    }));
+
+    if (error) {
+      setError("");
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError("");
 
-    const email = formData.email.trim().toLowerCase();
+    const emailPrefix = formData.emailPrefix.trim().toLowerCase();
     const password = formData.password;
 
     // ==============================
-    // KIỂM TRA EMAIL
+    // KIỂM TRA TÊN EMAIL
     // ==============================
 
-    if (!email) {
-      setError("Vui lòng nhập email.");
+    if (!emailPrefix) {
+      setError("Vui lòng nhập tên email.");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      setError("Email không đúng định dạng.");
+    /*
+     * Người dùng chỉ được nhập phần trước @flowershop.vn.
+     * Không cho phép nhập thêm @ hoặc domain khác.
+     */
+    if (!/^[a-zA-Z0-9._-]+$/.test(emailPrefix)) {
+      setError(
+        "Tên email chỉ được gồm chữ cái không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới."
+      );
       return;
     }
+
+    // ==============================
+    // TẠO EMAIL HOÀN CHỈNH
+    // ==============================
+
+    const email = `${emailPrefix}${EMAIL_DOMAIN}`;
 
     // ==============================
     // KIỂM TRA MẬT KHẨU
@@ -76,7 +101,7 @@ const LoginPage = () => {
       if (!result || result.success !== true) {
         setError(
           result?.message ||
-            "Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu."
+            "Đăng nhập thất bại. Vui lòng kiểm tra tên email và mật khẩu."
         );
 
         return;
@@ -148,38 +173,69 @@ const LoginPage = () => {
 
             <div className="mb-5">
               <label
-                htmlFor="email"
+                htmlFor="emailPrefix"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
                 Email
               </label>
 
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="example@gmail.com"
-                autoComplete="email"
-                disabled={loading}
-                aria-describedby="email-help"
+              <div
                 className="
+                  flex
                   w-full
-                  border border-gray-300
+                  overflow-hidden
                   rounded-lg
-                  px-4 py-3
-                  outline-none
+                  border border-gray-300
+                  bg-white
                   transition
-                  focus:border-pink-500
-                  focus:ring-1
-                  focus:ring-pink-500
-                  disabled:bg-gray-100
+                  focus-within:border-pink-500
+                  focus-within:ring-1
+                  focus-within:ring-pink-500
                 "
-              />
+              >
+                <input
+                  id="emailPrefix"
+                  name="emailPrefix"
+                  type="text"
+                  value={formData.emailPrefix}
+                  onChange={handleEmailPrefixChange}
+                  placeholder="Tên email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  disabled={loading}
+                  aria-describedby="email-help"
+                  className="
+                    min-w-0
+                    flex-1
+                    border-0
+                    bg-transparent
+                    px-4 py-3
+                    outline-none
+                    focus:ring-0
+                    disabled:bg-gray-100
+                  "
+                />
+
+                <span
+                  aria-hidden="true"
+                  className="
+                    flex
+                    shrink-0
+                    items-center
+                    border-l border-gray-200
+                    bg-gray-50
+                    px-3
+                    text-sm
+                    text-gray-500
+                  "
+                >
+                  {EMAIL_DOMAIN}
+                </span>
+              </div>
 
               <p id="email-help" className="mt-1.5 text-xs text-gray-400">
-                Nhập đúng địa chỉ email đã đăng ký tài khoản.
+                Chỉ cần nhập phần trước {EMAIL_DOMAIN}.
               </p>
             </div>
 
