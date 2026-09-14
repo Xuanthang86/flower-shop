@@ -62,12 +62,11 @@ const normalizeUser = (user) => {
 const sanitizeUser = (user) => {
   if (!user) return null;
 
-  const {
-    password: _password,
-    passwordHash: _passwordHash,
-    passwordSalt: _passwordSalt,
-    ...safeUser
-  } = user;
+  const safeUser = { ...user };
+
+  delete safeUser.password;
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
 
   return safeUser;
 };
@@ -857,18 +856,6 @@ const AuthProvider = ({ children }) => {
         return Object.values(PERMISSIONS);
       }
 
-      /*
-       * Luôn chuẩn hóa quyền trước khi trả ra UI
-       * hoặc dùng cho hasPermission().
-       *
-       * Điều này loại bỏ các quyền cũ/không còn
-       * nằm trong MANAGEMENT_PERMISSIONS, ví dụ:
-       * view_reports.
-       *
-       * Nhờ đó quyền hiển thị trong tài khoản và
-       * quyền hiển thị tại "Quản lý quyền được phép
-       * sử dụng" luôn đồng bộ.
-       */
       return normalizePermissionList(rolePermissions?.[role], role);
     },
     [rolePermissions]
