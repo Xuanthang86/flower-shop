@@ -15,13 +15,13 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 };
 
 /*
- * Nội dung mặc định của Shop.
+ * NỘI DUNG mặc định của Shop trong bài viết.
  *
- * QUAN TRỌNG:
- * - File này chỉ chứa nội dung mặc định.
- * - Không đặt CSS giao diện tại đây.
- * - Giao diện được quản lý bằng blog.defaultShopInfoStyle
- *   trong Tùy chỉnh giao diện.
+ * File này chỉ quản lý nội dung và cấu trúc HTML cơ bản.
+ * Không đặt CSS giao diện ở đây.
+ *
+ * Giao diện được quản lý riêng bằng:
+ * blog.defaultShopInfoStyle
  *
  * Có thể sử dụng:
  * {{siteName}}
@@ -226,10 +226,6 @@ const sanitizeDefaultShopInfoTemplate = (value) => {
 
     defaultBlock.setAttribute("data-flower-shop-default-info", "true");
 
-    /*
-     * Style giao diện không được lưu trong nội dung.
-     * Nội dung do người quản lý nhập vẫn được giữ lại.
-     */
     defaultBlock.querySelectorAll("[style]").forEach((element) => {
       element.removeAttribute("style");
     });
@@ -263,6 +259,62 @@ export const buildDefaultBlogShopInfoHtml = (settings) => {
     );
 };
 
+const convertLegacyTextContentToHtml = (content) => {
+  const value = String(content || "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  const hasBlockElement =
+    /<\s*(p|div|section|article|header|h1|h2|h3|h4|h5|h6|ul|ol|li|blockquote|table|tr|td|th)\b/i.test(
+      value
+    );
+
+  if (hasBlockElement) {
+    return value;
+  }
+
+  const hasBreak = /<\s*br\s*\/?>/i.test(value);
+
+  if (hasBreak) {
+    const normalized = value
+      .replace(/(?:\s*<br\s*\/?>\s*){2,}/gi, "</p><p>")
+      .replace(/<br\s*\/?>/gi, "<br />");
+
+    return `<p>${normalized}</p>`;
+  }
+
+  if (/<[^>]+>/.test(value)) {
+    return `<p>${value}</p>`;
+  }
+
+  const paragraphs = value
+    .split(/\n\s*\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length > 1) {
+    return paragraphs
+      .map((paragraph) => {
+        const text = paragraph
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br />");
+
+        return `<p>${text}</p>`;
+      })
+      .join("");
+  }
+
+  return `<p>${value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br />")}</p>`;
+};
+
 export const removeDefaultShopInfoFromContent = (content = "") => {
   const value = String(content || "").trim();
 
@@ -292,7 +344,11 @@ export const removeDefaultShopInfoFromContent = (content = "") => {
       .querySelectorAll('[data-flower-shop-default-info="true"]')
       .forEach((element) => element.remove());
 
-    return root.innerHTML.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "").trim();
+    const cleaned = root.innerHTML
+      .replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "")
+      .trim();
+
+    return convertLegacyTextContentToHtml(cleaned);
   } catch {
     return value;
   }
@@ -434,6 +490,7 @@ export const DEFAULT_SITE_SETTINGS = {
 
 const normalizeBanner = (banner, index, defaultInterval = 8) => {
   const duration = Number(banner?.duration || defaultInterval || 8);
+
   const priority = Number(banner?.priority || index + 1);
 
   return {
@@ -664,6 +721,7 @@ const mergeSettings = (input = {}) => {
       ...(source.blog || {}),
 
       defaultShopInfoHtml,
+
       defaultShopInfoStyle: normalizeBlogStyle(
         source.blog?.defaultShopInfoStyle
       ),
@@ -684,10 +742,6 @@ const mergeSettings = (input = {}) => {
       ? source.customerLogos
       : [],
 
-    /*
-     * Chỉ lưu nội dung bài viết thật.
-     * Không lưu thông tin Shop mặc định trong từng bài.
-     */
     blogPosts: normalizedBlogPosts,
   };
 };

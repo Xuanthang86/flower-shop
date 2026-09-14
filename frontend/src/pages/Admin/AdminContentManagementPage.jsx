@@ -315,8 +315,26 @@ const AdminContentManagementPage = () => {
   };
 
   const branding = settings.branding || {};
+
   const sections = settings.sections || {};
+
   const blog = settings.blog || {};
+
+  const blogStyle = blog.defaultShopInfoStyle || {
+    backgroundColor: "#fff7fb",
+    borderColor: "#fce7f3",
+    accentColor: "#db2777",
+    headingColor: "#1f2937",
+    textColor: "#4b5563",
+    borderRadius: 14,
+    padding: 14,
+    headingFontSize: 19,
+    subHeadingFontSize: 15,
+    bodyFontSize: 14,
+    lineHeight: 1.5,
+  };
+
+  const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
 
   const announcementMessages = Array.isArray(settings.announcementMessages)
     ? settings.announcementMessages
@@ -718,8 +736,11 @@ const AdminContentManagementPage = () => {
                   aria-label="Định dạng nội dung"
                 >
                   <option value="">Đoạn văn</option>
+
                   <option value="h2">Tiêu đề H2</option>
+
                   <option value="h3">Tiêu đề H3</option>
+
                   <option value="p">Đoạn văn</option>
                 </select>
 
@@ -732,6 +753,85 @@ const AdminContentManagementPage = () => {
                 </button>
               </div>
 
+              <style>
+                {`
+                  .admin-default-blog-editor {
+                    color: #374151;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    overflow-x: hidden;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                    white-space: normal;
+                  }
+
+                  .admin-default-blog-editor
+                    > *:first-child {
+                    margin-top: 0 !important;
+                  }
+
+                  .admin-default-blog-editor
+                    > *:last-child {
+                    margin-bottom: 0 !important;
+                  }
+
+                  .admin-default-blog-editor p {
+                    margin: .35rem 0 !important;
+                    line-height: 1.5 !important;
+                  }
+
+                  .admin-default-blog-editor h2 {
+                    margin: .65rem 0 .3rem !important;
+                    font-size: 19px !important;
+                    line-height: 1.25 !important;
+                    font-weight: 700 !important;
+                  }
+
+                  .admin-default-blog-editor h3 {
+                    margin: .55rem 0 .25rem !important;
+                    font-size: 15px !important;
+                    line-height: 1.3 !important;
+                    font-weight: 700 !important;
+                  }
+
+                  .admin-default-blog-editor section {
+                    margin: .45rem 0 !important;
+                    padding: .45rem .6rem !important;
+                    border: 1px solid #f3f4f6;
+                    border-radius: .65rem;
+                    background: rgba(255,255,255,.72);
+                  }
+
+                  .admin-default-blog-editor
+                    > section {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: 0;
+                    background: transparent;
+                  }
+
+                  .admin-default-blog-editor ul,
+                  .admin-default-blog-editor ol {
+                    margin: .35rem 0 .5rem !important;
+                    padding-left: 1.25rem;
+                  }
+
+                  .admin-default-blog-editor li {
+                    margin: 0 0 .1rem !important;
+                  }
+
+                  .admin-default-blog-editor a {
+                    color: #db2777;
+                    font-weight: 600;
+                    overflow-wrap: anywhere;
+                  }
+
+                  .admin-default-blog-editor strong {
+                    font-weight: 700;
+                  }
+                `}
+              </style>
+
               <div
                 ref={blogEditorRef}
                 contentEditable
@@ -739,7 +839,7 @@ const AdminContentManagementPage = () => {
                 role="textbox"
                 aria-label="Nội dung Shop mặc định trong bài viết"
                 onInput={syncBlogEditor}
-                className="min-h-[300px] w-full overflow-x-auto p-5 text-sm leading-7 text-gray-700 outline-none [&_a]:font-semibold [&_a]:text-pink-600 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_p]:my-1.5"
+                className="admin-default-blog-editor min-h-[300px] w-full overflow-x-hidden p-5 outline-none"
               />
             </div>
 
@@ -778,6 +878,82 @@ const AdminContentManagementPage = () => {
                 <FiSave />
                 Lưu thông tin Shop cho bài viết
               </button>
+            </div>
+
+            <div
+              className="mt-5 overflow-hidden rounded-xl border bg-white"
+              style={{
+                borderColor: blogStyle.borderColor,
+              }}
+            >
+              <div
+                className="blog-default-shop-preview p-4"
+                style={{
+                  backgroundColor: blogStyle.backgroundColor,
+                  color: blogStyle.textColor,
+                  fontSize: `${blogStyle.bodyFontSize}px`,
+                  lineHeight: blogStyle.lineHeight,
+                }}
+              >
+                <style>
+                  {`
+                    .blog-default-shop-preview {
+                      overflow-wrap: anywhere;
+                      word-break: break-word;
+                    }
+
+                    .blog-default-shop-preview
+                      [data-flower-shop-default-info="true"] {
+                      width: 100%;
+                      max-width: 100%;
+                    }
+
+                    .blog-default-shop-preview p {
+                      margin: .3rem 0 !important;
+                    }
+
+                    .blog-default-shop-preview h2 {
+                      margin: .55rem 0 .25rem !important;
+                      font-size: ${blogStyle.headingFontSize}px !important;
+                      line-height: 1.25 !important;
+                    }
+
+                    .blog-default-shop-preview h3 {
+                      margin: .45rem 0 .2rem !important;
+                      font-size: ${blogStyle.subHeadingFontSize}px !important;
+                      line-height: 1.3 !important;
+                    }
+
+                    .blog-default-shop-preview section {
+                      margin: .4rem 0 !important;
+                      padding: .45rem .6rem !important;
+                      border: 1px solid #f3f4f6;
+                      border-radius: .6rem;
+                    }
+
+                    .blog-default-shop-preview
+                      > [data-flower-shop-default-info="true"] {
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      border: 0 !important;
+                      background: transparent !important;
+                    }
+
+                    .blog-default-shop-preview
+                      a {
+                      color: ${blogStyle.accentColor};
+                      font-weight: 600;
+                      overflow-wrap: anywhere;
+                    }
+                  `}
+                </style>
+
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: defaultShopInfo,
+                  }}
+                />
+              </div>
             </div>
           </section>
         </div>
