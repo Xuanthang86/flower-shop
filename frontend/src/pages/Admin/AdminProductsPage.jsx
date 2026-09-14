@@ -33,7 +33,7 @@ import { uploadImageFile } from "@/services/media";
 
 import { downloadProductExcelTemplate } from "@/services/productExcel";
 
-import ProductExcelImportModal from "./AdminProductExcelImportModal";
+import AdminProductExcelImportModal from "./AdminProductExcelImportModal";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -602,29 +602,43 @@ const AdminProductsPage = () => {
 
   const handleExcelImport = (rows) => {
     if (!Array.isArray(rows) || rows.length === 0) {
-      setError("Không có dòng sản phẩm hợp lệ để nhập.");
+      const errorMessage = "Không có dòng sản phẩm hợp lệ để nhập.";
 
-      return;
+      setError(errorMessage);
+
+      return {
+        success: false,
+        message: errorMessage,
+      };
     }
 
     clearMessages();
 
+    const currentProducts = readProducts();
+
+    const importTimestamp = Date.now();
+
     const importedProducts = rows.map((row, index) => ({
-      id: `product-${Date.now()}-${index}-${Math.random()
+      id: `product-${importTimestamp}-${index}-${Math.random()
         .toString(36)
         .slice(2, 8)}`,
 
-      name: row.name,
+      name: String(row.name || "").trim(),
 
       price: Number(row.price || 0),
 
-      oldPrice: row.oldPrice === null ? null : Number(row.oldPrice),
+      oldPrice:
+        row.oldPrice === null ||
+        row.oldPrice === undefined ||
+        row.oldPrice === ""
+          ? null
+          : Number(row.oldPrice),
 
-      category: row.category,
+      category: String(row.category || "").trim(),
 
-      description: row.description || "",
+      description: String(row.description || "").trim(),
 
-      image: row.image || "",
+      image: String(row.image || "").trim(),
 
       salesCount: 0,
 
@@ -636,7 +650,7 @@ const AdminProductsPage = () => {
     }));
 
     try {
-      const saved = saveProducts([...products, ...importedProducts]);
+      const saved = saveProducts([...currentProducts, ...importedProducts]);
 
       setProducts(saved);
 
@@ -644,11 +658,28 @@ const AdminProductsPage = () => {
 
       setShowExcelImportModal(false);
 
-      setMessage(
-        `Đã nhập thành công ${importedProducts.length} sản phẩm từ Excel.`
-      );
+      const successMessage = `Đã nhập thành công ${importedProducts.length} sản phẩm từ Excel.`;
+
+      setMessage(successMessage);
+
+      return {
+        success: true,
+        products: saved,
+        importedProducts,
+        message: successMessage,
+      };
     } catch (saveError) {
-      setError(saveError.message || "Không thể lưu sản phẩm từ Excel.");
+      const errorMessage =
+        saveError?.message ||
+        "Không thể lưu sản phẩm từ Excel vào bộ nhớ trình duyệt.";
+
+      setError(errorMessage);
+
+      return {
+        success: false,
+        message: errorMessage,
+        error: saveError,
+      };
     }
   };
 
@@ -1442,7 +1473,7 @@ const AdminProductsPage = () => {
         </div>
       )}
 
-      <ProductExcelImportModal
+      <AdminProductExcelImportModal
         open={showExcelImportModal}
         categories={categoriesSorted}
         onClose={() => setShowExcelImportModal(false)}
