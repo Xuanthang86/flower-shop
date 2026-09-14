@@ -154,7 +154,9 @@ const readJson = (key) => {
 
 const writeJson = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const serialized = JSON.stringify(value);
+
+    localStorage.setItem(key, serialized);
 
     return true;
   } catch (error) {
@@ -162,6 +164,84 @@ const writeJson = (key, value) => {
 
     return false;
   }
+};
+
+const isQuotaExceededError = (error) => {
+  if (!error) {
+    return false;
+  }
+
+  const name = String(error.name || "").toLowerCase();
+
+  const message = String(error.message || "").toLowerCase();
+
+  return (
+    name === "quotaexceedederror" ||
+    name === "ns_error_dom_quota_reached" ||
+    Number(error.code) === 22 ||
+    Number(error.code) === 1014 ||
+    message.includes("quota") ||
+    message.includes("storage")
+  );
+};
+
+const getStorageWriteErrorMessage = (error, entityLabel = "dữ liệu") => {
+  if (isQuotaExceededError(error)) {
+    return (
+      `Không thể lưu ${entityLabel} vì bộ nhớ trình duyệt (localStorage) ` +
+      `đã đạt giới hạn hoặc không còn đủ dung lượng. ` +
+      `Ảnh Cloudinary vẫn tồn tại, nhưng danh sách sản phẩm chưa được lưu. ` +
+      `Hãy kiểm tra/xóa dữ liệu website không cần thiết trong trình duyệt ` +
+      `rồi thực hiện lại thao tác.`
+    );
+  }
+
+  const name = String(error?.name || "").toLowerCase();
+
+  if (name === "securityerror" || name === "notallowederror") {
+    return (
+      `Trình duyệt hiện không cho phép website ghi vào bộ nhớ localStorage. ` +
+      `Hãy kiểm tra chế độ riêng tư, quyền lưu dữ liệu website hoặc ` +
+      `cài đặt chặn storage của trình duyệt rồi thử lại.`
+    );
+  }
+
+  if (
+    name === "typeerror" ||
+    String(error?.message || "")
+      .toLowerCase()
+      .includes("circular")
+  ) {
+    return (
+      `Không thể lưu ${entityLabel} vì dữ liệu chứa cấu trúc ` +
+      `không thể chuyển thành JSON.`
+    );
+  }
+
+  return (
+    `Không thể lưu ${entityLabel} vào bộ nhớ trình duyệt. ` +
+    `Nguyên nhân kỹ thuật: ${error?.message || "không xác định"}`
+  );
+};
+
+const writeJsonOrThrow = (key, value, entityLabel) => {
+  let serialized;
+
+  try {
+    serialized = JSON.stringify(value);
+  } catch (error) {
+    throw new Error(getStorageWriteErrorMessage(error, entityLabel));
+  }
+
+  try {
+    localStorage.setItem(key, serialized);
+  } catch (error) {
+    console.error(`Không thể lưu dữ liệu ${key}:`, error);
+
+    throw new Error(getStorageWriteErrorMessage(error, entityLabel));
+  }
+
+  return true;
 };
 
 export const readProducts = () => {
@@ -188,11 +268,7 @@ export const readProducts = () => {
 export const saveProducts = (products) => {
   const normalized = normalizeProducts(products, defaultProducts);
 
-  const saved = writeJson(PRODUCT_STORAGE_KEY, normalized);
-
-  if (!saved) {
-    throw new Error("Không thể lưu danh sách sản phẩm.");
-  }
+  writeJsonOrThrow(PRODUCT_STORAGE_KEY, normalized, "danh sách sản phẩm");
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -262,11 +338,7 @@ export const readCategories = () => {
 export const saveCategories = (categories) => {
   const normalized = normalizeCategories(categories);
 
-  const saved = writeJson(PRODUCT_CATEGORIES_STORAGE_KEY, normalized);
-
-  if (!saved) {
-    throw new Error("Không thể lưu danh mục.");
-  }
+  writeJsonOrThrow(PRODUCT_CATEGORIES_STORAGE_KEY, normalized, "danh mục");
 
   window.dispatchEvent(new Event(CATEGORY_UPDATED_EVENT));
 
