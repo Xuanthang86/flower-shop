@@ -42,30 +42,83 @@ const normalizeBlogContent = (content = "") =>
  * - "2026-09-14"    -> "14/09/2026"
  * - " 14/09/2026 "  -> "14/09/2026"
  */
+// const formatPostDate = (value) => {
+//   const raw = String(value || "")
+//     .replace(/^[\s,，]+/, "")
+//     .trim();
+
+//   if (!raw) {
+//     return "";
+//   }
+
+//   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+//   if (isoMatch) {
+//     const [, year, month, day] = isoMatch;
+
+//     return `${day}/${month}/${year}`;
+//   }
+
+//   const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+//   if (slashMatch) {
+//     return raw;
+//   }
+
+//   return raw.replace(/^[,，]\s*/, "").trim();
+// };
+
 const formatPostDate = (value) => {
-  const raw = String(value || "")
-    .replace(/^[\s,，]+/, "")
+  const raw = String(value ?? "")
+    .replace(/\u00a0/g, " ")
     .trim();
 
   if (!raw) {
     return "";
   }
 
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  /*
+   * Ưu tiên tìm ngày dạng DD/MM/YYYY.
+   *
+   * Ví dụ:
+   * ", 14/09/2026"       -> "14/09/2026"
+   * "，14/09/2026"       -> "14/09/2026"
+   * " , 14/09/2026"      -> "14/09/2026"
+   * "Ngày đăng, 14/09/2026" -> "14/09/2026"
+   */
+  const vietnameseDateMatch = raw.match(
+    /(?:^|[^\d])(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})(?:$|[^\d])/
+  );
 
-  if (isoMatch) {
-    const [, year, month, day] = isoMatch;
+  if (vietnameseDateMatch) {
+    const [, day, month, year] = vietnameseDateMatch;
 
-    return `${day}/${month}/${year}`;
+    return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
   }
 
-  const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  /*
+   * Hỗ trợ ngày ISO:
+   *
+   * 2026-09-14
+   * 2026-9-14
+   */
+  const isoDateMatch = raw.match(
+    /(?:^|[^\d])(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})(?:$|[^\d])/
+  );
 
-  if (slashMatch) {
-    return raw;
+  if (isoDateMatch) {
+    const [, year, month, day] = isoDateMatch;
+
+    return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
   }
 
-  return raw.replace(/^[,，]\s*/, "").trim();
+  /*
+   * Trường hợp dữ liệu chỉ chứa dấu phẩy hoặc dấu cách
+   * ở đầu nhưng không khớp một định dạng ngày cụ thể.
+   *
+   * Vẫn loại bỏ toàn bộ dấu câu đứng trước nội dung.
+   */
+  return raw.replace(/^[\s,，.;:|_-]+/, "").trim();
 };
 
 const BlogPage = () => {
