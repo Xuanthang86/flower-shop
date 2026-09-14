@@ -11,6 +11,9 @@ export const PRODUCT_EXCEL_HEADERS = [
   "Hình ảnh",
 ];
 
+const IMAGE_FILE_PATTERN =
+  /^[^<>:"/\\|?*]+\.(?:jpe?g|png|webp|gif|bmp|avif|svg)$/i;
+
 const normalizeText = (value) =>
   String(value ?? "")
     .replace(/\uFEFF/g, "")
@@ -66,14 +69,16 @@ const parsePrice = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-const normalizeImageUrl = (value) => {
+const normalizeImageReference = (value) => {
   const image = normalizeText(value);
 
   if (!image) {
     return {
       value: "",
+      type: "empty",
       valid: true,
       warning: false,
+      fileName: "",
     };
   }
 
@@ -82,18 +87,36 @@ const normalizeImageUrl = (value) => {
 
     const validProtocol = url.protocol === "http:" || url.protocol === "https:";
 
-    return {
-      value: validProtocol ? url.toString() : "",
-      valid: validProtocol,
-      warning: !validProtocol,
-    };
+    if (validProtocol) {
+      return {
+        value: url.toString(),
+        type: "url",
+        valid: true,
+        warning: false,
+        fileName: "",
+      };
+    }
   } catch {
+    // Không phải URL → tiếp tục kiểm tra tên file ảnh local.
+  }
+
+  if (IMAGE_FILE_PATTERN.test(image)) {
     return {
-      value: "",
-      valid: false,
+      value: image,
+      type: "filename",
+      valid: true,
       warning: true,
+      fileName: image,
     };
   }
+
+  return {
+    value: "",
+    type: "invalid",
+    valid: false,
+    warning: true,
+    fileName: "",
+  };
 };
 
 const findCategory = (value, categories) => {
@@ -151,12 +174,12 @@ const getStatus = ({ name, price, category, image, oldPrice, hasOldPrice }) => {
     return createStatus("invalid_price", "❌ Giá không hợp lệ", "error");
   }
 
+  if (image.type === "filename") {
+    return createStatus("image_pending_upload", "⚠️ Ảnh chờ tải", "warning");
+  }
+
   if (image.warning) {
-    return createStatus(
-      "invalid_image",
-      "⚠️ URL hình ảnh không hợp lệ",
-      "warning"
-    );
+    return createStatus("invalid_image", "⚠️ Hình ảnh không hợp lệ", "warning");
   }
 
   return createStatus("valid", "✅ Hợp lệ", "success");
@@ -177,7 +200,7 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
   const description = normalizeText(row["Tóm tắt"]);
 
-  const image = normalizeImageUrl(row["Hình ảnh"]);
+  const image = normalizeImageReference(row["Hình ảnh"]);
 
   const status = getStatus({
     name,
@@ -204,6 +227,10 @@ export const createProductFromExcelRow = (row, categories, index) => {
     description,
 
     image: image.value,
+
+    imageType: image.type,
+
+    imageFileName: image.fileName,
 
     status,
 
@@ -290,7 +317,7 @@ export const downloadProductExcelTemplate = () => {
     { wch: 15 },
     { wch: 22 },
     { wch: 42 },
-    { wch: 60 },
+    { wch: 38 },
   ];
 
   const guideWorksheet = utils.aoa_to_sheet([
@@ -304,16 +331,24 @@ export const downloadProductExcelTemplate = () => {
     ["Tóm tắt", "Nội dung ngắn dùng làm mô tả sản phẩm."],
     [
       "Hình ảnh",
-      "Dùng URL http/https. Khuyến nghị URL Cloudinary của Flower Shop.",
+      "Có thể nhập tên file ảnh, ví dụ hoa-hong-do.jpg; hoặc URL http/https nếu ảnh đã có sẵn trên Cloudinary.",
     ],
     [],
     [
-      "Lưu ý",
-      "Không dùng đường dẫn C:\\ hoặc D:\\ trong Excel vì đó là đường dẫn chỉ tồn tại trên máy cá nhân.",
+      "Cách nhập ảnh hàng loạt",
+      "Đặt toàn bộ ảnh sản phẩm trong một thư mục. Trong Excel, cột Hình ảnh chỉ ghi đúng tên file, ví dụ hoa-hong-do.jpg. Khi nhập Excel, chọn thư mục ảnh; hệ thống sẽ tự tìm ảnh, upload lên Cloudinary và gắn URL vào sản phẩm.",
     ],
     [
-      "Cách lưu ảnh",
-      "Upload ảnh bằng chức năng Chọn tệp trong Quản lý sản phẩm để ảnh được lưu lên Cloudinary, sau đó copy địa chỉ ảnh và dán vào cột Hình ảnh.",
+      "Ví dụ thư mục",
+      "flower-shop/images/hoa-hong-do.jpg; flower-shop/images/hoa-huong-duong.jpg; flower-shop/images/tulip-hong.jpg",
+    ],
+    [
+      "Không dùng",
+      "Không nhập C:\\Users\\... hoặc D:\\FlowerShop\\... vào cột Hình ảnh.",
+    ],
+    [
+      "URL Cloudinary",
+      "Nếu ảnh đã được upload trước đó, có thể nhập trực tiếp URL https://res.cloudinary.com/... và hệ thống sẽ không upload lại.",
     ],
     [
       "Nhiều ảnh",

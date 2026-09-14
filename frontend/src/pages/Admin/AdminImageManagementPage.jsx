@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { FiEye, FiEyeOff, FiSave, FiTrash2, FiUpload } from "react-icons/fi";
+import {
+  FiCopy,
+  FiEye,
+  FiEyeOff,
+  FiExternalLink,
+  FiSave,
+  FiTrash2,
+  FiUpload,
+} from "react-icons/fi";
 
 import {
   readSiteSettings,
@@ -79,6 +87,44 @@ const normalizePriorityOrder = (list, bannerId, requestedPriority) => {
   }));
 };
 
+const copyTextToClipboard = async (value) => {
+  const text = String(value || "");
+
+  if (!text) {
+    throw new Error("Không có URL hình ảnh để sao chép.");
+  }
+
+  if (
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === "function"
+  ) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+
+  document.body.appendChild(textarea);
+
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error(
+      "Không thể sao chép URL. Vui lòng chọn và copy URL thủ công."
+    );
+  }
+};
+
 const AdminImageManagementPage = () => {
   const [activeTab, setActiveTab] = useState("banners");
 
@@ -101,7 +147,9 @@ const AdminImageManagementPage = () => {
 
     if (!robots) {
       robots = document.createElement("meta");
+
       robots.name = "robots";
+
       document.head.appendChild(robots);
     }
 
@@ -118,14 +166,20 @@ const AdminImageManagementPage = () => {
     const refreshProducts = () => setProducts(readProducts());
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
     window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
     window.addEventListener("storage", refreshSettings);
+
     window.addEventListener("storage", refreshProducts);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
       window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+
       window.removeEventListener("storage", refreshSettings);
+
       window.removeEventListener("storage", refreshProducts);
     };
   }, []);
@@ -285,6 +339,18 @@ const AdminImageManagementPage = () => {
     }
   };
 
+  const handleCopyProductImage = async (product) => {
+    try {
+      await copyTextToClipboard(product.image);
+
+      setError("");
+      setMessage(`Đã sao chép URL hình ảnh của "${product.name}".`);
+    } catch (copyError) {
+      setMessage("");
+      setError(copyError?.message || "Không thể sao chép URL hình ảnh.");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 py-6">
       <div className="mx-auto max-w-7xl px-4">
@@ -412,13 +478,16 @@ const AdminImageManagementPage = () => {
                             }
                             className="mt-1 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-sm outline-none focus:border-pink-400"
                           >
-                            {Array.from({ length: 11 }, (_, i) => i + 5).map(
-                              (seconds) => (
-                                <option key={seconds} value={seconds}>
-                                  {seconds}s
-                                </option>
-                              )
-                            )}
+                            {Array.from(
+                              {
+                                length: 11,
+                              },
+                              (_, i) => i + 5
+                            ).map((seconds) => (
+                              <option key={seconds} value={seconds}>
+                                {seconds}s
+                              </option>
+                            ))}
                           </select>
                         </label>
                       </div>
@@ -489,15 +558,23 @@ const AdminImageManagementPage = () => {
                     key={product.id}
                     className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"
                   >
-                    <div className="flex h-24 items-center justify-center overflow-hidden bg-gray-50 p-2">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="max-h-full max-w-full rounded-lg object-contain"
-                      />
-                    </div>
+                    <a
+                      href={product.image}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group block"
+                      title="Mở hình ảnh"
+                    >
+                      <div className="flex h-24 items-center justify-center overflow-hidden bg-gray-50 p-2">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="max-h-full max-w-full rounded-lg object-contain transition group-hover:scale-[1.03]"
+                        />
+                      </div>
+                    </a>
 
                     <div className="p-3">
                       <h3 className="line-clamp-2 min-h-[38px] text-sm font-semibold text-gray-800">
@@ -513,6 +590,33 @@ const AdminImageManagementPage = () => {
                         {Number(product.salesCount || 0).toLocaleString(
                           "vi-VN"
                         )}
+                      </p>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyProductImage(product)}
+                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-pink-100 bg-pink-50 px-2.5 py-2 text-xs font-semibold text-pink-700 hover:bg-pink-100"
+                          title="Sao chép URL ảnh"
+                        >
+                          <FiCopy />
+                          Sao chép URL
+                        </button>
+
+                        <a
+                          href={product.image}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-gray-600 hover:bg-gray-50"
+                          title="Mở ảnh"
+                          aria-label={`Mở ảnh ${product.name}`}
+                        >
+                          <FiExternalLink />
+                        </a>
+                      </div>
+
+                      <p className="mt-2 break-all text-[10px] leading-4 text-gray-400">
+                        {product.image}
                       </p>
                     </div>
                   </article>

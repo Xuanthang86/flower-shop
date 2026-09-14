@@ -1,29 +1,85 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   FiAlertTriangle,
   FiCheckCircle,
   FiFileText,
+  FiFolder,
   FiUpload,
   FiX,
 } from "react-icons/fi";
 
 import { parseProductExcel } from "@/services/productExcel";
+import { uploadImageFile } from "@/services/media";
 
 const PREVIEW_OPTIONS = [10, 20, 50];
 
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+
+const getFileKey = (file) =>
+  String(file?.name || "")
+    .trim()
+    .toLowerCase();
+
+const findImageFile = (files, fileName) => {
+  const normalizedName = String(fileName || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  return (
+    files.find((file) => getFileKey(file) === normalizedName) ||
+    files.find(
+      (file) =>
+        String(file.webkitRelativePath || "")
+          .split("/")
+          .pop()
+          ?.trim()
+          .toLowerCase() === normalizedName
+    ) ||
+    null
+  );
+};
 
 const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
   const [file, setFile] = useState(null);
 
   const [rows, setRows] = useState([]);
 
+  const [imageFiles, setImageFiles] = useState([]);
+
   const [previewSize, setPreviewSize] = useState(10);
 
   const [parsing, setParsing] = useState(false);
 
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  const [uploadProgress, setUploadProgress] = useState({
+    current: 0,
+    total: 0,
+  });
+
   const [parseError, setParseError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      return;
+    }
+
+    setFile(null);
+    setRows([]);
+    setImageFiles([]);
+    setParsing(false);
+    setUploadingImages(false);
+    setUploadProgress({
+      current: 0,
+      total: 0,
+    });
+    setParseError("");
+  }, [open]);
 
   const summary = useMemo(() => {
     const valid = rows.filter((row) => row.status.level === "success").length;
@@ -34,10 +90,15 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
 
     const errors = rows.filter((row) => row.status.level === "error").length;
 
+    const pendingImages = rows.filter(
+      (row) => row.imageType === "filename" && !row.matchedImageFile
+    ).length;
+
     return {
       valid,
       warnings,
       errors,
+      pendingImages,
     };
   }, [rows]);
 
@@ -49,6 +110,37 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
   if (!open) {
     return null;
   }
+
+  const resolveImageFilesForRows = (sourceRows, files) =>
+    sourceRows.map((row) => {
+      if (row.imageType !== "filename") {
+        return row;
+      }
+
+      const matchedImageFile = findImageFile(files, row.imageFileName);
+
+      if (matchedImageFile) {
+        return {
+          ...row,
+          matchedImageFile,
+          status: {
+            code: "valid",
+            label: "✅ Hợp lệ",
+            level: "success",
+          },
+        };
+      }
+
+      return {
+        ...row,
+        matchedImageFile: null,
+        status: {
+          code: "image_file_not_found",
+          label: "⚠️ Không tìm thấy ảnh",
+          level: "warning",
+        },
+      };
+    });
 
   const handleFileChange = async (event) => {
     const selectedFile = event.target.files?.[0];
@@ -70,7 +162,9 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
     try {
       const result = await parseProductExcel(selectedFile, categories);
 
-      setRows(result.rows);
+      const resolvedRows = resolveImageFilesForRows(result.rows, imageFiles);
+
+      setRows(resolvedRows);
     } catch (error) {
       setParseError(error?.message || "Không thể đọc file Excel.");
     } finally {
@@ -78,15 +172,125 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
     }
   };
 
-  const handleConfirm = () => {
-    const importableRows = rows.filter((row) => row.status.level !== "error");
+  const handleImageFolderChange = (event) => {
+    const files = Array.from(event.target.files || []).filter((item) =>
+      item?.type?.startsWith("image/")
+    );
 
-    if (!importableRows.length) {
+    event.target.value = "";
+
+    setImageFiles(files);
+
+    setRows((currentRows) => resolveImageFilesForRows(currentRows, files));
+
+    setParseError("");
+  };
+
+  const handleConfirm = async () => {
+    if (!rows.length || summary.errors > 0) {
       return;
     }
 
-    onConfirm(importableRows);
+    if (summary.pendingImages > 0) {
+      setParseError(
+        "Vẫn còn ảnh chưa được tìm thấy. Hãy chọn đúng thư mục ảnh hoặc kiểm tra lại tên file trong cột Hình ảnh."
+      );
+
+      return;
+    }
+
+    setParseError("");
+
+    const localImageRows = rows.filter((row) => row.imageType === "filename");
+
+    setUploadingImages(true);
+
+    setUploadProgress({
+      current: 0,
+      total: localImageRows.length,
+    });
+
+    try {
+      const uploadedUrlCache = new Map();
+
+      const resolvedRows = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+
+        if (row.imageType !== "filename") {
+          resolvedRows.push(row);
+          continue;
+        }
+
+        const imageFile = row.matchedImageFile;
+
+        if (!imageFile) {
+          throw new Error(
+            `Không tìm thấy file ảnh "${row.imageFileName}" cho dòng ${row.rowNumber}.`
+          );
+        }
+
+        const cacheKey = getFileKey(imageFile);
+
+        let imageUrl = uploadedUrlCache.get(cacheKey);
+
+        if (!imageUrl) {
+          imageUrl = await uploadImageFile(imageFile, {
+            folder: "flower-shop/products",
+            maxWidth: 1400,
+            maxHeight: 1000,
+            quality: 0.82,
+          });
+
+          uploadedUrlCache.set(cacheKey, imageUrl);
+        }
+
+        resolvedRows.push({
+          ...row,
+          image: imageUrl,
+          imageType: "url",
+          imageFileName: "",
+          matchedImageFile: null,
+          status: {
+            code: "valid",
+            label: "✅ Hợp lệ",
+            level: "success",
+          },
+        });
+
+        setUploadProgress({
+          current:
+            localImageRows.findIndex(
+              (item) => item.rowNumber === row.rowNumber
+            ) + 1,
+          total: localImageRows.length,
+        });
+      }
+
+      setRows(resolvedRows);
+
+      const importableRows = resolvedRows.filter(
+        (row) => row.status.level !== "error"
+      );
+
+      onConfirm(importableRows);
+    } catch (uploadError) {
+      setParseError(
+        uploadError?.message ||
+          "Không thể tải hình ảnh sản phẩm lên Cloudinary."
+      );
+    } finally {
+      setUploadingImages(false);
+    }
   };
+
+  const canConfirm =
+    !parsing &&
+    !uploadingImages &&
+    rows.length > 0 &&
+    summary.errors === 0 &&
+    summary.pendingImages === 0;
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50 p-4">
@@ -98,14 +302,16 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Đọc file .xlsx, kiểm tra dữ liệu và xem trước trước khi lưu.
+              Đọc file .xlsx, kiểm tra dữ liệu, ghép ảnh và xem trước trước khi
+              lưu.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 hover:bg-gray-100"
+            disabled={uploadingImages}
+            className="rounded-full p-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Đóng"
           >
             <FiX size={20} />
@@ -136,7 +342,7 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="sr-only"
                 onChange={handleFileChange}
-                disabled={parsing}
+                disabled={parsing || uploadingImages}
               />
 
               {file && (
@@ -160,30 +366,72 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
                 </div>
               )}
 
+              <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm leading-6 text-green-800">
+                <p className="font-bold">Nhập ảnh hàng loạt</p>
+
+                <p className="mt-2">
+                  Trong cột <strong>Hình ảnh</strong> của Excel, chỉ cần ghi tên
+                  file, ví dụ:
+                </p>
+
+                <p className="mt-2 rounded-lg bg-white px-3 py-2 font-mono text-xs">
+                  hoa-hong-do.jpg
+                </p>
+
+                <label
+                  htmlFor="product-image-folder"
+                  className={`mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white ${
+                    uploadingImages
+                      ? "cursor-not-allowed bg-gray-400"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
+                >
+                  <FiFolder />
+
+                  {imageFiles.length > 0
+                    ? `Đã chọn ${imageFiles.length} ảnh`
+                    : "Chọn thư mục ảnh"}
+
+                  <input
+                    id="product-image-folder"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    webkitdirectory="true"
+                    className="sr-only"
+                    onChange={handleImageFolderChange}
+                    disabled={uploadingImages}
+                  />
+                </label>
+
+                <p className="mt-2 text-xs text-green-700">
+                  Hệ thống sẽ tự tìm ảnh theo tên file, upload lên Cloudinary và
+                  gắn URL vào sản phẩm khi xác nhận nhập.
+                </p>
+              </div>
+
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                <p className="font-bold">Hướng dẫn hình ảnh</p>
+                <p className="font-bold">Nếu đã có URL Cloudinary</p>
 
-                <p className="mt-2">
-                  Ảnh không đưa trực tiếp vào Excel. Hãy upload ảnh bằng chức
-                  năng <strong>Chọn tệp</strong> trong Quản lý sản phẩm để ảnh
-                  được lưu lên Cloudinary.
+                <p className="mt-2">Bạn vẫn có thể nhập trực tiếp:</p>
+
+                <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 font-mono text-xs">
+                  https://res.cloudinary.com/...
                 </p>
 
                 <p className="mt-2">
-                  Sau đó dùng URL ảnh
-                  <strong> https://res.cloudinary.com/...</strong> trong cột{" "}
-                  <strong>Hình ảnh</strong>.
+                  Ảnh có URL Cloudinary sẽ không được upload lại.
                 </p>
 
-                <p className="mt-2">
-                  Không dùng:
-                  <br />
-                  <code>C:\Users\...</code>
-                  <br />
-                  hoặc
-                  <br />
-                  <code>D:\FlowerShop\...</code>
-                </p>
+                <p className="mt-2 font-semibold">Không nhập:</p>
+
+                <code className="mt-1 block rounded-lg bg-white px-3 py-2 text-xs">
+                  C:\Users\...
+                </code>
+
+                <code className="mt-1 block rounded-lg bg-white px-3 py-2 text-xs">
+                  D:\FlowerShop\...
+                </code>
               </div>
 
               {rows.length > 0 && (
@@ -204,7 +452,26 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
                     <p className="text-red-600">
                       ❌ Lỗi: <strong>{summary.errors}</strong>
                     </p>
+
+                    {summary.pendingImages > 0 && (
+                      <p className="text-amber-700">
+                        📷 Ảnh chưa ghép:{" "}
+                        <strong>{summary.pendingImages}</strong>
+                      </p>
+                    )}
                   </div>
+                </div>
+              )}
+
+              {uploadingImages && (
+                <div className="rounded-xl border border-pink-100 bg-pink-50 p-4">
+                  <p className="text-sm font-semibold text-pink-700">
+                    Đang tải ảnh lên Cloudinary...
+                  </p>
+
+                  <p className="mt-1 text-xs text-pink-600">
+                    {uploadProgress.current} / {uploadProgress.total} ảnh
+                  </p>
                 </div>
               )}
             </aside>
@@ -329,8 +596,26 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
                                 {row.categoryName || "—"}
                               </td>
 
-                              <td className="max-w-[250px] px-4 py-3">
-                                {row.image ? (
+                              <td className="max-w-[280px] px-4 py-3">
+                                {row.imageType === "filename" ? (
+                                  <div>
+                                    <p className="truncate text-xs font-semibold text-gray-700">
+                                      {row.imageFileName}
+                                    </p>
+
+                                    <p
+                                      className={`mt-1 text-[11px] ${
+                                        row.matchedImageFile
+                                          ? "text-green-600"
+                                          : "text-amber-600"
+                                      }`}
+                                    >
+                                      {row.matchedImageFile
+                                        ? "Đã tìm thấy ảnh"
+                                        : "Chưa tìm thấy ảnh"}
+                                    </p>
+                                  </div>
+                                ) : row.image ? (
                                   <span className="block truncate text-xs text-blue-600">
                                     {row.image}
                                   </span>
@@ -388,10 +673,20 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
 
             {rows.length > 0 &&
               summary.errors === 0 &&
+              summary.pendingImages > 0 && (
+                <span className="font-semibold text-amber-600">
+                  Hãy chọn đúng thư mục ảnh và bảo đảm tên file trong Excel khớp
+                  với tên file ảnh.
+                </span>
+              )}
+
+            {rows.length > 0 &&
+              summary.errors === 0 &&
+              summary.pendingImages === 0 &&
               summary.warnings > 0 && (
                 <span className="font-semibold text-amber-600">
-                  Có dòng cảnh báo hình ảnh. Các dòng này vẫn được nhập, nhưng
-                  hình ảnh không hợp lệ sẽ được bỏ qua.
+                  Có dòng cảnh báo hình ảnh. Các URL không hợp lệ sẽ được bỏ
+                  qua.
                 </span>
               )}
           </div>
@@ -400,7 +695,8 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700"
+              disabled={uploadingImages}
+              className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Hủy
             </button>
@@ -408,14 +704,18 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={parsing || rows.length === 0 || summary.errors > 0}
+              disabled={!canConfirm}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FiCheckCircle />
 
-              {summary.errors > 0
-                ? "Không thể nhập"
-                : `Xác nhận nhập ${summary.valid + summary.warnings} sản phẩm`}
+              {uploadingImages
+                ? `Đang tải ảnh ${uploadProgress.current}/${uploadProgress.total}...`
+                : summary.errors > 0
+                  ? "Không thể nhập"
+                  : summary.pendingImages > 0
+                    ? "Chưa đủ ảnh"
+                    : `Xác nhận nhập ${summary.valid + summary.warnings} sản phẩm`}
             </button>
           </div>
         </footer>

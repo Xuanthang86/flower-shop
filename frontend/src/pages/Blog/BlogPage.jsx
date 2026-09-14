@@ -32,42 +32,6 @@ const getCoverImage = (post) =>
 const normalizeBlogContent = (content = "") =>
   normalizeBlogPostContent(content);
 
-/**
- * Chuẩn hóa ngày hiển thị trên giao diện.
- *
- * Hỗ trợ:
- * - ", 14/09/2026"  -> "14/09/2026"
- * - "，14/09/2026"  -> "14/09/2026"
- * - "14/09/2026"    -> "14/09/2026"
- * - "2026-09-14"    -> "14/09/2026"
- * - " 14/09/2026 "  -> "14/09/2026"
- */
-// const formatPostDate = (value) => {
-//   const raw = String(value || "")
-//     .replace(/^[\s,，]+/, "")
-//     .trim();
-
-//   if (!raw) {
-//     return "";
-//   }
-
-//   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-//   if (isoMatch) {
-//     const [, year, month, day] = isoMatch;
-
-//     return `${day}/${month}/${year}`;
-//   }
-
-//   const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-
-//   if (slashMatch) {
-//     return raw;
-//   }
-
-//   return raw.replace(/^[,，]\s*/, "").trim();
-// };
-
 const formatPostDate = (value) => {
   const raw = String(value ?? "")
     .replace(/\u00a0/g, " ")
@@ -78,13 +42,14 @@ const formatPostDate = (value) => {
   }
 
   /*
-   * Ưu tiên tìm ngày dạng DD/MM/YYYY.
+   * Luôn tìm ngày DD/MM/YYYY bên trong chuỗi,
+   * thay vì chỉ kiểm tra chuỗi có đúng định dạng hay không.
    *
    * Ví dụ:
-   * ", 14/09/2026"       -> "14/09/2026"
-   * "，14/09/2026"       -> "14/09/2026"
-   * " , 14/09/2026"      -> "14/09/2026"
+   * ", 14/09/2026" -> "14/09/2026"
+   * "，14/09/2026" -> "14/09/2026"
    * "Ngày đăng, 14/09/2026" -> "14/09/2026"
+   * "14 / 09 / 2026" -> "14/09/2026"
    */
   const vietnameseDateMatch = raw.match(
     /(?:^|[^\d])(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})(?:$|[^\d])/
@@ -97,10 +62,10 @@ const formatPostDate = (value) => {
   }
 
   /*
-   * Hỗ trợ ngày ISO:
-   *
+   * Hỗ trợ:
    * 2026-09-14
    * 2026-9-14
+   * Ngày đăng: 2026-09-14
    */
   const isoDateMatch = raw.match(
     /(?:^|[^\d])(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})(?:$|[^\d])/
@@ -113,13 +78,16 @@ const formatPostDate = (value) => {
   }
 
   /*
-   * Trường hợp dữ liệu chỉ chứa dấu phẩy hoặc dấu cách
-   * ở đầu nhưng không khớp một định dạng ngày cụ thể.
-   *
-   * Vẫn loại bỏ toàn bộ dấu câu đứng trước nội dung.
+   * Nếu dữ liệu cũ có dấu câu ở đầu nhưng không
+   * chứa ngày hợp lệ, vẫn loại bỏ dấu câu đầu chuỗi.
    */
   return raw.replace(/^[\s,，.;:|_-]+/, "").trim();
 };
+
+const normalizePostForDisplay = (post) => ({
+  ...post,
+  date: formatPostDate(post?.date),
+});
 
 const BlogPage = () => {
   const { postId } = useParams();
@@ -132,15 +100,30 @@ const BlogPage = () => {
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+  const rawPosts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+
+  /*
+   * Chuẩn hóa ngày của toàn bộ bài viết trước khi
+   * tìm currentPost và render danh sách.
+   *
+   * Nhờ vậy dữ liệu cũ trong localStorage như:
+   * ", 14/09/2026"
+   * sẽ không thể đi thẳng ra giao diện.
+   */
+  const posts = useMemo(
+    () => rawPosts.map(normalizePostForDisplay),
+    [rawPosts]
+  );
 
   const currentPost = useMemo(
     () => posts.find((post) => String(post.id) === String(postId)),
@@ -174,7 +157,9 @@ const BlogPage = () => {
 
       if (!description) {
         description = document.createElement("meta");
+
         description.name = "description";
+
         document.head.appendChild(description);
       }
 
@@ -188,7 +173,9 @@ const BlogPage = () => {
 
       if (!canonical) {
         canonical = document.createElement("link");
+
         canonical.rel = "canonical";
+
         document.head.appendChild(canonical);
       }
 
@@ -204,33 +191,45 @@ const BlogPage = () => {
 
       const schema = {
         "@context": "https://schema.org",
+
         "@type": "BlogPosting",
+
         headline: currentPost.title,
+
         description: stripHtml(
           normalizeBlogPostContent(currentPost.content)
         ).slice(0, 300),
+
         url: canonical.href,
+
         mainEntityOfPage: {
           "@type": "WebPage",
           "@id": canonical.href,
         },
+
         datePublished: schemaDate
           ? `${schemaDate}T${currentPost.time || "08:00"}:00`
           : undefined,
+
         dateModified: currentPost.updatedAt || undefined,
+
         image: coverImage ? [coverImage] : undefined,
+
         author: {
           "@type": "Organization",
           name: siteName,
           url: window.location.origin,
         },
+
         publisher: {
           "@type": "Organization",
           name: siteName,
           url: window.location.origin,
+
           logo: settings.branding?.logoImage
             ? {
                 "@type": "ImageObject",
+
                 url: settings.branding.logoImage,
               }
             : undefined,
@@ -246,7 +245,9 @@ const BlogPage = () => {
       const schemaScript = document.createElement("script");
 
       schemaScript.id = "flower-shop-blog-schema";
+
       schemaScript.type = "application/ld+json";
+
       schemaScript.textContent = JSON.stringify(schema);
 
       document.head.appendChild(schemaScript);

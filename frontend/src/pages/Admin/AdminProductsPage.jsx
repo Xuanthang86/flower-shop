@@ -33,7 +33,7 @@ import { uploadImageFile } from "@/services/media";
 
 import { downloadProductExcelTemplate } from "@/services/productExcel";
 
-import ProductExcelImportModal from "./ProductExcelImportModal";
+import ProductExcelImportModal from "./AdminProductExcelImportModal";
 
 const PRODUCTS_PER_PAGE = 20;
 
