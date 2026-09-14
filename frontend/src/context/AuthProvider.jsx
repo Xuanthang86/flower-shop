@@ -204,12 +204,19 @@ const AuthProvider = ({ children }) => {
     const refreshPermissions = () => {
       const settings = readSiteSettings();
 
-      setRolePermissions(
-        settings.rolePermissions || {
-          manager: DEFAULT_ROLE_PERMISSIONS.manager,
-          product_manager: DEFAULT_ROLE_PERMISSIONS.product_manager,
-        }
-      );
+      const storedPermissions = settings.rolePermissions || {};
+
+      setRolePermissions({
+        manager: normalizePermissionList(
+          storedPermissions.manager,
+          ROLES.MANAGER
+        ),
+
+        product_manager: normalizePermissionList(
+          storedPermissions.product_manager,
+          ROLES.PRODUCT_MANAGER
+        ),
+      });
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshPermissions);
@@ -444,7 +451,17 @@ const AuthProvider = ({ children }) => {
 
       const saved = saveSiteSettings(nextSettings);
 
-      setRolePermissions(saved.rolePermissions);
+      setRolePermissions({
+        manager: normalizePermissionList(
+          saved.rolePermissions?.manager,
+          ROLES.MANAGER
+        ),
+
+        product_manager: normalizePermissionList(
+          saved.rolePermissions?.product_manager,
+          ROLES.PRODUCT_MANAGER
+        ),
+      });
 
       return {
         success: true,
@@ -840,7 +857,19 @@ const AuthProvider = ({ children }) => {
         return Object.values(PERMISSIONS);
       }
 
-      return rolePermissions?.[role] || getDefaultRolePermissions(role);
+      /*
+       * Luôn chuẩn hóa quyền trước khi trả ra UI
+       * hoặc dùng cho hasPermission().
+       *
+       * Điều này loại bỏ các quyền cũ/không còn
+       * nằm trong MANAGEMENT_PERMISSIONS, ví dụ:
+       * view_reports.
+       *
+       * Nhờ đó quyền hiển thị trong tài khoản và
+       * quyền hiển thị tại "Quản lý quyền được phép
+       * sử dụng" luôn đồng bộ.
+       */
+      return normalizePermissionList(rolePermissions?.[role], role);
     },
     [rolePermissions]
   );

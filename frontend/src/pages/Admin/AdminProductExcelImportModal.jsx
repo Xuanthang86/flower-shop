@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   FiAlertTriangle,
@@ -44,7 +44,12 @@ const findImageFile = (files, fileName) => {
   );
 };
 
-const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
+const AdminProductExcelImportModal = ({
+  open,
+  categories,
+  onClose,
+  onConfirm,
+}) => {
   const [file, setFile] = useState(null);
 
   const [rows, setRows] = useState([]);
@@ -64,11 +69,7 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
 
   const [parseError, setParseError] = useState("");
 
-  useEffect(() => {
-    if (open) {
-      return;
-    }
-
+  const resetModalState = () => {
     setFile(null);
     setRows([]);
     setImageFiles([]);
@@ -79,7 +80,17 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
       total: 0,
     });
     setParseError("");
-  }, [open]);
+    setPreviewSize(10);
+  };
+
+  const handleClose = () => {
+    if (uploadingImages) {
+      return;
+    }
+
+    resetModalState();
+    onClose();
+  };
 
   const summary = useMemo(() => {
     const valid = rows.filter((row) => row.status.level === "success").length;
@@ -152,11 +163,8 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
     }
 
     setFile(selectedFile);
-
     setRows([]);
-
     setParseError("");
-
     setParsing(true);
 
     try {
@@ -275,6 +283,8 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
       );
 
       onConfirm(importableRows);
+
+      resetModalState();
     } catch (uploadError) {
       setParseError(
         uploadError?.message ||
@@ -309,7 +319,7 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={uploadingImages}
             className="rounded-full p-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Đóng"
@@ -694,7 +704,7 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
           <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={uploadingImages}
               className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -715,7 +725,9 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
                   ? "Không thể nhập"
                   : summary.pendingImages > 0
                     ? "Chưa đủ ảnh"
-                    : `Xác nhận nhập ${summary.valid + summary.warnings} sản phẩm`}
+                    : `Xác nhận nhập ${
+                        summary.valid + summary.warnings
+                      } sản phẩm`}
             </button>
           </div>
         </footer>
@@ -724,4 +736,4 @@ const ProductExcelImportModal = ({ open, categories, onClose, onConfirm }) => {
   );
 };
 
-export default ProductExcelImportModal;
+export default AdminProductExcelImportModal;
