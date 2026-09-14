@@ -47,8 +47,30 @@ const stripHtml = (html = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+const normalizeDateValue = (value) => {
+  const raw = String(value || "")
+    .trim()
+    .replace(/[,，]/g, "");
+
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (match) {
+    return raw;
+  }
+
+  const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+
+    return `${year}-${month}-${day}`;
+  }
+
+  return raw;
+};
+
 const formatPostDate = (value) => {
-  const raw = String(value || "").slice(0, 10);
+  const raw = normalizeDateValue(value).slice(0, 10);
 
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
@@ -119,12 +141,10 @@ const AdminBlogManagementPage = () => {
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
-
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -161,7 +181,6 @@ const AdminBlogManagementPage = () => {
       const range = document.createRange();
 
       range.selectNodeContents(currentEditor);
-
       range.collapse(false);
 
       selection.removeAllRanges();
@@ -180,11 +199,8 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       ...EMPTY_POST,
-
       date: new Date().toISOString().slice(0, 10),
-
       time: new Date().toTimeString().slice(0, 5),
-
       content: "",
     });
 
@@ -202,13 +218,10 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       title: post.title || "",
-
-      date: post.date || new Date().toISOString().slice(0, 10),
-
+      date:
+        normalizeDateValue(post.date) || new Date().toISOString().slice(0, 10),
       time: post.time || "08:00",
-
       image: post.image || "",
-
       content: normalizeBlogPostContent(post.content || ""),
     });
 
@@ -226,16 +239,13 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       ...EMPTY_POST,
-
       date: new Date().toISOString().slice(0, 10),
-
       time: new Date().toTimeString().slice(0, 5),
     });
   };
 
   const saveEditorSelection = () => {
     const editor = editorRef.current;
-
     const selection = window.getSelection();
 
     if (
@@ -417,7 +427,6 @@ const AdminBlogManagementPage = () => {
 
       if (!editor || !editor.isConnected) {
         notifyError("Trình soạn thảo chưa sẵn sàng.");
-
         return;
       }
 
@@ -429,7 +438,6 @@ const AdminBlogManagementPage = () => {
 
       if (!selection || selection.rangeCount === 0) {
         notifyError("Không xác định được vị trí chèn ảnh.");
-
         return;
       }
 
@@ -437,7 +445,6 @@ const AdminBlogManagementPage = () => {
 
       if (!editor.contains(range.commonAncestorContainer)) {
         notifyError("Không xác định được vị trí chèn ảnh.");
-
         return;
       }
 
@@ -449,21 +456,15 @@ const AdminBlogManagementPage = () => {
       imageElement.decoding = "async";
 
       imageElement.style.display = "block";
-
       imageElement.style.maxWidth = "80%";
-
       imageElement.style.height = "auto";
-
       imageElement.style.margin = "12px auto";
-
       imageElement.style.borderRadius = "12px";
 
       range.deleteContents();
-
       range.insertNode(imageElement);
 
       range.setStartAfter(imageElement);
-
       range.collapse(true);
 
       selection.removeAllRanges();
@@ -486,19 +487,24 @@ const AdminBlogManagementPage = () => {
 
     const editor = editorRef.current;
 
-    let content = editor?.isConnected
+    const content = editor?.isConnected
       ? normalizeBlogPostContent(editor.innerHTML || "")
       : normalizeBlogPostContent(form.content);
 
+    const normalizedDate = normalizeDateValue(form.date);
+
     if (!title) {
       notifyError("Vui lòng nhập tiêu đề bài viết.");
-
       return;
     }
 
     if (!stripHtml(content)) {
       notifyError("Vui lòng nhập nội dung bài viết.");
+      return;
+    }
 
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      notifyError("Ngày đăng không hợp lệ.");
       return;
     }
 
@@ -506,17 +512,11 @@ const AdminBlogManagementPage = () => {
       id:
         editingPost?.id ||
         `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-
       title,
-
-      date: form.date,
-
+      date: normalizedDate,
       time: form.time || "08:00",
-
       image: form.image || "",
-
       content,
-
       updatedAt: new Date().toISOString(),
     };
 
@@ -554,20 +554,17 @@ const AdminBlogManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
-
         blogPosts: (settings.blogPosts || []).filter(
           (item) => String(item.id) !== String(confirmDelete.id)
         ),
       });
 
       setSettings(saved);
-
       setConfirmDelete(null);
 
       notifySuccess("Đã xóa bài viết.");
     } catch (deleteError) {
       setConfirmDelete(null);
-
       notifyError(deleteError?.message || "Không thể xóa bài viết.");
     }
   };
@@ -580,29 +577,19 @@ const AdminBlogManagementPage = () => {
 
   const toolbar = [
     ["bold", <FiBold />, "In đậm"],
-
     ["italic", <FiItalic />, "In nghiêng"],
-
     ["underline", <FiUnderline />, "Gạch chân"],
-
     ["justifyLeft", <FiAlignLeft />, "Căn trái"],
-
     ["justifyCenter", <FiAlignCenter />, "Căn giữa"],
-
     ["justifyRight", <FiAlignRight />, "Căn phải"],
-
     ["justifyFull", <FiAlignJustify />, "Căn đều"],
-
     ["insertUnorderedList", <FiList />, "Danh sách"],
-
     [
       "insertOrderedList",
       <span className="text-xs font-bold">1.</span>,
       "Danh sách số",
     ],
-
     ["undo", <span className="text-lg leading-none">↶</span>, "Hoàn tác"],
-
     ["redo", <span className="text-lg leading-none">↷</span>, "Làm lại"],
   ];
 
@@ -727,11 +714,11 @@ const AdminBlogManagementPage = () => {
 
                     <input
                       type="date"
-                      value={form.date}
+                      value={normalizeDateValue(form.date)}
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
-                          date: event.target.value,
+                          date: normalizeDateValue(event.target.value),
                         }))
                       }
                       className={inputClass}
@@ -768,7 +755,6 @@ const AdminBlogManagementPage = () => {
                       className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
                     >
                       <FiImage />
-
                       {uploading ? "Đang tải..." : "Chọn tệp"}
                     </label>
 
@@ -817,9 +803,7 @@ const AdminBlogManagementPage = () => {
                           type="button"
                           onMouseDown={(event) => {
                             event.preventDefault();
-
                             saveEditorSelection();
-
                             executeFormat(command);
                           }}
                           className="rounded-lg p-2.5 hover:bg-white"
@@ -840,11 +824,8 @@ const AdminBlogManagementPage = () => {
                         aria-label="Định dạng đoạn văn"
                       >
                         <option value="">Đoạn văn</option>
-
                         <option value="h2">Tiêu đề H2</option>
-
                         <option value="h3">Tiêu đề H3</option>
-
                         <option value="p">Đoạn văn</option>
                       </select>
 
@@ -852,9 +833,7 @@ const AdminBlogManagementPage = () => {
                         type="button"
                         onMouseDown={(event) => {
                           event.preventDefault();
-
                           saveEditorSelection();
-
                           createLink();
                         }}
                         className="rounded-lg p-2.5 hover:bg-white"
@@ -887,9 +866,7 @@ const AdminBlogManagementPage = () => {
                         type="button"
                         onMouseDown={(event) => {
                           event.preventDefault();
-
                           saveEditorSelection();
-
                           executeFormat("removeFormat");
                         }}
                         className="rounded-lg px-3 py-2 text-xs font-semibold hover:bg-white"
