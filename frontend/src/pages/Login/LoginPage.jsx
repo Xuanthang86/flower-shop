@@ -64,8 +64,17 @@ const LoginPage = () => {
     }
 
     /*
-     * Người dùng chỉ được nhập phần trước @flowershop.vn.
-     * Không cho phép nhập thêm @ hoặc domain khác.
+     * Người dùng chỉ nhập phần trước @flowershop.vn.
+     *
+     * Ví dụ:
+     * thang
+     * admin
+     * sales
+     *
+     * Hệ thống sẽ tự ghép thành:
+     * thang@flowershop.vn
+     * admin@flowershop.vn
+     * sales@flowershop.vn
      */
     if (!/^[a-zA-Z0-9._-]+$/.test(emailPrefix)) {
       setError(
@@ -150,6 +159,7 @@ const LoginPage = () => {
           {error && (
             <div
               role="alert"
+              aria-live="polite"
               className="
                 mb-6
                 rounded-lg
