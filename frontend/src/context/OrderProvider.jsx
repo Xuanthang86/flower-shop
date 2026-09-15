@@ -290,8 +290,7 @@ const OrderProvider = ({ children }) => {
 
       /*
        * BƯỚC 1:
-       * Kiểm tra và trừ tồn kho
-       * bằng dữ liệu Catalog mới nhất.
+       * Kiểm tra và trừ tồn kho bằng Catalog mới nhất.
        */
 
       const inventoryResult = await consumeStockForItems(items);
@@ -382,20 +381,23 @@ const OrderProvider = ({ children }) => {
         };
       });
 
-      let createdOrder = null;
-
-      let nextOrders = null;
-
       /*
        * BƯỚC 3:
        * Tạo order dựa trên snapshot.
+       *
+       * FIX:
+       * Không dùng:
+       *   let createdOrder = null;
+       *   let nextOrders = null;
+       *
+       * Vì hai biến đều được gán lại trước khi sử dụng.
        */
 
       const currentOrders = readOrders();
 
       const orderId = generateOrderCode(currentOrders);
 
-      createdOrder = normalizeOrder({
+      const createdOrder = normalizeOrder({
         ...orderData,
 
         id: orderId,
@@ -439,7 +441,7 @@ const OrderProvider = ({ children }) => {
         inventoryRestockSnapshots: [],
       });
 
-      nextOrders = [createdOrder, ...currentOrders];
+      const nextOrders = [createdOrder, ...currentOrders];
 
       /*
        * BƯỚC 4:
@@ -452,10 +454,6 @@ const OrderProvider = ({ children }) => {
       try {
         writeOrdersToStorage(nextOrders);
       } catch (storageError) {
-        /*
-         * ROLLBACK TỒN KHO
-         */
-
         const rollback = await restockOrderItems(snapshotItems);
 
         if (!rollback.success) {
@@ -610,8 +608,7 @@ const OrderProvider = ({ children }) => {
       }
 
       /*
-       * Nếu trạng thái không thay đổi
-       * → không làm gì.
+       * Nếu trạng thái không thay đổi.
        */
 
       if (currentStatus === status) {
@@ -632,7 +629,8 @@ const OrderProvider = ({ children }) => {
         currentStatus !== ORDER_STATUS.CANCELLED
       ) {
         /*
-         * Nếu đã hoàn tồn rồi thì không hoàn lần 2.
+         * Trường hợp dữ liệu đã ghi nhận hoàn tồn trước đó:
+         * chỉ cập nhật trạng thái, tuyệt đối không hoàn lần 2.
          */
 
         if (currentOrder.inventoryRestocked) {
@@ -740,11 +738,8 @@ const OrderProvider = ({ children }) => {
           };
         } catch (storageError) {
           /*
-           * Nếu cập nhật order cancel thất bại sau khi
-           * đã hoàn tồn thì KHÔNG được tự động restock
-           * lần nữa.
-           *
-           * Catalog đã trở về đúng tồn kho.
+           * Catalog đã được hoàn tồn.
+           * Không được gọi restock thêm lần nữa.
            */
 
           return {
