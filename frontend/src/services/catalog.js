@@ -13,6 +13,10 @@ Quản lý tập trung:
 */
 
 import { products as defaultProducts } from "@/data/products";
+import {
+  readProductsFromIndexedDB,
+  saveProductsToIndexedDB,
+} from "@/services/catalogStorage";
 
 import {
   DEFAULT_PRODUCT_CATEGORIES,
@@ -24,6 +28,11 @@ import {
 export const PRODUCT_STORAGE_KEY = "flower-shop-products";
 
 export const PRODUCT_UPDATED_EVENT = "flower-shop-products-updated";
+let productsCache = null;
+
+let productsPersistencePromise = Promise.resolve();
+
+let productsHydrationPromise = null;
 
 export { CATEGORY_UPDATED_EVENT };
 
@@ -214,19 +223,10 @@ const getStorageWriteErrorMessage = (error, entityLabel = "dữ liệu") => {
   );
 };
 
-const createStorageWriteError = (error, entityLabel) => {
-  const wrappedError = new Error(
-    getStorageWriteErrorMessage(error, entityLabel)
-  );
-
-  /*
-   * Gắn lỗi gốc một cách tương thích với các môi trường trình duyệt
-   * không hỗ trợ đầy đủ Error(message, { cause }).
-   */
-  wrappedError.cause = error;
-
-  return wrappedError;
-};
+const createStorageWriteError = (error, entityLabel) =>
+  new Error(getStorageWriteErrorMessage(error, entityLabel), {
+    cause: error,
+  });
 
 const writeJson = (key, value, entityLabel = "dữ liệu") => {
   let serialized;
@@ -265,41 +265,166 @@ const writeJsonSafely = (key, value, entityLabel = "dữ liệu") => {
   }
 };
 
-export const readProducts = () => {
+const getInitialProductsFromLocalStorage = () => {
   const stored = readJson(PRODUCT_STORAGE_KEY);
 
   if (!Array.isArray(stored)) {
-    const seeded = normalizeProducts(defaultProducts);
-
-    writeJsonSafely(PRODUCT_STORAGE_KEY, seeded, "danh sách sản phẩm mặc định");
-
-    return seeded;
+    return normalizeProducts(defaultProducts);
   }
 
-  const normalized = normalizeProducts(stored, defaultProducts);
+  return normalizeProducts(stored, defaultProducts);
+};
 
-  /*
-   * Chỉ cố gắng ghi lại dữ liệu sau khi normalize thành công.
-   * Nếu localStorage đã đầy, vẫn trả về dữ liệu đã đọc được thay vì
-   * làm trang bị blank page hoặc crash trong quá trình khởi tạo.
-   */
-  writeJsonSafely(
-    PRODUCT_STORAGE_KEY,
-    normalized,
-    "danh sách sản phẩm đã chuẩn hóa"
+const createProductPersistenceError = (error) => {
+  if (isQuotaExceededError(error)) {
+    return new Error(
+      "Không thể lưu danh sách sản phẩm vào bộ nhớ trình duyệt. " +
+        "Hệ thống đã chuyển dữ liệu sản phẩm sang IndexedDB nhưng trình duyệt vẫn từ chối ghi dữ liệu. " +
+        "Hãy kiểm tra dung lượng lưu trữ của trình duyệt hoặc chế độ riêng tư rồi thử lại.",
+      {
+        cause: error,
+      }
+    );
+  }
+
+  return new Error(
+    `Không thể lưu danh sách sản phẩm vào IndexedDB. ${
+      error?.message || "Nguyên nhân không xác định."
+    }`,
+    {
+      cause: error,
+    }
   );
+};
 
-  return normalized;
+const persistProducts = async (products) => {
+  try {
+    await saveProductsToIndexedDB(products);
+
+    /*
+     * Sau khi IndexedDB đã xác nhận lưu thành công,
+     * localStorage cũ không còn cần thiết nữa.
+     *
+     * Việc xóa key này giúp giải phóng quota localStorage
+     * đã có thể bị chiếm bởi danh sách sản phẩm cũ.
+     */
+    try {
+      localStorage.removeItem(PRODUCT_STORAGE_KEY);
+    } catch (removeError) {
+      console.warn(
+        `Không thể xóa dữ liệu sản phẩm cũ khỏi localStorage:`,
+        removeError
+      );
+    }
+
+    return products;
+  } catch (error) {
+    throw createProductPersistenceError(error);
+  }
+};
+
+const hydrateProductsFromIndexedDB = async () => {
+  try {
+    const indexedProducts = await readProductsFromIndexedDB();
+
+    if (Array.isArray(indexedProducts)) {
+      productsCache = normalizeProducts(indexedProducts, defaultProducts);
+
+      window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
+
+      return productsCache;
+    }
+
+    /*
+     * Chưa có dữ liệu trong IndexedDB.
+     *
+     * Đây là lần migrate đầu tiên:
+     * lấy dữ liệu hiện tại từ localStorage rồi chuyển sang IndexedDB.
+     */
+    const legacyProducts = getInitialProductsFromLocalStorage();
+
+    productsCache = legacyProducts;
+
+    await saveProductsToIndexedDB(legacyProducts);
+
+    try {
+      localStorage.removeItem(PRODUCT_STORAGE_KEY);
+    } catch (removeError) {
+      console.warn(
+        `Không thể xóa danh sách sản phẩm cũ khỏi localStorage:`,
+        removeError
+      );
+    }
+
+    window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
+
+    return productsCache;
+  } catch (error) {
+    console.error("Không thể khởi tạo kho sản phẩm IndexedDB:", error);
+
+    /*
+     * Nếu IndexedDB không khả dụng, vẫn giữ dữ liệu hiện tại
+     * trong bộ nhớ để giao diện không bị blank.
+     */
+    if (!Array.isArray(productsCache)) {
+      productsCache = getInitialProductsFromLocalStorage();
+    }
+
+    return productsCache;
+  }
+};
+
+export const hydrateProducts = () => {
+  if (!productsHydrationPromise) {
+    productsHydrationPromise = hydrateProductsFromIndexedDB();
+  }
+
+  return productsHydrationPromise;
+};
+
+export const readProducts = () => {
+  if (!Array.isArray(productsCache)) {
+    productsCache = getInitialProductsFromLocalStorage();
+  }
+
+  return productsCache;
 };
 
 export const saveProducts = (products) => {
   const normalized = normalizeProducts(products, defaultProducts);
 
-  writeJson(PRODUCT_STORAGE_KEY, normalized, "danh sách sản phẩm");
+  productsCache = normalized;
+
+  /*
+   * API đồng bộ cũ vẫn được giữ để không phá các màn hình
+   * đang gọi saveProducts() hiện tại.
+   *
+   * Việc ghi bền vững vào IndexedDB được quản lý qua
+   * saveProductsAsync() bên dưới.
+   */
+  productsPersistencePromise = persistProducts(normalized);
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
   return normalized;
+};
+
+export const saveProductsAsync = async (products) => {
+  const normalized = normalizeProducts(products, defaultProducts);
+
+  productsCache = normalized;
+
+  productsPersistencePromise = persistProducts(normalized);
+
+  await productsPersistencePromise;
+
+  window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
+
+  return normalized;
+};
+
+export const waitForProductsPersistence = async () => {
+  await productsPersistencePromise;
 };
 
 export const getProductById = (productId, products = readProducts()) =>

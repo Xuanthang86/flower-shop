@@ -21,6 +21,7 @@ import {
 import {
   readProducts,
   saveProducts,
+  saveProductsAsync,
   readCategories,
   saveCategories,
   PRODUCT_UPDATED_EVENT,
@@ -600,7 +601,7 @@ const AdminProductsPage = () => {
     }
   };
 
-  const handleExcelImport = (rows) => {
+  const handleExcelImport = async (rows) => {
     if (!Array.isArray(rows) || rows.length === 0) {
       const errorMessage = "Không có dòng sản phẩm hợp lệ để nhập.";
 
@@ -650,7 +651,10 @@ const AdminProductsPage = () => {
     }));
 
     try {
-      const saved = saveProducts([...currentProducts, ...importedProducts]);
+      const saved = await saveProductsAsync([
+        ...currentProducts,
+        ...importedProducts,
+      ]);
 
       setProducts(saved);
 

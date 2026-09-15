@@ -14,7 +14,7 @@ import {
 
 import { parseProductExcel } from "@/services/productExcel";
 import { uploadImageFile } from "@/services/media";
-import { readProducts } from "@/services/catalog";
+import { readProducts, waitForProductsPersistence } from "@/services/catalog";
 
 const PREVIEW_OPTIONS = [10, 20, 50];
 
@@ -179,7 +179,12 @@ const createSignatureCountMap = (products) => {
   return counts;
 };
 
-const verifyImportedProductsWereSaved = (beforeProducts, importedRows) => {
+const verifyImportedProductsWereSaved = async (
+  beforeProducts,
+  importedRows
+) => {
+  await waitForProductsPersistence();
+
   const afterProducts = readProducts();
 
   const beforeCounts = createSignatureCountMap(beforeProducts);
@@ -210,8 +215,7 @@ const verifyImportedProductsWereSaved = (beforeProducts, importedRows) => {
   if (missingRows.length > 0) {
     return {
       success: false,
-      message:
-        "Ảnh đã được upload lên Cloudinary nhưng danh sách sản phẩm chưa được lưu đầy đủ vào bộ nhớ trình duyệt.",
+      message: "Dữ liệu sản phẩm chưa được lưu đầy đủ vào bộ nhớ trình duyệt.",
       missingRows,
     };
   }
@@ -713,7 +717,7 @@ const AdminProductExcelImportModal = ({
         setSavingProducts(false);
       }
 
-      const verification = verifyImportedProductsWereSaved(
+      const verification = await verifyImportedProductsWereSaved(
         beforeProducts,
         importableRows
       );
@@ -726,7 +730,7 @@ const AdminProductExcelImportModal = ({
             .join("\n") || "";
 
         setParseError(
-          `${verification.message}\n\n${detail}\n\nNếu trình duyệt báo đầy bộ nhớ localStorage, hãy kiểm tra/xóa dữ liệu website không cần thiết rồi bấm "Xác nhận nhập" lại. Các ảnh đã upload thành công sẽ không bị upload lại.`
+          `${verification.message}\n\n${detail}\n\nCác ảnh đã upload thành công vẫn được giữ lại và sẽ không bị upload lại. Bạn có thể bấm "Xác nhận nhập" lại sau khi kiểm tra bộ nhớ trình duyệt.`
         );
 
         setOperationMessage(
