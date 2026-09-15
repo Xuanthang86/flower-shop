@@ -200,6 +200,38 @@ export const normalizeProduct = (product = {}, fallback = {}) => {
   const updatedAt =
     merged.updatedAt || merged.updated_at || fallback.updatedAt || null;
 
+  /*
+   * =========================================================
+   * INVENTORY
+   * =========================================================
+   */
+
+  const rawStock = merged.stock ?? fallback.stock;
+
+  const stock =
+    rawStock === null || rawStock === undefined || rawStock === ""
+      ? 0
+      : Math.max(0, Math.floor(safeNumber(rawStock, 0)));
+
+  const rawLowStockThreshold =
+    merged.lowStockThreshold ?? fallback.lowStockThreshold;
+
+  const lowStockThreshold =
+    rawLowStockThreshold === null ||
+    rawLowStockThreshold === undefined ||
+    rawLowStockThreshold === ""
+      ? 3
+      : Math.max(0, Math.floor(safeNumber(rawLowStockThreshold, 3)));
+
+  const disabled = Boolean(merged.disabled ?? fallback.disabled ?? false);
+
+  const soldOut = Boolean(merged.soldOut ?? fallback.soldOut ?? false);
+
+  const stockStatus =
+    String(merged.stockStatus || fallback.stockStatus || "")
+      .trim()
+      .toLowerCase() || null;
+
   return {
     ...merged,
 
@@ -241,6 +273,19 @@ export const normalizeProduct = (product = {}, fallback = {}) => {
     ),
 
     isNew: Boolean(merged.isNew ?? fallback.isNew ?? false),
+
+    /*
+     * INVENTORY FIELDS
+     */
+    stock,
+
+    lowStockThreshold,
+
+    disabled,
+
+    soldOut,
+
+    stockStatus,
 
     createdAt,
 

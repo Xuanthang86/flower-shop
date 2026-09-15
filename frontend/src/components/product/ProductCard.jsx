@@ -3,12 +3,21 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiShoppingCart } from "react-icons/fi";
 
 import { ROLES, useAuth } from "@/context/AuthContext";
+
 import { useCart } from "@/context/CartContext";
+
+import {
+  getStockStatus,
+  getStockStatusLabel,
+  isProductSellable,
+  STOCK_STATUS,
+} from "@/services/inventory";
 
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
 const getDiscountPercent = (product) => {
   const oldPrice = Number(product?.oldPrice || 0);
+
   const price = Number(product?.price || 0);
 
   if (
@@ -25,10 +34,13 @@ const getDiscountPercent = (product) => {
 
 const ProductCard = ({ product }) => {
   const navigate = useNavigate();
+
   const { user } = useAuth();
+
   const { addToCart } = useCart();
 
   const [toast, setToast] = useState("");
+
   const toastTimerRef = useRef(null);
 
   const isStaff =
@@ -43,6 +55,13 @@ const ProductCard = ({ product }) => {
     "";
 
   const discountPercent = getDiscountPercent(product);
+
+  const stockStatus = getStockStatus(product);
+
+  const stockStatusLabel = getStockStatusLabel(product);
+
+  const sellable = isProductSellable(product);
+
   const showAddToCart = !isStaff;
 
   const showToast = (message) => {
@@ -73,6 +92,12 @@ const ProductCard = ({ product }) => {
     }
 
     if (user.role !== ROLES.CUSTOMER) {
+      return;
+    }
+
+    if (!sellable) {
+      showToast(`${stockStatusLabel}. Không thể thêm sản phẩm vào giỏ hàng.`);
+
       return;
     }
 
@@ -113,6 +138,22 @@ const ProductCard = ({ product }) => {
                 GIẢM {discountPercent}%
               </span>
             )}
+
+            <span
+              className={`absolute right-2 top-2 rounded-md px-2 py-1 text-[10px] font-semibold shadow-sm ${
+                stockStatus === STOCK_STATUS.IN_STOCK
+                  ? "bg-green-600 text-white"
+                  : stockStatus === STOCK_STATUS.LOW_STOCK
+                    ? "bg-yellow-500 text-white"
+                    : stockStatus === STOCK_STATUS.DISABLED
+                      ? "bg-gray-600 text-white"
+                      : stockStatus === STOCK_STATUS.SOLD_OUT
+                        ? "bg-purple-600 text-white"
+                        : "bg-red-600 text-white"
+              }`}
+            >
+              {stockStatusLabel}
+            </span>
           </div>
         </Link>
 
@@ -140,6 +181,16 @@ const ProductCard = ({ product }) => {
             )}
           </div>
 
+          {sellable && (
+            <p className="mt-1 text-[11px] text-gray-500">
+              Còn{" "}
+              <strong className="text-gray-700">
+                {Number(product.stock || 0).toLocaleString("vi-VN")}
+              </strong>{" "}
+              sản phẩm
+            </p>
+          )}
+
           <div className="mt-3 flex w-full gap-2">
             <Link
               to={`/products/${product.id}`}
@@ -156,10 +207,16 @@ const ProductCard = ({ product }) => {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-pink-600 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-300 sm:text-xs"
+                disabled={!sellable}
+                className={`flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-[11px] font-semibold text-white transition focus:outline-none sm:text-xs ${
+                  sellable
+                    ? "bg-pink-600 hover:bg-pink-700 focus:ring-2 focus:ring-pink-300"
+                    : "cursor-not-allowed bg-gray-300 text-gray-600"
+                }`}
               >
                 <FiShoppingCart size={13} />
-                <span>Thêm vào giỏ</span>
+
+                <span>{sellable ? "Thêm vào giỏ" : stockStatusLabel}</span>
               </button>
             )}
           </div>

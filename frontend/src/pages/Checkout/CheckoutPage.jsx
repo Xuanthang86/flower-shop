@@ -83,25 +83,18 @@ const CheckoutPage = () => {
   // ĐẶT HÀNG
   // ==========================================
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError("");
-
-    // ------------------------------------------
-    // KIỂM TRA GIỎ HÀNG
-    // ------------------------------------------
 
     if (!cartItems || cartItems.length === 0) {
       setError(
         "Giỏ hàng đang trống. Vui lòng thêm sản phẩm trước khi đặt hàng."
       );
+
       return;
     }
-
-    // ------------------------------------------
-    // THÔNG TIN KHÁCH HÀNG
-    // ------------------------------------------
 
     if (!formData.fullName.trim()) {
       setError("Vui lòng nhập họ và tên.");
@@ -113,126 +106,100 @@ const CheckoutPage = () => {
       return;
     }
 
-    // ------------------------------------------
-    // TỈNH / THÀNH PHỐ
-    // ------------------------------------------
-
     if (!formData.address.provinceCode || !formData.address.provinceName) {
       setError("Vui lòng chọn tỉnh/thành phố.");
       return;
     }
-
-    // ------------------------------------------
-    // PHƯỜNG / XÃ
-    // ------------------------------------------
 
     if (!formData.address.wardCode || !formData.address.wardName) {
       setError("Vui lòng chọn phường/xã.");
       return;
     }
 
-    // ------------------------------------------
-    // SỐ NHÀ
-    // ------------------------------------------
-
     if (!formData.address.houseNumber.trim()) {
       setError("Vui lòng nhập số nhà.");
       return;
     }
-
-    // ------------------------------------------
-    // TÊN ĐƯỜNG
-    // ------------------------------------------
 
     if (!formData.address.street.trim()) {
       setError("Vui lòng nhập tên đường.");
       return;
     }
 
-    // ==========================================
-    // TẠO ĐƠN HÀNG
-    // ==========================================
+    try {
+      const result = await createOrder({
+        customer: {
+          name: formData.fullName.trim(),
 
-    const result = createOrder({
-      customer: {
-        name: formData.fullName.trim(),
+          fullName: formData.fullName.trim(),
 
-        fullName: formData.fullName.trim(),
+          phone: formData.phone.trim(),
 
-        phone: formData.phone.trim(),
+          email: formData.email.trim(),
 
-        email: formData.email.trim(),
+          address: {
+            provinceCode: formData.address.provinceCode,
 
-        address: {
-          provinceCode: formData.address.provinceCode,
+            provinceName: formData.address.provinceName,
 
-          provinceName: formData.address.provinceName,
+            wardCode: formData.address.wardCode,
 
-          wardCode: formData.address.wardCode,
+            wardName: formData.address.wardName,
 
-          wardName: formData.address.wardName,
+            houseNumber: formData.address.houseNumber.trim(),
 
-          // QUAN TRỌNG:
-          // BỔ SUNG SỐ NHÀ
-          houseNumber: formData.address.houseNumber.trim(),
+            street: formData.address.street.trim(),
+          },
 
-          street: formData.address.street.trim(),
+          note: formData.note.trim(),
         },
 
-        note: formData.note.trim(),
-      },
+        paymentMethod: formData.paymentMethod,
 
-      paymentMethod: formData.paymentMethod,
+        items: cartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 0,
+          image: item.image || "",
+        })),
 
-      items: cartItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: Number(item.price) || 0,
-        quantity: Number(item.quantity) || 0,
-        image: item.image || "",
-      })),
+        total: Number(cartTotal) || 0,
 
-      total: Number(cartTotal) || 0,
+        status: "pending",
+      });
 
-      status: "pending",
-    });
+      if (!result || result.success !== true || !result.order) {
+        setError(
+          result?.message || "Không thể tạo đơn hàng. Vui lòng thử lại."
+        );
 
-    // ==========================================
-    // KIỂM TRA KẾT QUẢ CREATE ORDER
-    // ==========================================
+        return;
+      }
 
-    if (!result || result.success !== true || !result.order) {
-      setError(result?.message || "Không thể tạo đơn hàng. Vui lòng thử lại.");
-      return;
+      const newOrder = result.order;
+
+      try {
+        localStorage.setItem(
+          "flower-shop-last-order",
+          JSON.stringify(newOrder)
+        );
+      } catch (storageError) {
+        console.error("Lỗi lưu đơn hàng gần nhất:", storageError);
+      }
+
+      clearCart();
+
+      navigate("/order-success", {
+        state: {
+          orderId: newOrder.id,
+        },
+      });
+    } catch (submitError) {
+      console.error("Lỗi đặt hàng:", submitError);
+
+      setError(submitError?.message || "Không thể đặt hàng. Vui lòng thử lại.");
     }
-
-    const newOrder = result.order;
-
-    // ==========================================
-    // LƯU ĐƠN HÀNG GẦN NHẤT
-    // ==========================================
-
-    try {
-      localStorage.setItem("flower-shop-last-order", JSON.stringify(newOrder));
-    } catch (storageError) {
-      console.error("Lỗi lưu đơn hàng gần nhất:", storageError);
-    }
-
-    // ==========================================
-    // XÓA GIỎ HÀNG
-    // ==========================================
-
-    clearCart();
-
-    // ==========================================
-    // CHUYỂN TRANG
-    // ==========================================
-
-    navigate("/order-success", {
-      state: {
-        orderId: newOrder.id,
-      },
-    });
   };
 
   // ==========================================

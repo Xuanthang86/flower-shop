@@ -5,10 +5,12 @@ import { AuthContext } from "./AuthContext";
 
 import { ORDER_STATUS, normalizeOrderStatus } from "@/utils/orderStatus";
 
+import { consumeStockForItems, restockOrderItems } from "@/services/inventory";
+
 const STORAGE_KEY = "flower-shop-orders";
 
 /* =========================================================
-   ĐỊA CHỈ MẶC ĐỊNH
+   ĐỊA CHỈ
 ========================================================= */
 
 const EMPTY_ADDRESS = {
@@ -21,7 +23,7 @@ const EMPTY_ADDRESS = {
 };
 
 /* =========================================================
-   CHUẨN HÓA ĐỊA CHỈ
+   NORMALIZE ADDRESS
 ========================================================= */
 
 const normalizeAddress = (address = {}) => {
@@ -58,7 +60,7 @@ const normalizeAddress = (address = {}) => {
 };
 
 /* =========================================================
-   LẤY ĐỊA CHỈ TỪ MỌI CẤU TRÚC CŨ
+   ORDER ADDRESS
 ========================================================= */
 
 const getOrderAddressSource = (order = {}) => {
@@ -72,7 +74,7 @@ const getOrderAddressSource = (order = {}) => {
 };
 
 /* =========================================================
-   CHUẨN HÓA CUSTOMER
+   NORMALIZE CUSTOMER
 ========================================================= */
 
 const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
@@ -99,7 +101,7 @@ const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
 };
 
 /* =========================================================
-   CHUẨN HÓA ORDER
+   NORMALIZE ORDER
 ========================================================= */
 
 const normalizeOrder = (order) => {
@@ -151,11 +153,19 @@ const normalizeOrder = (order) => {
     ),
 
     status: normalizeOrderStatus(order.status),
+
+    inventoryConsumed: Boolean(order.inventoryConsumed),
+
+    inventoryRestocked: Boolean(order.inventoryRestocked),
+
+    inventorySnapshots: Array.isArray(order.inventorySnapshots)
+      ? order.inventorySnapshots
+      : [],
   };
 };
 
 /* =========================================================
-   TẠO MÃ ĐƠN HÀNG
+   ORDER CODE
 ========================================================= */
 
 const generateOrderCode = (orders) => {
@@ -204,7 +214,7 @@ const OrderProvider = ({ children }) => {
   const { user } = auth;
 
   /* =======================================================
-     ĐỌC ĐƠN HÀNG
+     READ ORDERS
   ======================================================= */
 
   const readOrders = useCallback(() => {
@@ -232,7 +242,7 @@ const OrderProvider = ({ children }) => {
   const [orders, setOrders] = useState(() => readOrders());
 
   /* =======================================================
-     LƯU ĐƠN HÀNG
+     SAVE ORDERS
   ======================================================= */
 
   useEffect(() => {
@@ -244,7 +254,7 @@ const OrderProvider = ({ children }) => {
   }, [orders]);
 
   /* =======================================================
-     ĐỒNG BỘ GIỮA CÁC TAB
+     CROSS TAB
   ======================================================= */
 
   useEffect(() => {
@@ -273,15 +283,40 @@ const OrderProvider = ({ children }) => {
   }, [readOrders]);
 
   /* =======================================================
-     TẠO ĐƠN HÀNG
+     CREATE ORDER
   ======================================================= */
 
   const createOrder = useCallback(
-    (orderData = {}) => {
+    async (orderData = {}) => {
       if (!user) {
         return {
           success: false,
           message: "Bạn cần đăng nhập trước khi đặt hàng.",
+        };
+      }
+
+      const items = Array.isArray(orderData.items) ? orderData.items : [];
+
+      if (items.length === 0) {
+        return {
+          success: false,
+          message: "Đơn hàng không có sản phẩm.",
+        };
+      }
+
+      /*
+       * QUAN TRỌNG:
+       * Kiểm tra và trừ tồn kho ở thời điểm
+       * tạo đơn, không dựa vào stock trong cart.
+       */
+      const inventoryResult = await consumeStockForItems(items);
+
+      if (!inventoryResult.success) {
+        return {
+          success: false,
+          message:
+            inventoryResult.message || "Tồn kho không đủ để hoàn tất đơn hàng.",
+          errors: inventoryResult.errors || [],
         };
       }
 
@@ -328,10 +363,42 @@ const OrderProvider = ({ children }) => {
       let createdOrder = null;
 
       setOrders((currentOrders) => {
+        const orderId = generateOrderCode(currentOrders);
+
+        const snapshotItems = items.map((item) => {
+          const snapshot = inventoryResult.snapshots.find(
+            (entry) => String(entry.productId) === String(item.id)
+          );
+
+          return {
+            id: item.id,
+
+            productId: item.id,
+
+            name: item.name || "Sản phẩm",
+
+            price: Number(item.price) || 0,
+
+            quantity: Number(item.quantity) || 0,
+
+            image: item.image || "",
+
+            stockSnapshot: snapshot
+              ? {
+                  stockBefore: snapshot.stockBefore,
+
+                  stockAfter: snapshot.stockAfter,
+
+                  stockStatusBefore: snapshot.stockStatusBefore,
+                }
+              : null,
+          };
+        });
+
         createdOrder = normalizeOrder({
           ...orderData,
 
-          id: generateOrderCode(currentOrders),
+          id: orderId,
 
           createdAt,
 
@@ -353,7 +420,7 @@ const OrderProvider = ({ children }) => {
 
           address,
 
-          items: Array.isArray(orderData.items) ? orderData.items : [],
+          items: snapshotItems,
 
           total:
             orderData.total ??
@@ -362,6 +429,12 @@ const OrderProvider = ({ children }) => {
             orderData.grandTotal ??
             orderData.subtotal ??
             0,
+
+          inventoryConsumed: true,
+
+          inventoryRestocked: false,
+
+          inventorySnapshots: inventoryResult.snapshots,
         });
 
         return [createdOrder, ...currentOrders];
@@ -369,7 +442,9 @@ const OrderProvider = ({ children }) => {
 
       return {
         success: true,
+
         order: createdOrder,
+
         ...(createdOrder || {}),
       };
     },
@@ -377,7 +452,7 @@ const OrderProvider = ({ children }) => {
   );
 
   /* =======================================================
-     LẤY ĐƠN THEO ID
+     GET ORDER
   ======================================================= */
 
   const getOrderById = useCallback(
@@ -398,7 +473,7 @@ const OrderProvider = ({ children }) => {
   );
 
   /* =======================================================
-     ĐƠN CỦA KHÁCH HÀNG
+     MY ORDERS
   ======================================================= */
 
   const getMyOrders = useCallback(() => {
@@ -416,7 +491,7 @@ const OrderProvider = ({ children }) => {
   }, [orders, user]);
 
   /* =======================================================
-     QUYỀN XEM ĐƠN
+     CAN VIEW
   ======================================================= */
 
   const canViewOrder = useCallback(
@@ -435,63 +510,159 @@ const OrderProvider = ({ children }) => {
   );
 
   /* =======================================================
-     CẬP NHẬT TRẠNG THÁI
+     UPDATE STATUS
   ======================================================= */
 
-  const updateOrderStatus = useCallback((orderId, newStatus) => {
-    if (!orderId) {
-      return {
-        success: false,
-        message: "Thiếu mã đơn hàng.",
-      };
-    }
+  const updateOrderStatus = useCallback(
+    async (orderId, newStatus) => {
+      if (!orderId) {
+        return {
+          success: false,
+          message: "Thiếu mã đơn hàng.",
+        };
+      }
 
-    const normalizedId = String(orderId).replace(/^#/, "");
+      const normalizedId = String(orderId).replace(/^#/, "");
 
-    const status = normalizeOrderStatus(newStatus);
+      const status = normalizeOrderStatus(newStatus);
 
-    let found = false;
+      const currentOrder = orders.find(
+        (order) =>
+          String(order?.id || order?.orderId || "").replace(/^#/, "") ===
+          normalizedId
+      );
 
-    setOrders((currentOrders) =>
-      currentOrders.map((order) => {
-        const currentId = String(order?.id || order?.orderId || "").replace(
-          /^#/,
-          ""
-        );
+      if (!currentOrder) {
+        return {
+          success: false,
+          message: "Không tìm thấy đơn hàng.",
+        };
+      }
 
-        if (currentId !== normalizedId) {
-          return order;
+      const currentStatus = normalizeOrderStatus(currentOrder.status);
+
+      /*
+       * Không cho đơn đã hủy quay lại trạng thái
+       * đang xử lý vì tồn kho đã được hoàn.
+       */
+      if (
+        currentStatus === ORDER_STATUS.CANCELLED &&
+        status !== ORDER_STATUS.CANCELLED
+      ) {
+        return {
+          success: false,
+          message:
+            "Đơn hàng đã hủy và tồn kho đã được hoàn. Không thể chuyển lại trạng thái xử lý.",
+        };
+      }
+
+      /*
+       * HỦY ĐƠN → HOÀN TỒN
+       */
+      if (
+        status === ORDER_STATUS.CANCELLED &&
+        currentStatus !== ORDER_STATUS.CANCELLED &&
+        !currentOrder.inventoryRestocked
+      ) {
+        const restockResult = await restockOrderItems(currentOrder.items);
+
+        if (!restockResult.success) {
+          return {
+            success: false,
+            message: restockResult.message || "Không thể hoàn tồn kho.",
+          };
         }
 
-        found = true;
+        setOrders((currentOrders) =>
+          currentOrders.map((order) => {
+            const currentId = String(order?.id || order?.orderId || "").replace(
+              /^#/,
+              ""
+            );
+
+            if (currentId !== normalizedId) {
+              return order;
+            }
+
+            return {
+              ...order,
+
+              id: currentId,
+
+              orderId: currentId,
+
+              status,
+
+              inventoryRestocked: true,
+
+              inventoryRestockSnapshots: restockResult.snapshots,
+
+              updatedAt: new Date().toISOString(),
+            };
+          })
+        );
+
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event("flower-shop-orders-updated"));
+        }, 0);
 
         return {
-          ...order,
-
-          id: currentId,
-
-          orderId: currentId,
-
+          success: true,
           status,
-
-          updatedAt: new Date().toISOString(),
+          found: true,
+          inventoryRestocked: true,
         };
-      })
-    );
+      }
 
-    window.setTimeout(() => {
-      window.dispatchEvent(new Event("flower-shop-orders-updated"));
-    }, 0);
+      /*
+       * CÁC TRẠNG THÁI KHÁC
+       */
+      let found = false;
 
-    return {
-      success: true,
-      status,
-      found,
-    };
-  }, []);
+      setOrders((currentOrders) =>
+        currentOrders.map((order) => {
+          const currentId = String(order?.id || order?.orderId || "").replace(
+            /^#/,
+            ""
+          );
+
+          if (currentId !== normalizedId) {
+            return order;
+          }
+
+          found = true;
+
+          return {
+            ...order,
+
+            id: currentId,
+
+            orderId: currentId,
+
+            status,
+
+            updatedAt: new Date().toISOString(),
+          };
+        })
+      );
+
+      window.setTimeout(() => {
+        window.dispatchEvent(new Event("flower-shop-orders-updated"));
+      }, 0);
+
+      return {
+        success: true,
+
+        status,
+
+        found,
+      };
+    },
+    [orders]
+  );
 
   /* =======================================================
-     XÓA ĐƠN
+     REMOVE ORDER
   ======================================================= */
 
   const removeOrder = useCallback((orderId) => {
@@ -506,23 +677,39 @@ const OrderProvider = ({ children }) => {
     );
   }, []);
 
+  /* =======================================================
+     VALUE
+  ======================================================= */
+
   const value = useMemo(
     () => ({
       orders,
+
       createOrder,
+
       getOrderById,
+
       getMyOrders,
+
       canViewOrder,
+
       updateOrderStatus,
+
       removeOrder,
     }),
     [
       orders,
+
       createOrder,
+
       getOrderById,
+
       getMyOrders,
+
       canViewOrder,
+
       updateOrderStatus,
+
       removeOrder,
     ]
   );
@@ -533,547 +720,3 @@ const OrderProvider = ({ children }) => {
 };
 
 export default OrderProvider;
-
-// import { useContext, useEffect, useMemo, useState } from "react";
-// import { OrderContext } from "./OrderContext";
-// import { AuthContext } from "./AuthContext";
-
-// const STORAGE_KEY = "flower-shop-orders";
-
-// /* =====================================================
-//    CHUẨN HÓA ĐỊA CHỈ
-// ===================================================== */
-
-// const normalizeAddress = (address = {}) => {
-//   if (!address || typeof address !== "object") {
-//     return {
-//       provinceCode: "",
-//       provinceName: "",
-//       wardCode: "",
-//       wardName: "",
-//       houseNumber: "",
-//       street: "",
-//     };
-//   }
-
-//   return {
-//     provinceCode: address.provinceCode
-//       ? String(address.provinceCode)
-//       : address.province_id
-//         ? String(address.province_id)
-//         : "",
-
-//     provinceName:
-//       address.provinceName || address.province || address.province_name || "",
-
-//     wardCode: address.wardCode
-//       ? String(address.wardCode)
-//       : address.ward_id
-//         ? String(address.ward_id)
-//         : "",
-
-//     wardName:
-//       address.wardName ||
-//       address.ward ||
-//       address.ward_name ||
-//       address.communeName ||
-//       "",
-
-//     houseNumber:
-//       address.houseNumber || address.house_number || address.house || "",
-
-//     street: address.street || address.streetName || address.street_name || "",
-
-//     note: address.note || "",
-//   };
-// };
-
-// /* =====================================================
-//    CHUẨN HÓA KHÁCH HÀNG
-// ===================================================== */
-
-// const normalizeCustomer = (customer = {}) => ({
-//   ...customer,
-
-//   name: customer.name || customer.fullName || "",
-
-//   fullName: customer.fullName || customer.name || "",
-
-//   phone: customer.phone || "",
-
-//   email: customer.email || "",
-
-//   address: normalizeAddress(customer.address),
-
-//   note: customer.note || "",
-// });
-
-// /* =====================================================
-//    CHUẨN HÓA TRẠNG THÁI
-
-//    QUAN TRỌNG:
-//    delivered = Đã giao
-
-//    completed chỉ được giữ để tương thích dữ liệu cũ.
-// ===================================================== */
-
-// export const normalizeOrderStatus = (status) => {
-//   const value = String(status || "")
-//     .trim()
-//     .toLowerCase();
-
-//   const STATUS_MAP = {
-//     "": "pending",
-
-//     pending: "pending",
-//     "chờ xác nhận": "pending",
-//     "đã đặt hàng": "pending",
-
-//     confirmed: "confirmed",
-//     "đã xác nhận": "confirmed",
-
-//     preparing: "preparing",
-//     "đang chuẩn bị": "preparing",
-
-//     shipping: "shipping",
-//     "đang giao": "shipping",
-
-//     delivered: "delivered",
-//     "đã giao": "delivered",
-
-//     // Tương thích dữ liệu cũ
-//     completed: "delivered",
-//     "hoàn thành": "delivered",
-
-//     cancelled: "cancelled",
-//     canceled: "cancelled",
-//     "đã hủy": "cancelled",
-//   };
-
-//   return STATUS_MAP[value] || "pending";
-// };
-
-// /* =====================================================
-//    CHUẨN HÓA ĐƠN HÀNG
-// ===================================================== */
-
-// const normalizeOrder = (order) => {
-//   if (!order || typeof order !== "object") {
-//     return null;
-//   }
-
-//   const id = String(order.id || order.orderId || "").replace(/^#/, "");
-
-//   return {
-//     ...order,
-
-//     id,
-
-//     customer: normalizeCustomer(order.customer),
-
-//     items: Array.isArray(order.items)
-//       ? order.items
-//       : Array.isArray(order.products)
-//         ? order.products
-//         : [],
-
-//     total: Number(
-//       order.total ??
-//         order.totalAmount ??
-//         order.cartTotal ??
-//         order.grandTotal ??
-//         order.subtotal ??
-//         0
-//     ),
-
-//     status: normalizeOrderStatus(order.status),
-//   };
-// };
-
-// /* =====================================================
-//    ĐỌC ĐƠN HÀNG TỪ LOCAL STORAGE
-// ===================================================== */
-
-// const readOrdersFromStorage = () => {
-//   try {
-//     const savedOrders = localStorage.getItem(STORAGE_KEY);
-
-//     if (!savedOrders) {
-//       return [];
-//     }
-
-//     const parsedOrders = JSON.parse(savedOrders);
-
-//     if (!Array.isArray(parsedOrders)) {
-//       return [];
-//     }
-
-//     return parsedOrders.map(normalizeOrder).filter(Boolean);
-//   } catch (error) {
-//     console.error("Lỗi khi đọc đơn hàng từ LocalStorage:", error);
-
-//     return [];
-//   }
-// };
-
-// /* =====================================================
-//    TẠO MÃ ĐƠN HÀNG
-// ===================================================== */
-
-// const generateOrderCode = (orders) => {
-//   const now = new Date();
-
-//   const year = now.getFullYear();
-
-//   const month = String(now.getMonth() + 1).padStart(2, "0");
-
-//   const day = String(now.getDate()).padStart(2, "0");
-
-//   const prefix = `FS-${year}${month}${day}`;
-
-//   const todayOrders = orders.filter((order) => {
-//     if (!order?.createdAt) {
-//       return false;
-//     }
-
-//     const date = new Date(order.createdAt);
-
-//     if (Number.isNaN(date.getTime())) {
-//       return false;
-//     }
-
-//     return (
-//       date.getFullYear() === year &&
-//       String(date.getMonth() + 1).padStart(2, "0") === month &&
-//       String(date.getDate()).padStart(2, "0") === day
-//     );
-//   });
-
-//   const sequence = String(todayOrders.length + 1).padStart(2, "0");
-
-//   return `${prefix}${sequence}`;
-// };
-
-// /* =====================================================
-//    PROVIDER
-// ===================================================== */
-
-// const OrderProvider = ({ children }) => {
-//   const auth = useContext(AuthContext);
-
-//   if (!auth) {
-//     throw new Error("OrderProvider phải được đặt bên trong AuthProvider.");
-//   }
-
-//   const { user } = auth;
-
-//   /* ===================================================
-//      STATE
-//   =================================================== */
-
-//   const [orders, setOrders] = useState(() => readOrdersFromStorage());
-
-//   /* ===================================================
-//      GHI ORDERS VÀO LOCAL STORAGE
-
-//      Chỉ ghi khi state orders thay đổi.
-//   =================================================== */
-
-//   useEffect(() => {
-//     try {
-//       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-//     } catch (error) {
-//       console.error("Lỗi khi lưu đơn hàng:", error);
-//     }
-//   }, [orders]);
-
-//   /* ===================================================
-//      ĐỒNG BỘ ĐƠN HÀNG GIỮA CÁC TAB
-
-//      Admin tab cập nhật:
-//        localStorage
-
-//      Customer tab:
-//        nhận storage event
-//        → đọc lại orders
-//        → setOrders
-//        → giao diện cập nhật.
-//   =================================================== */
-
-//   useEffect(() => {
-//     const reloadOrders = () => {
-//       const latestOrders = readOrdersFromStorage();
-
-//       setOrders((currentOrders) => {
-//         const currentJson = JSON.stringify(currentOrders);
-
-//         const latestJson = JSON.stringify(latestOrders);
-
-//         if (currentJson === latestJson) {
-//           return currentOrders;
-//         }
-
-//         return latestOrders;
-//       });
-//     };
-
-//     const handleStorage = (event) => {
-//       if (event.key === STORAGE_KEY) {
-//         reloadOrders();
-//       }
-//     };
-
-//     const handleFocus = () => {
-//       reloadOrders();
-//     };
-
-//     const handleVisibilityChange = () => {
-//       if (document.visibilityState === "visible") {
-//         reloadOrders();
-//       }
-//     };
-
-//     window.addEventListener("storage", handleStorage);
-
-//     window.addEventListener("focus", handleFocus);
-
-//     document.addEventListener("visibilitychange", handleVisibilityChange);
-
-//     return () => {
-//       window.removeEventListener("storage", handleStorage);
-
-//       window.removeEventListener("focus", handleFocus);
-
-//       document.removeEventListener("visibilitychange", handleVisibilityChange);
-//     };
-//   }, []);
-
-//   /* ===================================================
-//      TẠO ĐƠN HÀNG
-//   =================================================== */
-
-//   const createOrder = (orderData) => {
-//     if (!user) {
-//       return {
-//         success: false,
-//         message: "Bạn cần đăng nhập trước khi đặt hàng.",
-//       };
-//     }
-
-//     const createdAt = new Date().toISOString();
-
-//     const customer = normalizeCustomer(orderData?.customer);
-
-//     let createdOrder = null;
-
-//     setOrders((currentOrders) => {
-//       createdOrder = {
-//         ...orderData,
-
-//         id: generateOrderCode(currentOrders),
-
-//         createdAt,
-
-//         updatedAt: createdAt,
-
-//         status: normalizeOrderStatus(orderData?.status || "pending"),
-
-//         customer,
-
-//         customerId: user.id,
-
-//         customerEmail: user.email,
-
-//         customerName: user.name || customer.fullName || customer.name || "",
-//       };
-
-//       return [createdOrder, ...currentOrders];
-//     });
-
-//     return {
-//       success: true,
-//       order: createdOrder,
-//       ...(createdOrder || {}),
-//     };
-//   };
-
-//   /* ===================================================
-//      LẤY ĐƠN THEO ID
-//   =================================================== */
-
-//   const getOrderById = (orderId) => {
-//     if (!orderId) {
-//       return undefined;
-//     }
-
-//     const normalizedId = String(orderId).replace(/^#/, "");
-
-//     return orders.find((order) => {
-//       const currentId = String(order?.id || order?.orderId || "").replace(
-//         /^#/,
-//         ""
-//       );
-
-//       return currentId === normalizedId;
-//     });
-//   };
-
-//   /* ===================================================
-//      LẤY ĐƠN CỦA USER HIỆN TẠI
-//   =================================================== */
-
-//   const getMyOrders = () => {
-//     if (!user) {
-//       return [];
-//     }
-
-//     if (user.role === "admin") {
-//       return orders;
-//     }
-
-//     return orders.filter(
-//       (order) => String(order?.customerId || "") === String(user.id || "")
-//     );
-//   };
-
-//   /* ===================================================
-//      KIỂM TRA QUYỀN XEM ĐƠN
-//   =================================================== */
-
-//   const canViewOrder = (order) => {
-//     if (!order || !user) {
-//       return false;
-//     }
-
-//     if (user.role === "admin" || user.role === "manager") {
-//       return true;
-//     }
-
-//     return String(order.customerId || "") === String(user.id || "");
-//   };
-
-//   /* ===================================================
-//      CẬP NHẬT TRẠNG THÁI
-
-//      Đây là phần quan trọng nhất.
-//   =================================================== */
-
-//   const updateOrderStatus = (orderId, newStatus) => {
-//     if (!orderId) {
-//       return {
-//         success: false,
-//         message: "Thiếu mã đơn hàng.",
-//       };
-//     }
-
-//     const normalizedId = String(orderId).replace(/^#/, "");
-
-//     const status = normalizeOrderStatus(newStatus);
-
-//     const updatedAt = new Date().toISOString();
-
-//     let updated = false;
-
-//     setOrders((currentOrders) => {
-//       const nextOrders = currentOrders.map((order) => {
-//         const currentId = String(order?.id || order?.orderId || "").replace(
-//           /^#/,
-//           ""
-//         );
-
-//         if (currentId !== normalizedId) {
-//           return order;
-//         }
-
-//         updated = true;
-
-//         return {
-//           ...order,
-
-//           id: currentId,
-
-//           status,
-
-//           updatedAt,
-//         };
-//       });
-
-//       /*
-//        * Ghi NGAY vào LocalStorage.
-//        *
-//        * Không chờ useEffect.
-//        * Điều này giúp tab khách hàng
-//        * nhận được thay đổi sớm nhất.
-//        */
-//       try {
-//         localStorage.setItem(STORAGE_KEY, JSON.stringify(nextOrders));
-//       } catch (error) {
-//         console.error("Lỗi khi ghi trạng thái đơn hàng:", error);
-//       }
-
-//       return nextOrders;
-//     });
-
-//     if (!updated) {
-//       return {
-//         success: false,
-//         message: "Không tìm thấy đơn hàng.",
-//       };
-//     }
-
-//     return {
-//       success: true,
-//       status,
-//     };
-//   };
-
-//   /* ===================================================
-//      XÓA ĐƠN
-//   =================================================== */
-
-//   const removeOrder = (orderId) => {
-//     const normalizedId = String(orderId || "").replace(/^#/, "");
-
-//     setOrders((currentOrders) =>
-//       currentOrders.filter((order) => {
-//         const currentId = String(order?.id || order?.orderId || "").replace(
-//           /^#/,
-//           ""
-//         );
-
-//         return currentId !== normalizedId;
-//       })
-//     );
-//   };
-
-//   /* ===================================================
-//      CONTEXT VALUE
-//   =================================================== */
-
-//   const value = useMemo(
-//     () => ({
-//       orders,
-
-//       createOrder,
-
-//       getOrderById,
-
-//       getMyOrders,
-
-//       canViewOrder,
-
-//       updateOrderStatus,
-
-//       removeOrder,
-
-//       normalizeOrderStatus,
-//     }),
-//     [orders, user]
-//   );
-
-//   return (
-//     <OrderContext.Provider value={value}>{children}</OrderContext.Provider>
-//   );
-// };
-
-// export default OrderProvider;

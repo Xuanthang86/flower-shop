@@ -1,7 +1,26 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { CartContext } from "./CartContext";
 import { AuthContext } from "./AuthContext";
+
+import {
+  getProductsSnapshot,
+  subscribeProducts,
+  getProductById,
+} from "@/services/catalog";
+
+import {
+  validateProductQuantity,
+  getStockStatusLabel,
+  isProductSellable,
+} from "@/services/inventory";
 
 /* =========================================================
    PREFIX STORAGE
@@ -10,7 +29,7 @@ import { AuthContext } from "./AuthContext";
 const CART_STORAGE_PREFIX = "flower-shop-cart-user-";
 
 /* =========================================================
-   TẠO KEY THEO USER
+   KEY USER
 ========================================================= */
 
 const getCartStorageKey = (userId) => {
@@ -22,7 +41,7 @@ const getCartStorageKey = (userId) => {
 };
 
 /* =========================================================
-   ĐỌC CART
+   READ CART
 ========================================================= */
 
 const readCart = (userId) => {
@@ -54,7 +73,7 @@ const readCart = (userId) => {
 };
 
 /* =========================================================
-   CHUẨN HÓA SẢN PHẨM
+   NORMALIZE CART ITEM
 ========================================================= */
 
 const normalizeCartItem = (item) => {
@@ -67,14 +86,77 @@ const normalizeCartItem = (item) => {
 
     price: Number(item.price) || 0,
 
-    quantity: Math.max(1, Number(item.quantity) || 1),
+    quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
 
     image: item.image || "",
+
+    stock: Number.isFinite(Number(item.stock))
+      ? Math.max(0, Math.floor(Number(item.stock)))
+      : 0,
+
+    stockStatus: item.stockStatus || "",
+
+    lowStockThreshold: Number.isFinite(Number(item.lowStockThreshold))
+      ? Math.max(0, Math.floor(Number(item.lowStockThreshold)))
+      : 3,
   };
 };
 
 /* =========================================================
-   CART PROVIDER
+   SYNC CART WITH CURRENT CATALOG
+========================================================= */
+
+const syncCartWithProducts = (cartItems, products) => {
+  if (!Array.isArray(cartItems)) {
+    return [];
+  }
+
+  const nextItems = [];
+
+  for (const item of cartItems) {
+    const product = getProductById(item.id, products);
+
+    if (!product || !isProductSellable(product)) {
+      continue;
+    }
+
+    const stock = Math.max(0, Math.floor(Number(product.stock) || 0));
+
+    if (stock <= 0) {
+      continue;
+    }
+
+    const quantity = Math.min(
+      Math.max(1, Math.floor(Number(item.quantity) || 1)),
+      stock
+    );
+
+    nextItems.push(
+      normalizeCartItem({
+        ...item,
+
+        name: product.name || item.name,
+
+        price: Number(product.price) || 0,
+
+        image: product.image || product.images?.[0] || item.image || "",
+
+        stock,
+
+        stockStatus: product.stockStatus || "",
+
+        lowStockThreshold: product.lowStockThreshold ?? 3,
+
+        quantity,
+      })
+    );
+  }
+
+  return nextItems;
+};
+
+/* =========================================================
+   PROVIDER
 ========================================================= */
 
 const CartProvider = ({ children }) => {
@@ -86,29 +168,18 @@ const CartProvider = ({ children }) => {
 
   const { user } = auth;
 
-  /* =======================================================
-     CART HIỆN TẠI
-  ======================================================= */
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
 
   const [cartItems, setCartItems] = useState([]);
-
-  /* =======================================================
-     USER ĐANG ĐƯỢC LOAD CART
-     
-     Biến này rất quan trọng.
-     
-     Nó ngăn effect lưu [] vào nhầm cart của user cũ
-     trong thời điểm chuyển tài khoản.
-  ======================================================= */
 
   const [loadedUserId, setLoadedUserId] = useState(null);
 
   /* =======================================================
-     KHI USER THAY ĐỔI
-     
-     - Logout → cart = []
-     - Login user mới → đọc cart riêng
-     - User mới chưa có cart → []
+     LOAD CART
   ======================================================= */
 
   useEffect(() => {
@@ -122,13 +193,18 @@ const CartProvider = ({ children }) => {
 
     const savedCart = readCart(userId);
 
-    setCartItems(savedCart.map(normalizeCartItem));
+    const syncedCart = syncCartWithProducts(
+      savedCart.map(normalizeCartItem),
+      products
+    );
+
+    setCartItems(syncedCart);
 
     setLoadedUserId(userId);
-  }, [user?.id]);
+  }, [user?.id, products]);
 
   /* =======================================================
-     LƯU CART THEO USER
+     SAVE CART
   ======================================================= */
 
   useEffect(() => {
@@ -137,10 +213,6 @@ const CartProvider = ({ children }) => {
     }
 
     const userId = String(user.id);
-
-    /*
-      Chỉ lưu khi cart thực sự thuộc user hiện tại.
-    */
 
     if (loadedUserId !== userId) {
       return;
@@ -160,7 +232,7 @@ const CartProvider = ({ children }) => {
   }, [cartItems, user?.id, loadedUserId]);
 
   /* =======================================================
-     THÊM VÀO GIỎ
+     ADD TO CART
   ======================================================= */
 
   const addToCart = useCallback(
@@ -172,41 +244,90 @@ const CartProvider = ({ children }) => {
         };
       }
 
-      const normalizedProduct = normalizeCartItem({
-        ...product,
-        quantity,
-      });
+      const currentProduct = getProductById(product?.id, products);
+
+      const requestedQuantity = Math.floor(Number(quantity));
+
+      const validation = validateProductQuantity(
+        currentProduct,
+        requestedQuantity
+      );
+
+      if (!validation.success) {
+        return validation;
+      }
+
+      let result = {
+        success: true,
+        message: "Đã thêm sản phẩm vào giỏ hàng.",
+      };
 
       setCartItems((currentItems) => {
         const existingItem = currentItems.find(
-          (item) => String(item.id) === String(normalizedProduct.id)
+          (item) => String(item.id) === String(currentProduct.id)
         );
 
         if (existingItem) {
+          const nextQuantity =
+            Number(existingItem.quantity || 0) + requestedQuantity;
+
+          const quantityValidation = validateProductQuantity(
+            currentProduct,
+            nextQuantity
+          );
+
+          if (!quantityValidation.success) {
+            result = quantityValidation;
+
+            return currentItems;
+          }
+
           return currentItems.map((item) => {
-            if (String(item.id) !== String(normalizedProduct.id)) {
+            if (String(item.id) !== String(currentProduct.id)) {
               return item;
             }
 
-            return {
+            return normalizeCartItem({
               ...item,
-              quantity: item.quantity + normalizedProduct.quantity,
-            };
+
+              name: currentProduct.name,
+
+              price: currentProduct.price,
+
+              image:
+                currentProduct.image ||
+                currentProduct.images?.[0] ||
+                item.image ||
+                "",
+
+              stock: currentProduct.stock,
+
+              stockStatus: currentProduct.stockStatus,
+
+              lowStockThreshold: currentProduct.lowStockThreshold,
+
+              quantity: nextQuantity,
+            });
           });
         }
 
-        return [...currentItems, normalizedProduct];
+        return [
+          ...currentItems,
+          normalizeCartItem({
+            ...currentProduct,
+
+            quantity: requestedQuantity,
+          }),
+        ];
       });
 
-      return {
-        success: true,
-      };
+      return result;
     },
-    [user?.id]
+    [products, user?.id]
   );
 
   /* =======================================================
-     XÓA SẢN PHẨM
+     REMOVE
   ======================================================= */
 
   const removeFromCart = useCallback((productId) => {
@@ -216,16 +337,28 @@ const CartProvider = ({ children }) => {
   }, []);
 
   /* =======================================================
-     CẬP NHẬT SỐ LƯỢNG
+     UPDATE QUANTITY
   ======================================================= */
 
   const updateQuantity = useCallback(
     (productId, quantity) => {
-      const newQuantity = Number(quantity);
+      const newQuantity = Math.floor(Number(quantity));
 
       if (!Number.isFinite(newQuantity) || newQuantity <= 0) {
         removeFromCart(productId);
-        return;
+
+        return {
+          success: false,
+          message: "Số lượng không hợp lệ.",
+        };
+      }
+
+      const product = getProductById(productId, products);
+
+      const validation = validateProductQuantity(product, newQuantity);
+
+      if (!validation.success) {
+        return validation;
       }
 
       setCartItems((currentItems) =>
@@ -234,58 +367,91 @@ const CartProvider = ({ children }) => {
             return item;
           }
 
-          return {
+          return normalizeCartItem({
             ...item,
-            quantity: Math.floor(newQuantity),
-          };
+
+            name: product.name,
+
+            price: product.price,
+
+            image: product.image || product.images?.[0] || item.image || "",
+
+            stock: product.stock,
+
+            stockStatus: product.stockStatus,
+
+            lowStockThreshold: product.lowStockThreshold,
+
+            quantity: newQuantity,
+          });
         })
       );
+
+      return {
+        success: true,
+        message: "Đã cập nhật số lượng.",
+      };
     },
-    [removeFromCart]
+    [products, removeFromCart]
   );
 
   /* =======================================================
-     TĂNG SỐ LƯỢNG
+     INCREASE
   ======================================================= */
 
-  const increaseQuantity = useCallback((productId) => {
-    setCartItems((currentItems) =>
-      currentItems.map((item) => {
-        if (String(item.id) !== String(productId)) {
-          return item;
-        }
+  const increaseQuantity = useCallback(
+    (productId) => {
+      const item = cartItems.find(
+        (currentItem) => String(currentItem.id) === String(productId)
+      );
+
+      if (!item) {
+        return {
+          success: false,
+          message: "Không tìm thấy sản phẩm trong giỏ.",
+        };
+      }
+
+      return updateQuantity(productId, Number(item.quantity || 0) + 1);
+    },
+    [cartItems, updateQuantity]
+  );
+
+  /* =======================================================
+     DECREASE
+  ======================================================= */
+
+  const decreaseQuantity = useCallback(
+    (productId) => {
+      const item = cartItems.find(
+        (currentItem) => String(currentItem.id) === String(productId)
+      );
+
+      if (!item) {
+        return {
+          success: false,
+          message: "Không tìm thấy sản phẩm trong giỏ.",
+        };
+      }
+
+      const nextQuantity = Number(item.quantity || 0) - 1;
+
+      if (nextQuantity <= 0) {
+        removeFromCart(productId);
 
         return {
-          ...item,
-          quantity: Number(item.quantity || 0) + 1,
+          success: true,
+          message: "Đã xóa sản phẩm khỏi giỏ hàng.",
         };
-      })
-    );
-  }, []);
+      }
+
+      return updateQuantity(productId, nextQuantity);
+    },
+    [cartItems, removeFromCart, updateQuantity]
+  );
 
   /* =======================================================
-     GIẢM SỐ LƯỢNG
-  ======================================================= */
-
-  const decreaseQuantity = useCallback((productId) => {
-    setCartItems((currentItems) =>
-      currentItems
-        .map((item) => {
-          if (String(item.id) !== String(productId)) {
-            return item;
-          }
-
-          return {
-            ...item,
-            quantity: Number(item.quantity || 0) - 1,
-          };
-        })
-        .filter((item) => Number(item.quantity) > 0)
-    );
-  }, []);
-
-  /* =======================================================
-     XÓA TOÀN BỘ CART
+     CLEAR
   ======================================================= */
 
   const clearCart = useCallback(() => {
@@ -305,7 +471,7 @@ const CartProvider = ({ children }) => {
   }, [user?.id]);
 
   /* =======================================================
-     TỔNG SỐ LƯỢNG
+     COUNT
   ======================================================= */
 
   const cartCount = useMemo(() => {
@@ -316,7 +482,7 @@ const CartProvider = ({ children }) => {
   }, [cartItems]);
 
   /* =======================================================
-     TỔNG TIỀN
+     TOTAL
   ======================================================= */
 
   const cartTotal = useMemo(() => {
@@ -352,6 +518,8 @@ const CartProvider = ({ children }) => {
       decreaseQuantity,
 
       clearCart,
+
+      getStockStatusLabel,
     }),
     [
       cartItems,

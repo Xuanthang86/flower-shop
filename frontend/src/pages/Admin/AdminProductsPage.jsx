@@ -1,3 +1,8 @@
+import {
+  getStockStatus,
+  getStockStatusLabel,
+  STOCK_STATUS,
+} from "@/services/inventory";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
@@ -38,6 +43,14 @@ const EMPTY_PRODUCT = {
   description: "",
   image: "",
   salesCount: 0,
+
+  stock: 0,
+
+  lowStockThreshold: 3,
+
+  disabled: false,
+
+  soldOut: false,
 };
 
 const inputClass =
@@ -222,6 +235,14 @@ const AdminProductsPage = () => {
       description: product.description || "",
       image: product.image || "",
       salesCount: Number(product.salesCount || 0),
+
+      stock: Number(product.stock || 0),
+
+      lowStockThreshold: Number(product.lowStockThreshold ?? 3),
+
+      disabled: Boolean(product.disabled),
+
+      soldOut: Boolean(product.soldOut),
     });
 
     setShowProductModal(true);
@@ -282,6 +303,9 @@ const AdminProductsPage = () => {
       productForm.oldPrice === "" ? null : Number(productForm.oldPrice);
 
     const salesCount = Number(productForm.salesCount);
+    const stock = Number(productForm.stock);
+
+    const lowStockThreshold = Number(productForm.lowStockThreshold);
 
     if (!name) {
       setError("Vui lòng nhập Tên sản phẩm.");
@@ -315,6 +339,21 @@ const AdminProductsPage = () => {
 
       return;
     }
+    if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
+      setError("Tồn kho phải là số nguyên không âm.");
+
+      return;
+    }
+
+    if (
+      !Number.isFinite(lowStockThreshold) ||
+      lowStockThreshold < 0 ||
+      !Number.isInteger(lowStockThreshold)
+    ) {
+      setError("Ngưỡng sắp hết phải là số nguyên không âm.");
+
+      return;
+    }
 
     const data = {
       name,
@@ -324,6 +363,14 @@ const AdminProductsPage = () => {
       description: productForm.description,
       image: productForm.image || "",
       salesCount: Math.floor(salesCount),
+
+      stock: Math.floor(stock),
+
+      lowStockThreshold: Math.floor(lowStockThreshold),
+
+      disabled: Boolean(productForm.disabled),
+
+      soldOut: Boolean(productForm.soldOut),
     };
 
     try {
@@ -411,6 +458,14 @@ const AdminProductsPage = () => {
       createdAt: new Date().toISOString(),
 
       importedFrom: "excel",
+
+      stock: Number(row.stock || 0),
+
+      lowStockThreshold: Number(row.lowStockThreshold ?? 3),
+
+      disabled: Boolean(row.disabled),
+
+      soldOut: Boolean(row.soldOut),
     }));
 
     try {
@@ -585,6 +640,9 @@ const AdminProductsPage = () => {
                 product.price,
                 product.oldPrice
               );
+              const stockStatus = getStockStatus(product);
+
+              const stockStatusLabel = getStockStatusLabel(product);
 
               return (
                 <article
@@ -639,6 +697,111 @@ const AdminProductsPage = () => {
                           "vi-VN"
                         )}
                       </strong>
+                    </div>
+
+                    <div className="mt-1 text-xs text-gray-500">
+                      Tồn kho:{" "}
+                      <strong className="text-gray-700">
+                        {Number(product.stock || 0).toLocaleString("vi-VN")}
+                      </strong>
+                    </div>
+
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${
+                          stockStatus === STOCK_STATUS.IN_STOCK
+                            ? "bg-green-50 text-green-700"
+                            : stockStatus === STOCK_STATUS.LOW_STOCK
+                              ? "bg-yellow-50 text-yellow-700"
+                              : stockStatus === STOCK_STATUS.DISABLED
+                                ? "bg-gray-100 text-gray-600"
+                                : stockStatus === STOCK_STATUS.SOLD_OUT
+                                  ? "bg-purple-50 text-purple-700"
+                                  : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {stockStatusLabel}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Tồn kho
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={productForm.stock}
+                        onChange={(event) =>
+                          setProductForm((current) => ({
+                            ...current,
+                            stock: event.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Ngưỡng sắp hết
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={productForm.lowStockThreshold}
+                        onChange={(event) =>
+                          setProductForm((current) => ({
+                            ...current,
+                            lowStockThreshold: event.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(productForm.disabled)}
+                          onChange={(event) =>
+                            setProductForm((current) => ({
+                              ...current,
+                              disabled: event.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                        />
+
+                        <span className="text-sm font-semibold text-gray-700">
+                          Ngừng bán sản phẩm
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(productForm.soldOut)}
+                          onChange={(event) =>
+                            setProductForm((current) => ({
+                              ...current,
+                              soldOut: event.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                        />
+
+                        <span className="text-sm font-semibold text-gray-700">
+                          Đánh dấu đã bán hết
+                        </span>
+                      </label>
                     </div>
 
                     <div className="mt-3 flex gap-2">
