@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore, useState } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -6,9 +6,9 @@ import { FiArrowLeft, FiCheck, FiHeart, FiShoppingCart } from "react-icons/fi";
 
 import {
   getProductById,
-  readProducts,
+  getProductsSnapshot,
   readCategories,
-  PRODUCT_UPDATED_EVENT,
+  subscribeProducts,
   CATEGORY_UPDATED_EVENT,
 } from "@/services/catalog";
 
@@ -123,7 +123,11 @@ const ProductDetailPage = () => {
 
   const { notifySuccess, notifyError, notifyInfo } = useNotification();
 
-  const [products, setProducts] = useState(() => readProducts());
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
 
   const [categories, setCategories] = useState(() => readCategories());
 
@@ -135,24 +139,14 @@ const ProductDetailPage = () => {
   const isStaff = STAFF_ROLES.has(user?.role);
 
   useEffect(() => {
-    const refreshProducts = () => setProducts(readProducts());
-
     const refreshCategories = () => setCategories(readCategories());
 
-    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-    window.addEventListener("storage", refreshProducts);
 
     window.addEventListener("storage", refreshCategories);
 
     return () => {
-      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-      window.removeEventListener("storage", refreshProducts);
 
       window.removeEventListener("storage", refreshCategories);
     };
@@ -357,20 +351,6 @@ const ProductDetailPage = () => {
     };
   }, [product, category, productId]);
 
-  /*
-   * Logic mới:
-   *
-   * 1. Không lấy sản phẩm hiện tại.
-   * 2. Ưu tiên sản phẩm cùng danh mục.
-   * 3. Nếu chưa đủ 12 sản phẩm thì bổ sung
-   *    từ danh mục khác.
-   * 4. Mỗi lần productId thay đổi, product thay đổi,
-   *    useMemo tính lại danh sách hoàn toàn mới.
-   *
-   * Điều này tránh việc danh sách liên quan
-   * chỉ còn một sản phẩm B khi đang xem A,
-   * rồi khi chuyển sang B chỉ đổi ngược lại thành A.
-   */
   const relatedProducts = useMemo(() => {
     if (!product) {
       return [];
@@ -501,6 +481,24 @@ const ProductDetailPage = () => {
         : "Đã bỏ sản phẩm khỏi danh sách yêu thích."
     );
   };
+
+  if (products.length === 0) {
+    return (
+      <section className="min-h-screen bg-gray-50 py-8 md:py-10">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="rounded-3xl border border-gray-100 bg-white p-10 text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-gray-800">
+              Đang tải sản phẩm...
+            </h1>
+
+            <p className="mt-3 text-gray-500">
+              Hệ thống đang tải dữ liệu sản phẩm.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (!product) {
     return (

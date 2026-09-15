@@ -9,10 +9,13 @@ Quản lý tập trung:
 - Đồng bộ Home / Products / Product Detail / Admin
 - Bảo vệ dữ liệu seed
 - Tự phục hồi image + description bị thiếu
+- IndexedDB là nguồn lưu trữ chính cho catalog sản phẩm
+- External store để React đồng bộ dữ liệu catalog
 ============================================================
 */
 
 import { products as defaultProducts } from "@/data/products";
+
 import {
   readProductsFromIndexedDB,
   saveProductsToIndexedDB,
@@ -47,7 +50,40 @@ let productsHydrationPromise = null;
  */
 let productsMutationVersion = 0;
 
+/*
+ * External store subscribers.
+ *
+ * React components dùng useSyncExternalStore() sẽ đăng ký
+ * vào store này để nhận thông báo khi catalog thay đổi.
+ */
+const productsSubscribers = new Set();
+
+/*
+ * Snapshot rỗng cố định.
+ *
+ * Không tạo [] mới trong getProductsSnapshot(), vì
+ * useSyncExternalStore yêu cầu snapshot phải được cache.
+ */
+const EMPTY_PRODUCTS_SNAPSHOT = [];
+
 export { CATEGORY_UPDATED_EVENT };
+
+const notifyProductsSubscribers = () => {
+  productsSubscribers.forEach((subscriber) => {
+    subscriber();
+  });
+};
+
+export const subscribeProducts = (subscriber) => {
+  productsSubscribers.add(subscriber);
+
+  return () => {
+    productsSubscribers.delete(subscriber);
+  };
+};
+
+export const getProductsSnapshot = () =>
+  Array.isArray(productsCache) ? productsCache : EMPTY_PRODUCTS_SNAPSHOT;
 
 const safeNumber = (value, fallback = 0) => {
   const number = Number(value);
@@ -366,11 +402,9 @@ const hydrateProductsFromIndexedDB = async () => {
     if (Array.isArray(indexedProducts)) {
       productsCache = normalizeProducts(indexedProducts, defaultProducts);
 
-      /*
-       * Nếu localStorage vẫn còn bản cũ thì xóa để tránh
-       * giữ một bản catalog cũ song song với IndexedDB.
-       */
       removeLegacyProductStorage();
+
+      notifyProductsSubscribers();
 
       window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -400,6 +434,8 @@ const hydrateProductsFromIndexedDB = async () => {
 
     removeLegacyProductStorage();
 
+    notifyProductsSubscribers();
+
     window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
     return productsCache;
@@ -413,6 +449,8 @@ const hydrateProductsFromIndexedDB = async () => {
     if (!Array.isArray(productsCache)) {
       productsCache = getInitialProductsFromLocalStorage();
     }
+
+    notifyProductsSubscribers();
 
     return productsCache;
   }
@@ -455,18 +493,11 @@ export const saveProducts = (products) => {
 
   productsPersistencePromise = nextPersistence;
 
-  /*
-   * saveProducts() là API đồng bộ cũ nên không await được.
-   *
-   * Gắn catch vào nhánh xử lý để tránh tạo
-   * unhandled promise rejection trong trình duyệt.
-   *
-   * waitForProductsPersistence() vẫn có thể nhận được
-   * promise gốc và phát hiện lỗi khi cần.
-   */
   nextPersistence.catch((error) => {
     console.error("Không thể lưu danh sách sản phẩm:", error);
   });
+
+  notifyProductsSubscribers();
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -502,6 +533,8 @@ export const saveProductsAsync = async (products) => {
 
   productsPersistencePromise = nextPersistence;
 
+  notifyProductsSubscribers();
+
   await nextPersistence;
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
@@ -514,19 +547,8 @@ export const waitForProductsPersistence = async () => {
 };
 
 /*
- * QUAN TRỌNG:
- *
  * Khởi động quá trình hydrate ngay khi catalog service được
  * import lần đầu.
- *
- * Nếu không có dòng này:
- *
- * - saveProductsAsync() vẫn có thể lưu 128 sản phẩm vào IndexedDB;
- * - Admin đang mở vẫn thấy 128;
- * - nhưng sau reload readProducts() sẽ không tự đọc IndexedDB;
- * - kết quả sẽ quay về defaultProducts (28 sản phẩm).
- *
- * Đây chính là nguyên nhân của lỗi 128 -> 28 đã xảy ra.
  */
 hydrateProducts();
 
@@ -609,6 +631,6 @@ export const getActiveCategories = (categories = readCategories()) =>
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
 export const getCatalogSnapshot = () => ({
-  products: readProducts(),
+  products: getProductsSnapshot(),
   categories: readCategories(),
 });

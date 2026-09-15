@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore, useState } from "react";
 
 import { Link } from "react-router-dom";
 
 import {
-  readProducts,
+  getProductsSnapshot,
   readCategories,
-  PRODUCT_UPDATED_EVENT,
+  subscribeProducts,
   CATEGORY_UPDATED_EVENT,
 } from "@/services/catalog";
 
@@ -14,38 +14,36 @@ import {
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
-import { ROLES, useAuth } from "@/context/AuthContext";
-
 import ProductCard from "@/components/product/ProductCard";
 
 const FeaturedProducts = () => {
-  const [products, setProducts] = useState(() => readProducts());
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
 
   const [categories, setCategories] = useState(() => readCategories());
 
   const [settings, setSettings] = useState(() => readSiteSettings());
 
-  const { user } = useAuth();
-
   useEffect(() => {
-    const refreshProducts = () => setProducts(readProducts());
-
     const refreshCategories = () => setCategories(readCategories());
 
     const refreshSettings = () => setSettings(readSiteSettings());
-
-    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
 
-    return () => {
-      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+    window.addEventListener("storage", refreshCategories);
 
+    return () => {
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
+      window.removeEventListener("storage", refreshCategories);
     };
   }, []);
 

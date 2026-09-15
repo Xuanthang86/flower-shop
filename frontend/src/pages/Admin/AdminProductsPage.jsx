@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   FiChevronDown,
@@ -19,12 +19,12 @@ import {
 } from "react-icons/fi";
 
 import {
-  readProducts,
+  getProductsSnapshot,
+  subscribeProducts,
   saveProducts,
   saveProductsAsync,
   readCategories,
   saveCategories,
-  PRODUCT_UPDATED_EVENT,
   CATEGORY_UPDATED_EVENT,
 } from "@/services/catalog";
 
@@ -109,7 +109,11 @@ const FilePicker = ({ id, selected, disabled, onChange }) => (
 );
 
 const AdminProductsPage = () => {
-  const [products, setProducts] = useState(() => readProducts());
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
 
   const [categories, setCategories] = useState(() => readCategories());
 
@@ -158,24 +162,16 @@ const AdminProductsPage = () => {
   }, []);
 
   useEffect(() => {
-    const refreshProducts = () => setProducts(readProducts());
-
-    const refreshCategories = () => setCategories(readCategories());
-
-    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-    window.addEventListener("storage", refreshProducts);
 
     window.addEventListener("storage", refreshCategories);
 
     return () => {
-      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-      window.removeEventListener("storage", refreshProducts);
 
       window.removeEventListener("storage", refreshCategories);
     };
@@ -615,7 +611,13 @@ const AdminProductsPage = () => {
 
     clearMessages();
 
-    const currentProducts = readProducts();
+    /*
+     * Lấy snapshot trực tiếp từ external catalog store.
+     *
+     * Không dùng readProducts() ở đây vì readProducts()
+     * có fallback seed khi IndexedDB chưa hydrate xong.
+     */
+    const currentProducts = getProductsSnapshot();
 
     const importTimestamp = Date.now();
 
@@ -655,8 +657,6 @@ const AdminProductsPage = () => {
         ...currentProducts,
         ...importedProducts,
       ]);
-
-      setProducts(saved);
 
       setCurrentPage(1);
 

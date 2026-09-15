@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
 import {
-  readProducts,
+  getProductsSnapshot,
   readCategories,
-  PRODUCT_UPDATED_EVENT,
+  subscribeProducts,
   CATEGORY_UPDATED_EVENT,
 } from "@/services/catalog";
 
@@ -16,7 +16,11 @@ const PRODUCTS_PER_PAGE = 20;
 const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [products, setProducts] = useState(() => readProducts());
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
 
   const [categories, setCategories] = useState(() => readCategories());
 
@@ -30,28 +34,16 @@ const ProductsPage = () => {
     Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
 
   useEffect(() => {
-    const refreshProducts = () => {
-      setProducts(readProducts());
-    };
-
     const refreshCategories = () => {
       setCategories(readCategories());
     };
 
-    window.addEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-    window.addEventListener("storage", refreshProducts);
 
     window.addEventListener("storage", refreshCategories);
 
     return () => {
-      window.removeEventListener(PRODUCT_UPDATED_EVENT, refreshProducts);
-
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
-
-      window.removeEventListener("storage", refreshProducts);
 
       window.removeEventListener("storage", refreshCategories);
     };
