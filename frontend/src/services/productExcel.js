@@ -9,6 +9,7 @@ export const PRODUCT_EXCEL_HEADERS = [
   "Danh mục",
   "Tóm tắt",
   "Hình ảnh",
+  "Tồn kho",
 ];
 
 const MAX_EXCEL_FILE_SIZE = 20 * 1024 * 1024;
@@ -50,6 +51,8 @@ const HEADER_ALIASES = {
   "hinh anh": "Hình ảnh",
   hinh: "Hình ảnh",
   image: "Hình ảnh",
+  "ton kho": "Tồn kho",
+  stock: "Tồn kho",
 };
 
 const getCanonicalHeader = (value) => {
@@ -58,13 +61,13 @@ const getCanonicalHeader = (value) => {
   return HEADER_ALIASES[normalized] || normalizeText(value);
 };
 
-const parsePrice = (value) => {
+const parseNumber = (value, fallback = null) => {
   if (value === null || value === undefined || value === "") {
-    return null;
+    return fallback;
   }
 
   if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
+    return Number.isFinite(value) ? value : fallback;
   }
 
   const normalized = String(value)
@@ -74,12 +77,24 @@ const parsePrice = (value) => {
     .replace(/,/g, "");
 
   if (!normalized) {
-    return null;
+    return fallback;
   }
 
   const number = Number(normalized);
 
-  return Number.isFinite(number) ? number : null;
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const parsePrice = (value) => parseNumber(value, null);
+
+const parseStock = (value) => {
+  const stock = parseNumber(value, 0);
+
+  if (!Number.isFinite(stock)) {
+    return null;
+  }
+
+  return Math.floor(stock);
 };
 
 const normalizeImageReference = (value) => {
@@ -110,7 +125,7 @@ const normalizeImageReference = (value) => {
       };
     }
   } catch {
-    // Không phải URL → tiếp tục kiểm tra tên file.
+    // Tiếp tục kiểm tra tên file.
   }
 
   if (IMAGE_FILE_PATTERN.test(image)) {
@@ -172,7 +187,15 @@ const createImportIdentityKey = (name, category) =>
     .trim()
     .toLowerCase()}`;
 
-const getStatus = ({ name, price, category, image, oldPrice, hasOldPrice }) => {
+const getStatus = ({
+  name,
+  price,
+  category,
+  image,
+  oldPrice,
+  hasOldPrice,
+  stock,
+}) => {
   const errors = [];
 
   if (!name) {
@@ -195,6 +218,10 @@ const getStatus = ({ name, price, category, image, oldPrice, hasOldPrice }) => {
 
   if (!image.valid) {
     errors.push("Hình ảnh phải là URL http/https hoặc tên file ảnh hợp lệ.");
+  }
+
+  if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
+    errors.push("Tồn kho phải là số nguyên không âm.");
   }
 
   if (errors.length > 0) {
@@ -238,13 +265,28 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
   const image = normalizeImageReference(row["Hình ảnh"]);
 
+  /*
+   * TỒN KHO
+   *
+   * Không nhập → mặc định 0.
+   */
+
+  const stock = parseStock(row["Tồn kho"]);
+
   const status = getStatus({
     name,
+
     price,
+
     category,
+
     image,
+
     oldPrice,
+
     hasOldPrice,
+
+    stock,
   });
 
   const categorySlug = category?.slug || "";
@@ -271,6 +313,27 @@ export const createProductFromExcelRow = (row, categories, index) => {
     imageFileName: image.fileName,
 
     importIdentityKey: createImportIdentityKey(name, categorySlug),
+
+    /*
+     * INVENTORY
+     */
+
+    stock: Number.isFinite(stock) ? stock : 0,
+
+    /*
+     * Cố định theo yêu cầu:
+     * ngưỡng sắp hết = 3
+     */
+
+    lowStockThreshold: 3,
+
+    /*
+     * Excel không quản lý 2 trạng thái này.
+     */
+
+    disabled: false,
+
+    soldOut: false,
 
     status,
 
@@ -394,6 +457,7 @@ export const parseProductExcel = async (file, categories) => {
 
   return {
     rows,
+
     total: rows.length,
   };
 };
@@ -401,7 +465,8 @@ export const parseProductExcel = async (file, categories) => {
 export const downloadProductExcelTemplate = () => {
   const worksheet = utils.aoa_to_sheet([
     PRODUCT_EXCEL_HEADERS,
-    ["", "", "", "", "", ""],
+
+    ["", "", "", "", "", "", 0],
   ]);
 
   worksheet["!cols"] = [
@@ -411,39 +476,66 @@ export const downloadProductExcelTemplate = () => {
     { wch: 22 },
     { wch: 42 },
     { wch: 38 },
+    { wch: 14 },
   ];
 
   const guideWorksheet = utils.aoa_to_sheet([
     ["HƯỚNG DẪN NHẬP SẢN PHẨM"],
+
     [],
+
     ["Cột", "Quy định"],
+
     ["Tên sản phẩm", "Bắt buộc. Không được để trống."],
+
     ["Giá", "Bắt buộc. Nhập số, ví dụ 450000."],
+
     ["Giá cũ", "Không bắt buộc. Nếu nhập phải là số và lớn hơn Giá."],
+
     ["Danh mục", "Nhập đúng tên danh mục hoặc slug đang có trong hệ thống."],
+
     ["Tóm tắt", "Có thể chứa nhiều đoạn. Hệ thống giữ nguyên xuống dòng."],
+
     ["Hình ảnh", "Có thể nhập tên file ảnh hoặc URL http/https."],
+
+    [
+      "Tồn kho",
+      "Số nguyên không âm. Nếu để trống hệ thống mặc định Tồn kho = 0.",
+    ],
+
+    [
+      "Ngưỡng sắp hết",
+      "Không cần nhập trong Excel. Hệ thống mặc định ngưỡng sắp hết = 3.",
+    ],
+
+    ["Ngừng bán", "Không nhập trong Excel. Mặc định sản phẩm được phép bán."],
+
+    [
+      "Đánh dấu đã bán hết",
+      "Không nhập trong Excel. Mặc định sản phẩm chưa được đánh dấu bán hết.",
+    ],
+
     [],
+
     [
       "Cách nhập ảnh hàng loạt",
       "Đặt toàn bộ ảnh sản phẩm trong một thư mục. Trong Excel, cột Hình ảnh chỉ ghi đúng tên file.",
     ],
-    [
-      "Ví dụ thư mục",
-      "flower-shop/images/hoa-hong-do.jpg; flower-shop/images/hoa-huong-duong.jpg",
-    ],
+
     [
       "Không dùng",
       "Không nhập C:\\Users\\... hoặc D:\\FlowerShop\\... vào cột Hình ảnh.",
     ],
+
     [
       "URL Cloudinary",
       "Nếu ảnh đã được upload trước đó, có thể nhập trực tiếp URL https://res.cloudinary.com/...",
     ],
+
     ["Nhiều ảnh", "Phiên bản hiện tại nhập 1 ảnh chính cho mỗi sản phẩm."],
   ]);
 
-  guideWorksheet["!cols"] = [{ wch: 24 }, { wch: 110 }];
+  guideWorksheet["!cols"] = [{ wch: 28 }, { wch: 110 }];
 
   const workbook = utils.book_new();
 

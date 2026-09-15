@@ -9,9 +9,7 @@ import { consumeStockForItems, restockOrderItems } from "@/services/inventory";
 
 const STORAGE_KEY = "flower-shop-orders";
 
-/* =========================================================
-   ĐỊA CHỈ
-========================================================= */
+const ORDERS_UPDATED_EVENT = "flower-shop-orders-updated";
 
 const EMPTY_ADDRESS = {
   provinceCode: "",
@@ -22,13 +20,11 @@ const EMPTY_ADDRESS = {
   street: "",
 };
 
-/* =========================================================
-   NORMALIZE ADDRESS
-========================================================= */
-
 const normalizeAddress = (address = {}) => {
   if (!address || typeof address !== "object") {
-    return { ...EMPTY_ADDRESS };
+    return {
+      ...EMPTY_ADDRESS,
+    };
   }
 
   return {
@@ -59,23 +55,12 @@ const normalizeAddress = (address = {}) => {
   };
 };
 
-/* =========================================================
-   ORDER ADDRESS
-========================================================= */
-
-const getOrderAddressSource = (order = {}) => {
-  return (
-    order?.customer?.address ||
-    order?.shippingAddress ||
-    order?.customerAddress ||
-    order?.address ||
-    {}
-  );
-};
-
-/* =========================================================
-   NORMALIZE CUSTOMER
-========================================================= */
+const getOrderAddressSource = (order = {}) =>
+  order?.customer?.address ||
+  order?.shippingAddress ||
+  order?.customerAddress ||
+  order?.address ||
+  {};
 
 const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
   const addressSource =
@@ -99,10 +84,6 @@ const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
     note: customer.note || "",
   };
 };
-
-/* =========================================================
-   NORMALIZE ORDER
-========================================================= */
 
 const normalizeOrder = (order) => {
   if (!order) {
@@ -161,12 +142,12 @@ const normalizeOrder = (order) => {
     inventorySnapshots: Array.isArray(order.inventorySnapshots)
       ? order.inventorySnapshots
       : [],
+
+    inventoryRestockSnapshots: Array.isArray(order.inventoryRestockSnapshots)
+      ? order.inventoryRestockSnapshots
+      : [],
   };
 };
-
-/* =========================================================
-   ORDER CODE
-========================================================= */
 
 const generateOrderCode = (orders) => {
   const now = new Date();
@@ -200,9 +181,13 @@ const generateOrderCode = (orders) => {
   return `${prefix}${String(todayOrders.length + 1).padStart(2, "0")}`;
 };
 
-/* =========================================================
-   PROVIDER
-========================================================= */
+const writeOrdersToStorage = (orders) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+};
+
+const notifyOrdersUpdated = () => {
+  window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
+};
 
 const OrderProvider = ({ children }) => {
   const auth = useContext(AuthContext);
@@ -212,10 +197,6 @@ const OrderProvider = ({ children }) => {
   }
 
   const { user } = auth;
-
-  /* =======================================================
-     READ ORDERS
-  ======================================================= */
 
   const readOrders = useCallback(() => {
     try {
@@ -241,21 +222,25 @@ const OrderProvider = ({ children }) => {
 
   const [orders, setOrders] = useState(() => readOrders());
 
-  /* =======================================================
-     SAVE ORDERS
-  ======================================================= */
+  /*
+  ========================================================
+  SAVE ORDERS
+  ========================================================
+  */
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+      writeOrdersToStorage(orders);
     } catch (error) {
       console.error("Lỗi lưu đơn hàng:", error);
     }
   }, [orders]);
 
-  /* =======================================================
-     CROSS TAB
-  ======================================================= */
+  /*
+  ========================================================
+  CROSS TAB
+  ========================================================
+  */
 
   useEffect(() => {
     const handleStorage = (event) => {
@@ -270,21 +255,20 @@ const OrderProvider = ({ children }) => {
 
     window.addEventListener("storage", handleStorage);
 
-    window.addEventListener("flower-shop-orders-updated", handleCustomUpdate);
+    window.addEventListener(ORDERS_UPDATED_EVENT, handleCustomUpdate);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
 
-      window.removeEventListener(
-        "flower-shop-orders-updated",
-        handleCustomUpdate
-      );
+      window.removeEventListener(ORDERS_UPDATED_EVENT, handleCustomUpdate);
     };
   }, [readOrders]);
 
-  /* =======================================================
-     CREATE ORDER
-  ======================================================= */
+  /*
+  ========================================================
+  CREATE ORDER
+  ========================================================
+  */
 
   const createOrder = useCallback(
     async (orderData = {}) => {
@@ -305,17 +289,20 @@ const OrderProvider = ({ children }) => {
       }
 
       /*
-       * QUAN TRỌNG:
-       * Kiểm tra và trừ tồn kho ở thời điểm
-       * tạo đơn, không dựa vào stock trong cart.
+       * BƯỚC 1:
+       * Kiểm tra và trừ tồn kho
+       * bằng dữ liệu Catalog mới nhất.
        */
+
       const inventoryResult = await consumeStockForItems(items);
 
       if (!inventoryResult.success) {
         return {
           success: false,
+
           message:
             inventoryResult.message || "Tồn kho không đủ để hoàn tất đơn hàng.",
+
           errors: inventoryResult.errors || [],
         };
       }
@@ -360,100 +347,160 @@ const OrderProvider = ({ children }) => {
         address
       );
 
+      /*
+       * BƯỚC 2:
+       * Tạo snapshot sản phẩm.
+       */
+
+      const snapshotItems = items.map((item) => {
+        const snapshot = inventoryResult.snapshots.find(
+          (entry) => String(entry.productId) === String(item.id)
+        );
+
+        return {
+          id: item.id,
+
+          productId: item.id,
+
+          name: item.name || "Sản phẩm",
+
+          price: Number(item.price) || 0,
+
+          quantity: Number(item.quantity) || 0,
+
+          image: item.image || "",
+
+          stockSnapshot: snapshot
+            ? {
+                stockBefore: snapshot.stockBefore,
+
+                stockAfter: snapshot.stockAfter,
+
+                stockStatusBefore: snapshot.stockStatusBefore,
+              }
+            : null,
+        };
+      });
+
       let createdOrder = null;
 
-      setOrders((currentOrders) => {
-        const orderId = generateOrderCode(currentOrders);
+      let nextOrders = null;
 
-        const snapshotItems = items.map((item) => {
-          const snapshot = inventoryResult.snapshots.find(
-            (entry) => String(entry.productId) === String(item.id)
-          );
+      /*
+       * BƯỚC 3:
+       * Tạo order dựa trên snapshot.
+       */
 
-          return {
-            id: item.id,
+      const currentOrders = readOrders();
 
-            productId: item.id,
+      const orderId = generateOrderCode(currentOrders);
 
-            name: item.name || "Sản phẩm",
+      createdOrder = normalizeOrder({
+        ...orderData,
 
-            price: Number(item.price) || 0,
+        id: orderId,
 
-            quantity: Number(item.quantity) || 0,
+        createdAt,
 
-            image: item.image || "",
+        updatedAt: createdAt,
 
-            stockSnapshot: snapshot
-              ? {
-                  stockBefore: snapshot.stockBefore,
+        status: ORDER_STATUS.PENDING,
 
-                  stockAfter: snapshot.stockAfter,
+        customer,
 
-                  stockStatusBefore: snapshot.stockStatusBefore,
-                }
-              : null,
-          };
-        });
+        customerId: user.id,
 
-        createdOrder = normalizeOrder({
-          ...orderData,
+        customerEmail: user.email,
 
-          id: orderId,
+        customerName: user.name || customer.name || customer.fullName || "",
 
-          createdAt,
+        shippingAddress: address,
 
-          updatedAt: createdAt,
+        customerAddress: address,
 
-          status: ORDER_STATUS.PENDING,
+        address,
 
-          customer,
+        items: snapshotItems,
 
-          customerId: user.id,
+        total:
+          orderData.total ??
+          orderData.totalAmount ??
+          orderData.cartTotal ??
+          orderData.grandTotal ??
+          orderData.subtotal ??
+          0,
 
-          customerEmail: user.email,
+        inventoryConsumed: true,
 
-          customerName: user.name || customer.name || customer.fullName || "",
+        inventoryRestocked: false,
 
-          shippingAddress: address,
+        inventorySnapshots: inventoryResult.snapshots,
 
-          customerAddress: address,
-
-          address,
-
-          items: snapshotItems,
-
-          total:
-            orderData.total ??
-            orderData.totalAmount ??
-            orderData.cartTotal ??
-            orderData.grandTotal ??
-            orderData.subtotal ??
-            0,
-
-          inventoryConsumed: true,
-
-          inventoryRestocked: false,
-
-          inventorySnapshots: inventoryResult.snapshots,
-        });
-
-        return [createdOrder, ...currentOrders];
+        inventoryRestockSnapshots: [],
       });
+
+      nextOrders = [createdOrder, ...currentOrders];
+
+      /*
+       * BƯỚC 4:
+       * Ghi order xuống localStorage trước khi
+       * cập nhật React state.
+       *
+       * Nếu ghi thất bại → hoàn tồn.
+       */
+
+      try {
+        writeOrdersToStorage(nextOrders);
+      } catch (storageError) {
+        /*
+         * ROLLBACK TỒN KHO
+         */
+
+        const rollback = await restockOrderItems(snapshotItems);
+
+        if (!rollback.success) {
+          console.error(
+            "LỖI NGHIÊM TRỌNG: Không thể rollback tồn kho sau khi ghi order thất bại.",
+            rollback
+          );
+        }
+
+        return {
+          success: false,
+
+          message:
+            "Không thể lưu đơn hàng. Hệ thống đã thực hiện hoàn tồn kho.",
+
+          error: storageError,
+        };
+      }
+
+      /*
+       * BƯỚC 5:
+       * Cập nhật React state sau khi order đã được
+       * ghi thành công.
+       */
+
+      setOrders(nextOrders);
+
+      notifyOrdersUpdated();
 
       return {
         success: true,
 
         order: createdOrder,
 
-        ...(createdOrder || {}),
+        ...createdOrder,
       };
     },
-    [user]
+    [user, readOrders]
   );
 
-  /* =======================================================
-     GET ORDER
-  ======================================================= */
+  /*
+  ========================================================
+  GET ORDER
+  ========================================================
+  */
 
   const getOrderById = useCallback(
     (orderId) => {
@@ -472,9 +519,11 @@ const OrderProvider = ({ children }) => {
     [orders]
   );
 
-  /* =======================================================
-     MY ORDERS
-  ======================================================= */
+  /*
+  ========================================================
+  MY ORDERS
+  ========================================================
+  */
 
   const getMyOrders = useCallback(() => {
     if (!user) {
@@ -490,9 +539,11 @@ const OrderProvider = ({ children }) => {
     );
   }, [orders, user]);
 
-  /* =======================================================
-     CAN VIEW
-  ======================================================= */
+  /*
+  ========================================================
+  CAN VIEW
+  ========================================================
+  */
 
   const canViewOrder = useCallback(
     (order) => {
@@ -509,9 +560,11 @@ const OrderProvider = ({ children }) => {
     [user]
   );
 
-  /* =======================================================
-     UPDATE STATUS
-  ======================================================= */
+  /*
+  ========================================================
+  UPDATE STATUS
+  ========================================================
+  */
 
   const updateOrderStatus = useCallback(
     async (orderId, newStatus) => {
@@ -542,9 +595,9 @@ const OrderProvider = ({ children }) => {
       const currentStatus = normalizeOrderStatus(currentOrder.status);
 
       /*
-       * Không cho đơn đã hủy quay lại trạng thái
-       * đang xử lý vì tồn kho đã được hoàn.
+       * Đơn đã hủy không thể quay lại xử lý.
        */
+
       if (
         currentStatus === ORDER_STATUS.CANCELLED &&
         status !== ORDER_STATUS.CANCELLED
@@ -557,24 +610,33 @@ const OrderProvider = ({ children }) => {
       }
 
       /*
-       * HỦY ĐƠN → HOÀN TỒN
+       * Nếu trạng thái không thay đổi
+       * → không làm gì.
        */
+
+      if (currentStatus === status) {
+        return {
+          success: true,
+          status,
+          found: true,
+          inventoryRestocked: Boolean(currentOrder.inventoryRestocked),
+        };
+      }
+
+      /*
+       * HỦY ĐƠN
+       */
+
       if (
         status === ORDER_STATUS.CANCELLED &&
-        currentStatus !== ORDER_STATUS.CANCELLED &&
-        !currentOrder.inventoryRestocked
+        currentStatus !== ORDER_STATUS.CANCELLED
       ) {
-        const restockResult = await restockOrderItems(currentOrder.items);
+        /*
+         * Nếu đã hoàn tồn rồi thì không hoàn lần 2.
+         */
 
-        if (!restockResult.success) {
-          return {
-            success: false,
-            message: restockResult.message || "Không thể hoàn tồn kho.",
-          };
-        }
-
-        setOrders((currentOrders) =>
-          currentOrders.map((order) => {
+        if (currentOrder.inventoryRestocked) {
+          const nextOrders = orders.map((order) => {
             const currentId = String(order?.id || order?.orderId || "").replace(
               /^#/,
               ""
@@ -593,34 +655,47 @@ const OrderProvider = ({ children }) => {
 
               status,
 
-              inventoryRestocked: true,
-
-              inventoryRestockSnapshots: restockResult.snapshots,
-
               updatedAt: new Date().toISOString(),
             };
-          })
-        );
+          });
 
-        window.setTimeout(() => {
-          window.dispatchEvent(new Event("flower-shop-orders-updated"));
-        }, 0);
+          try {
+            writeOrdersToStorage(nextOrders);
 
-        return {
-          success: true,
-          status,
-          found: true,
-          inventoryRestocked: true,
-        };
-      }
+            setOrders(nextOrders);
 
-      /*
-       * CÁC TRẠNG THÁI KHÁC
-       */
-      let found = false;
+            notifyOrdersUpdated();
 
-      setOrders((currentOrders) =>
-        currentOrders.map((order) => {
+            return {
+              success: true,
+              status,
+              found: true,
+              inventoryRestocked: true,
+            };
+          } catch (error) {
+            return {
+              success: false,
+              message: "Không thể cập nhật trạng thái đơn hàng.",
+              error,
+            };
+          }
+        }
+
+        /*
+         * Hoàn tồn đúng một lần.
+         */
+
+        const restockResult = await restockOrderItems(currentOrder.items);
+
+        if (!restockResult.success) {
+          return {
+            success: false,
+
+            message: restockResult.message || "Không thể hoàn tồn kho.",
+          };
+        }
+
+        const nextOrders = orders.map((order) => {
           const currentId = String(order?.id || order?.orderId || "").replace(
             /^#/,
             ""
@@ -629,8 +704,6 @@ const OrderProvider = ({ children }) => {
           if (currentId !== normalizedId) {
             return order;
           }
-
-          found = true;
 
           return {
             ...order,
@@ -641,45 +714,151 @@ const OrderProvider = ({ children }) => {
 
             status,
 
+            inventoryRestocked: true,
+
+            inventoryRestockSnapshots: restockResult.snapshots,
+
             updatedAt: new Date().toISOString(),
           };
-        })
+        });
+
+        try {
+          writeOrdersToStorage(nextOrders);
+
+          setOrders(nextOrders);
+
+          notifyOrdersUpdated();
+
+          return {
+            success: true,
+
+            status,
+
+            found: true,
+
+            inventoryRestocked: true,
+          };
+        } catch (storageError) {
+          /*
+           * Nếu cập nhật order cancel thất bại sau khi
+           * đã hoàn tồn thì KHÔNG được tự động restock
+           * lần nữa.
+           *
+           * Catalog đã trở về đúng tồn kho.
+           */
+
+          return {
+            success: false,
+
+            message:
+              "Đã hoàn tồn kho nhưng không thể lưu trạng thái hủy đơn. Vui lòng tải lại trang để đồng bộ đơn hàng.",
+
+            error: storageError,
+          };
+        }
+      }
+
+      /*
+       * CÁC TRẠNG THÁI KHÁC
+       */
+
+      const nextOrders = orders.map((order) => {
+        const currentId = String(order?.id || order?.orderId || "").replace(
+          /^#/,
+          ""
+        );
+
+        if (currentId !== normalizedId) {
+          return order;
+        }
+
+        return {
+          ...order,
+
+          id: currentId,
+
+          orderId: currentId,
+
+          status,
+
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      const found = nextOrders.some(
+        (order) =>
+          String(order?.id || order?.orderId || "").replace(/^#/, "") ===
+          normalizedId
       );
 
-      window.setTimeout(() => {
-        window.dispatchEvent(new Event("flower-shop-orders-updated"));
-      }, 0);
+      if (!found) {
+        return {
+          success: false,
+          message: "Không tìm thấy đơn hàng.",
+        };
+      }
 
-      return {
-        success: true,
+      try {
+        writeOrdersToStorage(nextOrders);
 
-        status,
+        setOrders(nextOrders);
 
-        found,
-      };
+        notifyOrdersUpdated();
+
+        return {
+          success: true,
+
+          status,
+
+          found: true,
+        };
+      } catch (storageError) {
+        return {
+          success: false,
+
+          message: "Không thể lưu trạng thái đơn hàng.",
+
+          error: storageError,
+        };
+      }
     },
     [orders]
   );
 
-  /* =======================================================
-     REMOVE ORDER
-  ======================================================= */
+  /*
+  ========================================================
+  REMOVE ORDER
+  ========================================================
+  */
 
-  const removeOrder = useCallback((orderId) => {
-    const normalizedId = String(orderId || "").replace(/^#/, "");
+  const removeOrder = useCallback(
+    (orderId) => {
+      const normalizedId = String(orderId || "").replace(/^#/, "");
 
-    setOrders((currentOrders) =>
-      currentOrders.filter(
+      const nextOrders = orders.filter(
         (order) =>
           String(order?.id || order?.orderId || "").replace(/^#/, "") !==
           normalizedId
-      )
-    );
-  }, []);
+      );
 
-  /* =======================================================
-     VALUE
-  ======================================================= */
+      try {
+        writeOrdersToStorage(nextOrders);
+
+        setOrders(nextOrders);
+
+        notifyOrdersUpdated();
+      } catch (error) {
+        console.error("Lỗi xóa đơn hàng:", error);
+      }
+    },
+    [orders]
+  );
+
+  /*
+  ========================================================
+  VALUE
+  ========================================================
+  */
 
   const value = useMemo(
     () => ({

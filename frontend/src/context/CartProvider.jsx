@@ -1,7 +1,6 @@
 import {
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -22,15 +21,7 @@ import {
   isProductSellable,
 } from "@/services/inventory";
 
-/* =========================================================
-   PREFIX STORAGE
-========================================================= */
-
 const CART_STORAGE_PREFIX = "flower-shop-cart-user-";
-
-/* =========================================================
-   KEY USER
-========================================================= */
 
 const getCartStorageKey = (userId) => {
   if (!userId) {
@@ -39,10 +30,6 @@ const getCartStorageKey = (userId) => {
 
   return `${CART_STORAGE_PREFIX}${String(userId)}`;
 };
-
-/* =========================================================
-   READ CART
-========================================================= */
 
 const readCart = (userId) => {
   const storageKey = getCartStorageKey(userId);
@@ -60,11 +47,7 @@ const readCart = (userId) => {
 
     const parsedCart = JSON.parse(savedCart);
 
-    if (!Array.isArray(parsedCart)) {
-      return [];
-    }
-
-    return parsedCart;
+    return Array.isArray(parsedCart) ? parsedCart : [];
   } catch (error) {
     console.error("Lỗi đọc giỏ hàng:", error);
 
@@ -72,11 +55,17 @@ const readCart = (userId) => {
   }
 };
 
-/* =========================================================
-   NORMALIZE CART ITEM
-========================================================= */
+const normalizeCartItem = (item = {}) => {
+  const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
-const normalizeCartItem = (item) => {
+  const stock = Number.isFinite(Number(item.stock))
+    ? Math.max(0, Math.floor(Number(item.stock)))
+    : 0;
+
+  const lowStockThreshold = Number.isFinite(Number(item.lowStockThreshold))
+    ? Math.max(0, Math.floor(Number(item.lowStockThreshold)))
+    : 3;
+
   return {
     ...item,
 
@@ -86,25 +75,17 @@ const normalizeCartItem = (item) => {
 
     price: Number(item.price) || 0,
 
-    quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+    quantity,
 
     image: item.image || "",
 
-    stock: Number.isFinite(Number(item.stock))
-      ? Math.max(0, Math.floor(Number(item.stock)))
-      : 0,
+    stock,
 
     stockStatus: item.stockStatus || "",
 
-    lowStockThreshold: Number.isFinite(Number(item.lowStockThreshold))
-      ? Math.max(0, Math.floor(Number(item.lowStockThreshold)))
-      : 3,
+    lowStockThreshold,
   };
 };
-
-/* =========================================================
-   SYNC CART WITH CURRENT CATALOG
-========================================================= */
 
 const syncCartWithProducts = (cartItems, products) => {
   if (!Array.isArray(cartItems)) {
@@ -155,89 +136,65 @@ const syncCartWithProducts = (cartItems, products) => {
   return nextItems;
 };
 
-/* =========================================================
-   PROVIDER
-========================================================= */
+/*
+=========================================================
+CART SESSION
 
-const CartProvider = ({ children }) => {
-  const auth = useContext(AuthContext);
+Mỗi user có một CartSession riêng.
+Không dùng useEffect để reset state khi đổi user.
+=========================================================
+*/
 
-  if (!auth) {
-    throw new Error("CartProvider phải được đặt bên trong AuthProvider.");
-  }
+const CartSession = ({ user, products, children }) => {
+  const userId = user?.id ? String(user.id) : "";
 
-  const { user } = auth;
-
-  const products = useSyncExternalStore(
-    subscribeProducts,
-    getProductsSnapshot,
-    getProductsSnapshot
-  );
-
-  const [cartItems, setCartItems] = useState([]);
-
-  const [loadedUserId, setLoadedUserId] = useState(null);
-
-  /* =======================================================
-     LOAD CART
-  ======================================================= */
-
-  useEffect(() => {
-    if (!user?.id) {
-      setCartItems([]);
-      setLoadedUserId(null);
-      return;
+  const [cartItems, setCartItems] = useState(() => {
+    if (!userId) {
+      return [];
     }
 
-    const userId = String(user.id);
-
-    const savedCart = readCart(userId);
-
-    const syncedCart = syncCartWithProducts(
-      savedCart.map(normalizeCartItem),
+    return syncCartWithProducts(
+      readCart(userId).map(normalizeCartItem),
       products
     );
+  });
 
-    setCartItems(syncedCart);
+  /*
+  ========================================================
+  SAVE CART
+  ========================================================
+  */
 
-    setLoadedUserId(userId);
-  }, [user?.id, products]);
+  const persistCart = useCallback(
+    (items) => {
+      if (!userId) {
+        return;
+      }
 
-  /* =======================================================
-     SAVE CART
-  ======================================================= */
+      const storageKey = getCartStorageKey(userId);
 
-  useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
+      if (!storageKey) {
+        return;
+      }
 
-    const userId = String(user.id);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(items));
+      } catch (error) {
+        console.error("Lỗi lưu giỏ hàng:", error);
+      }
+    },
+    [userId]
+  );
 
-    if (loadedUserId !== userId) {
-      return;
-    }
-
-    const storageKey = getCartStorageKey(userId);
-
-    if (!storageKey) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(cartItems));
-    } catch (error) {
-      console.error("Lỗi lưu giỏ hàng:", error);
-    }
-  }, [cartItems, user?.id, loadedUserId]);
-
-  /* =======================================================
-     ADD TO CART
-  ======================================================= */
+  /*
+  ========================================================
+  ADD TO CART
+  ========================================================
+  */
 
   const addToCart = useCallback(
     (product, quantity = 1) => {
-      if (!user?.id) {
+      if (!userId) {
         return {
           success: false,
           message: "Vui lòng đăng nhập trước khi thêm sản phẩm vào giỏ hàng.",
@@ -282,7 +239,7 @@ const CartProvider = ({ children }) => {
             return currentItems;
           }
 
-          return currentItems.map((item) => {
+          const nextItems = currentItems.map((item) => {
             if (String(item.id) !== String(currentProduct.id)) {
               return item;
             }
@@ -304,41 +261,61 @@ const CartProvider = ({ children }) => {
 
               stockStatus: currentProduct.stockStatus,
 
-              lowStockThreshold: currentProduct.lowStockThreshold,
+              lowStockThreshold: currentProduct.lowStockThreshold ?? 3,
 
               quantity: nextQuantity,
             });
           });
+
+          persistCart(nextItems);
+
+          return nextItems;
         }
 
-        return [
+        const nextItems = [
           ...currentItems,
           normalizeCartItem({
             ...currentProduct,
-
             quantity: requestedQuantity,
           }),
         ];
+
+        persistCart(nextItems);
+
+        return nextItems;
       });
 
       return result;
     },
-    [products, user?.id]
+    [products, userId, persistCart]
   );
 
-  /* =======================================================
-     REMOVE
-  ======================================================= */
+  /*
+  ========================================================
+  REMOVE
+  ========================================================
+  */
 
-  const removeFromCart = useCallback((productId) => {
-    setCartItems((currentItems) =>
-      currentItems.filter((item) => String(item.id) !== String(productId))
-    );
-  }, []);
+  const removeFromCart = useCallback(
+    (productId) => {
+      setCartItems((currentItems) => {
+        const nextItems = currentItems.filter(
+          (item) => String(item.id) !== String(productId)
+        );
 
-  /* =======================================================
-     UPDATE QUANTITY
-  ======================================================= */
+        persistCart(nextItems);
+
+        return nextItems;
+      });
+    },
+    [persistCart]
+  );
+
+  /*
+  ========================================================
+  UPDATE QUANTITY
+  ========================================================
+  */
 
   const updateQuantity = useCallback(
     (productId, quantity) => {
@@ -361,8 +338,8 @@ const CartProvider = ({ children }) => {
         return validation;
       }
 
-      setCartItems((currentItems) =>
-        currentItems.map((item) => {
+      setCartItems((currentItems) => {
+        const nextItems = currentItems.map((item) => {
           if (String(item.id) !== String(productId)) {
             return item;
           }
@@ -380,24 +357,30 @@ const CartProvider = ({ children }) => {
 
             stockStatus: product.stockStatus,
 
-            lowStockThreshold: product.lowStockThreshold,
+            lowStockThreshold: product.lowStockThreshold ?? 3,
 
             quantity: newQuantity,
           });
-        })
-      );
+        });
+
+        persistCart(nextItems);
+
+        return nextItems;
+      });
 
       return {
         success: true,
         message: "Đã cập nhật số lượng.",
       };
     },
-    [products, removeFromCart]
+    [products, removeFromCart, persistCart]
   );
 
-  /* =======================================================
-     INCREASE
-  ======================================================= */
+  /*
+  ========================================================
+  INCREASE
+  ========================================================
+  */
 
   const increaseQuantity = useCallback(
     (productId) => {
@@ -417,9 +400,11 @@ const CartProvider = ({ children }) => {
     [cartItems, updateQuantity]
   );
 
-  /* =======================================================
-     DECREASE
-  ======================================================= */
+  /*
+  ========================================================
+  DECREASE
+  ========================================================
+  */
 
   const decreaseQuantity = useCallback(
     (productId) => {
@@ -450,54 +435,70 @@ const CartProvider = ({ children }) => {
     [cartItems, removeFromCart, updateQuantity]
   );
 
-  /* =======================================================
-     CLEAR
-  ======================================================= */
+  /*
+  ========================================================
+  CLEAR CART
+  ========================================================
+  */
 
   const clearCart = useCallback(() => {
     setCartItems([]);
 
-    if (!user?.id) {
+    if (!userId) {
       return;
     }
 
-    const storageKey = getCartStorageKey(user.id);
+    const storageKey = getCartStorageKey(userId);
+
+    if (!storageKey) {
+      return;
+    }
 
     try {
       localStorage.removeItem(storageKey);
     } catch (error) {
       console.error("Lỗi xóa giỏ hàng:", error);
     }
-  }, [user?.id]);
+  }, [userId]);
 
-  /* =======================================================
-     COUNT
-  ======================================================= */
+  /*
+  ========================================================
+  COUNT
+  ========================================================
+  */
 
-  const cartCount = useMemo(() => {
-    return cartItems.reduce(
-      (total, item) => total + (Number(item.quantity) || 0),
-      0
-    );
-  }, [cartItems]);
+  const cartCount = useMemo(
+    () =>
+      cartItems.reduce(
+        (total, item) => total + (Number(item.quantity) || 0),
+        0
+      ),
+    [cartItems]
+  );
 
-  /* =======================================================
-     TOTAL
-  ======================================================= */
+  /*
+  ========================================================
+  TOTAL
+  ========================================================
+  */
 
-  const cartTotal = useMemo(() => {
-    return cartItems.reduce((total, item) => {
-      const price = Number(item.price) || 0;
+  const cartTotal = useMemo(
+    () =>
+      cartItems.reduce((total, item) => {
+        const price = Number(item.price) || 0;
 
-      const quantity = Number(item.quantity) || 0;
+        const quantity = Number(item.quantity) || 0;
 
-      return total + price * quantity;
-    }, 0);
-  }, [cartItems]);
+        return total + price * quantity;
+      }, 0),
+    [cartItems]
+  );
 
-  /* =======================================================
-     VALUE
-  ======================================================= */
+  /*
+  ========================================================
+  CONTEXT VALUE
+  ========================================================
+  */
 
   const value = useMemo(
     () => ({
@@ -535,6 +536,45 @@ const CartProvider = ({ children }) => {
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+};
+
+/*
+=========================================================
+PROVIDER
+=========================================================
+*/
+
+const CartProvider = ({ children }) => {
+  const auth = useContext(AuthContext);
+
+  if (!auth) {
+    throw new Error("CartProvider phải được đặt bên trong AuthProvider.");
+  }
+
+  const { user } = auth;
+
+  const products = useSyncExternalStore(
+    subscribeProducts,
+    getProductsSnapshot,
+    getProductsSnapshot
+  );
+
+  /*
+   * key thay đổi khi user thay đổi.
+   *
+   * Vì vậy CartSession cũ bị unmount và CartSession
+   * của user mới được khởi tạo từ đúng localStorage.
+   *
+   * Không cần useEffect + setCartItems để reset state.
+   */
+
+  const sessionKey = user?.id ? String(user.id) : "guest";
+
+  return (
+    <CartSession key={sessionKey} user={user} products={products}>
+      {children}
+    </CartSession>
+  );
 };
 
 export default CartProvider;
