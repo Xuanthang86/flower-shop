@@ -555,10 +555,8 @@ const AdminProductsPage = () => {
     };
 
     try {
-      let saved;
-
       if (editingProduct) {
-        saved = saveProducts(
+        saveProducts(
           products.map((product) =>
             String(product.id) === String(editingProduct.id)
               ? {
@@ -571,7 +569,7 @@ const AdminProductsPage = () => {
 
         setMessage("Đã cập nhật sản phẩm thành công.");
       } else {
-        saved = saveProducts([
+        saveProducts([
           ...products,
           {
             id: `product-${Date.now()}-${Math.random()
@@ -588,8 +586,6 @@ const AdminProductsPage = () => {
 
         setMessage("Đã thêm sản phẩm thành công.");
       }
-
-      setProducts(saved);
 
       closeProductModal();
     } catch (saveError) {
@@ -722,13 +718,11 @@ const AdminProductsPage = () => {
 
     try {
       if (confirmDelete.type === "product") {
-        const saved = saveProducts(
+        saveProducts(
           products.filter(
             (product) => String(product.id) !== String(confirmDelete.id)
           )
         );
-
-        setProducts(saved);
 
         setMessage("Đã xóa sản phẩm.");
       }
