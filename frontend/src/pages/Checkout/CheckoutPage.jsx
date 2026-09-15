@@ -21,7 +21,7 @@ import {
 
 const EMPTY_SHIPPING_RESULT = {
   success: false,
-  message: "Vui lòng nhập đầy đủ địa chỉ nhận hàng để tính phí giao hàng.",
+  message: "Vui lòng nhập đầy đủ thông tin giao hàng.",
   shippingFee: 0,
   distanceKm: null,
   freeShippingApplied: false,
@@ -55,12 +55,6 @@ const CheckoutPage = () => {
     paymentMethod: "cod",
   });
 
-  /*
-  ==========================================================
-  DELIVERY MODE
-  ==========================================================
-  */
-
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
   const [deliveryDate, setDeliveryDate] = useState(
@@ -69,19 +63,11 @@ const CheckoutPage = () => {
 
   const [deliveryTimeSlot, setDeliveryTimeSlot] = useState("");
 
-  /*
-  ==========================================================
-  SHIPPING STATE
-  ==========================================================
-  */
-
   const [shippingCalculation, setShippingCalculation] = useState(
     EMPTY_SHIPPING_RESULT
   );
 
   const [shippingLoading, setShippingLoading] = useState(false);
-
-  const [shippingRequestId, setShippingRequestId] = useState(0);
 
   const [error, setError] = useState("");
 
@@ -89,7 +75,7 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  CART TOTAL
+  CART
   ==========================================================
   */
 
@@ -103,19 +89,13 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  AVAILABLE TIME SLOTS
+  TIME SLOTS
   ==========================================================
   */
 
   const availableTimeSlots = useMemo(() => {
     return getAvailableDeliveryTimeSlots(deliveryDate, deliveryMode);
   }, [deliveryDate, deliveryMode]);
-
-  /*
-  ==========================================================
-  AUTO SELECT TIME SLOT
-  ==========================================================
-  */
 
   useEffect(() => {
     const stillAvailable = availableTimeSlots.some(
@@ -129,7 +109,7 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  DELIVERY MODE CHANGE
+  DELIVERY MODE
   ==========================================================
   */
 
@@ -145,7 +125,7 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  CUSTOMER INPUT
+  INPUT
   ==========================================================
   */
 
@@ -161,7 +141,7 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  ADDRESS CHANGE
+  ADDRESS
   ==========================================================
   */
 
@@ -189,12 +169,6 @@ const CheckoutPage = () => {
     setShippingCalculation(EMPTY_SHIPPING_RESULT);
 
     setError("");
-
-    /*
-     * Tăng request ID để các request
-     * cũ không được phép ghi đè kết quả mới.
-     */
-    setShippingRequestId((current) => current + 1);
   };
 
   /*
@@ -214,20 +188,6 @@ const CheckoutPage = () => {
   /*
   ==========================================================
   CALCULATE SHIPPING
-  ==========================================================
-
-  Chỉ tính khi có:
-  - Tỉnh/thành
-  - Phường/xã
-  - Số nhà
-  - Tên đường
-  - Ngày
-  - Khung giờ
-
-  Sau đó:
-  - geocode địa chỉ
-  - tính km
-  - tính phí
   ==========================================================
   */
 
@@ -273,8 +233,6 @@ const CheckoutPage = () => {
       return undefined;
     }
 
-    const currentRequestId = shippingRequestId;
-
     setShippingLoading(true);
 
     setShippingCalculation({
@@ -303,14 +261,12 @@ const CheckoutPage = () => {
           return;
         }
 
-        if (currentRequestId !== shippingRequestId) {
-          return;
-        }
-
         setShippingCalculation(result);
 
         if (!result.success) {
           setError(result.message || "Không thể tính phí giao hàng.");
+        } else {
+          setError("");
         }
       })
       .catch((calculationError) => {
@@ -328,8 +284,7 @@ const CheckoutPage = () => {
         });
 
         setError(
-          calculationError?.message ||
-            "Không thể xác định phí giao hàng. Vui lòng kiểm tra lại địa chỉ."
+          calculationError?.message || "Không thể xác định phí giao hàng."
         );
       })
       .finally(() => {
@@ -348,7 +303,6 @@ const CheckoutPage = () => {
     deliveryDate,
     deliveryTimeSlot,
     deliveryMode,
-    shippingRequestId,
   ]);
 
   /*
@@ -366,20 +320,12 @@ const CheckoutPage = () => {
       return;
     }
 
-    /*
-     * Kiểm tra giỏ hàng.
-     */
     if (!cartItems || cartItems.length === 0) {
-      setError(
-        "Giỏ hàng đang trống. Vui lòng thêm sản phẩm trước khi đặt hàng."
-      );
+      setError("Giỏ hàng đang trống.");
 
       return;
     }
 
-    /*
-     * Kiểm tra khách hàng.
-     */
     if (!formData.fullName.trim()) {
       setError("Vui lòng nhập họ và tên.");
 
@@ -392,9 +338,6 @@ const CheckoutPage = () => {
       return;
     }
 
-    /*
-     * Kiểm tra địa chỉ.
-     */
     if (!formData.address.provinceCode || !formData.address.provinceName) {
       setError("Vui lòng chọn tỉnh/thành phố.");
 
@@ -431,39 +374,26 @@ const CheckoutPage = () => {
       return;
     }
 
-    /*
-     * Nếu đang tính khoảng cách,
-     * không cho đặt.
-     */
     if (shippingLoading) {
-      setError(
-        "Hệ thống đang xác định khoảng cách và phí giao hàng. Vui lòng chờ một chút."
-      );
+      setError("Đang xác định khoảng cách và phí giao hàng.");
 
       return;
     }
 
-    /*
-     * Phải có kết quả shipping thành công.
-     */
     if (!shippingCalculation?.success) {
       setError(
-        shippingCalculation?.message ||
-          "Không thể xác định phí giao hàng. Vui lòng kiểm tra lại địa chỉ."
+        shippingCalculation?.message || "Không thể xác định phí giao hàng."
       );
 
       return;
     }
 
-    /*
-     * TÍNH LẠI LẦN CUỐI TRƯỚC KHI ĐẶT
-     *
-     * Không tin hoàn toàn vào state
-     * hiển thị trên giao diện.
-     */
     setSubmitting(true);
 
     try {
+      /*
+       * Tính lại lần cuối.
+       */
       const finalShippingCalculation = await calculateShippingAsync({
         address: formData.address,
 
@@ -492,7 +422,7 @@ const CheckoutPage = () => {
       const shippingSnapshot = createShippingSnapshot(finalShippingCalculation);
 
       if (!shippingSnapshot) {
-        setError("Không thể tạo thông tin giao hàng. Vui lòng thử lại.");
+        setError("Không thể tạo thông tin giao hàng.");
 
         return;
       }
@@ -502,13 +432,6 @@ const CheckoutPage = () => {
 
       const finalGrandTotal = subtotal + finalShippingFee;
 
-      /*
-       * Tạo order.
-       *
-       * OrderProvider hiện tại nhận object
-       * orderData nên shippingSnapshot
-       * sẽ được giữ trong order.
-       */
       const result = await createOrder({
         customer: {
           name: formData.fullName.trim(),
@@ -550,29 +473,14 @@ const CheckoutPage = () => {
           image: item.image || "",
         })),
 
-        /*
-         * Giá trị hàng hóa.
-         */
         subtotal,
 
-        /*
-         * Phí giao đã chốt.
-         */
         shippingFee: finalShippingFee,
 
-        /*
-         * Tổng thanh toán.
-         */
         total: finalGrandTotal,
 
-        /*
-         * Shipping snapshot.
-         */
         shippingSnapshot,
 
-        /*
-         * Các trường tiện dụng.
-         */
         deliveryMode: finalShippingCalculation.deliveryMode,
 
         deliveryModeLabel: finalShippingCalculation.deliveryModeLabel,
@@ -583,6 +491,8 @@ const CheckoutPage = () => {
 
         deliveryTimeSlotLabel: finalShippingCalculation.deliveryTimeSlotLabel,
 
+        estimatedDeliveryTime: finalShippingCalculation.estimatedDeliveryTime,
+
         deliveryNote: finalShippingCalculation.deliveryNote,
 
         deliveryDistanceKm: finalShippingCalculation.distanceKm,
@@ -591,9 +501,7 @@ const CheckoutPage = () => {
       });
 
       if (!result || result.success !== true || !result.order) {
-        setError(
-          result?.message || "Không thể tạo đơn hàng. Vui lòng thử lại."
-        );
+        setError(result?.message || "Không thể tạo đơn hàng.");
 
         return;
       }
@@ -660,8 +568,6 @@ const CheckoutPage = () => {
   return (
     <section className="py-12 md:py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4">
-        {/* HEADER */}
-
         <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
             Thanh toán
@@ -671,8 +577,6 @@ const CheckoutPage = () => {
             Vui lòng nhập thông tin nhận hàng để hoàn tất đơn hàng.
           </p>
         </div>
-
-        {/* ERROR */}
 
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-600">
@@ -684,10 +588,6 @@ const CheckoutPage = () => {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 lg:grid-cols-3 gap-8"
         >
-          {/* =====================================
-              LEFT
-          ====================================== */}
-
           <div className="lg:col-span-2 space-y-8">
             {/* THÔNG TIN NHẬN HÀNG */}
 
@@ -697,8 +597,6 @@ const CheckoutPage = () => {
               </h2>
 
               <div className="mt-6 space-y-5">
-                {/* HỌ TÊN */}
-
                 <div>
                   <label
                     htmlFor="fullName"
@@ -717,8 +615,6 @@ const CheckoutPage = () => {
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                   />
                 </div>
-
-                {/* PHONE */}
 
                 <div>
                   <label
@@ -739,8 +635,6 @@ const CheckoutPage = () => {
                   />
                 </div>
 
-                {/* EMAIL */}
-
                 <div>
                   <label
                     htmlFor="email"
@@ -760,8 +654,6 @@ const CheckoutPage = () => {
                   />
                 </div>
 
-                {/* ADDRESS */}
-
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
                     Địa chỉ nhận hàng
@@ -778,17 +670,9 @@ const CheckoutPage = () => {
             {/* GIAO HÀNG */}
 
             <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Giao hàng
-                </h2>
+              <h2 className="text-xl font-semibold text-gray-800">Giao hàng</h2>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  Khoảng cách được tính từ 40 Nguyễn Chí Thanh, Đà Nẵng.
-                </p>
-              </div>
-
-              {/* DELIVERY MODE */}
+              {/* HÌNH THỨC */}
 
               <div className="mt-6">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -854,7 +738,7 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* DATE */}
+              {/* NGÀY + KHUNG GIỜ */}
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
@@ -887,8 +771,6 @@ const CheckoutPage = () => {
                   )}
                 </div>
 
-                {/* TIME SLOT */}
-
                 <div>
                   <label
                     htmlFor="deliveryTimeSlot"
@@ -915,37 +797,35 @@ const CheckoutPage = () => {
                       </option>
                     ))}
                   </select>
-
-                  {availableTimeSlots.length === 0 && (
-                    <p className="mt-1 text-xs text-red-500">
-                      Hiện không còn khung giờ phù hợp với hình thức giao đã
-                      chọn.
-                    </p>
-                  )}
                 </div>
               </div>
 
-              {/* SHIPPING CALCULATION */}
+              {/* SHIPPING RESULT */}
 
               <div className="mt-6 rounded-xl border border-gray-200 p-4">
                 {shippingLoading ? (
-                  <div>
+                  <div className="py-1">
                     <p className="font-medium text-gray-800">
-                      Đang xác định khoảng cách...
-                    </p>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      Hệ thống đang xác định vị trí địa chỉ nhận hàng và tính
-                      phí giao.
+                      Đang xác định khoảng cách và phí giao hàng...
                     </p>
                   </div>
                 ) : shippingCalculation.success ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-gray-600">Khoảng cách</span>
+                      <span className="text-gray-600">Số km</span>
 
                       <span className="font-semibold text-gray-800">
                         {Number(shippingCalculation.distanceKm).toFixed(2)} km
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-600">
+                        Thời gian giao hàng dự kiến
+                      </span>
+
+                      <span className="font-semibold text-gray-800 text-right">
+                        {shippingCalculation.estimatedDeliveryTime}
                       </span>
                     </div>
 
@@ -958,7 +838,7 @@ const CheckoutPage = () => {
                     </div>
 
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-gray-600">Phí giao</span>
+                      <span className="text-gray-600">Phí giao hàng</span>
 
                       <span
                         className={`font-semibold ${
@@ -980,18 +860,10 @@ const CheckoutPage = () => {
                         {shippingCalculation.freeShippingReason}
                       </div>
                     )}
-
-                    {!shippingCalculation.freeShippingApplied && (
-                      <p className="text-xs text-gray-500">
-                        Đơn từ 500.000đ hoặc khoảng cách dưới 7 km sẽ được miễn
-                        phí giao hàng.
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    {shippingCalculation.message ||
-                      "Nhập đầy đủ địa chỉ để hệ thống tính phí giao hàng."}
+                    {shippingCalculation.message}
                   </p>
                 )}
               </div>
@@ -1028,9 +900,7 @@ const CheckoutPage = () => {
             </div>
           </div>
 
-          {/* =====================================
-              ORDER SUMMARY
-          ====================================== */}
+          {/* ORDER SUMMARY */}
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8 lg:sticky lg:top-24">
@@ -1116,13 +986,6 @@ const CheckoutPage = () => {
                     ? "Đang tính phí giao hàng..."
                     : "Đặt hàng"}
               </button>
-
-              {!shippingCalculation.success && !shippingLoading && (
-                <p className="mt-3 text-xs text-center text-gray-500">
-                  Vui lòng nhập đầy đủ địa chỉ để hệ thống tính phí giao hàng
-                  trước khi đặt.
-                </p>
-              )}
             </div>
           </div>
         </form>

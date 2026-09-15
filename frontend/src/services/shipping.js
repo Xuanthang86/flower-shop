@@ -3,39 +3,6 @@
 SHIPPING SERVICE
 NỘI DUNG 14 — SHIPPING / GIAO HOA
 ============================================================
-
-NGUYÊN TẮC HIỆN TẠI
-
-1. Điểm xuất phát của shop:
-   40 Nguyễn Chí Thanh, Đà Nẵng.
-
-2. Địa chỉ giao hàng của khách:
-   - Tỉnh/thành phố
-   - Phường/xã
-   - Số nhà
-   - Tên đường
-
-3. Khoảng cách:
-   - Geocode địa chỉ giao hàng.
-   - Tính khoảng cách đường bộ từ shop tới khách.
-   - Dùng OSRM để lấy khoảng cách lái xe.
-   - Nếu OSRM không trả được tuyến thì dùng khoảng cách
-     đường thẳng Haversine làm fallback.
-
-4. Miễn phí:
-   - subtotal >= 500.000đ
-   HOẶC
-   - khoảng cách < 7 km.
-
-5. Nếu không được miễn phí:
-   - Giao tiết kiệm: 20.000đ
-   - Giao tiêu chuẩn: 30.000đ
-   - Giao hỏa tốc: 50.000đ
-
-6. Hiện tại chỉ hỗ trợ Đà Nẵng.
-   Kiến trúc được tách riêng để sau này mở rộng toàn quốc.
-
-============================================================
 */
 
 export const SHIPPING_ZONE = {
@@ -63,8 +30,21 @@ SHOP LOCATION
 
 export const SHOP_LOCATION = {
   name: "Flower Shop",
+
   address: "40 Nguyễn Chí Thanh, Đà Nẵng, Việt Nam",
+
   provinceName: "Đà Nẵng",
+
+  /*
+   * Tọa độ trung tâm dùng làm fallback.
+   *
+   * Khi routing API hoạt động, hệ thống sẽ dùng
+   * tọa độ chính xác được cấu hình dưới đây.
+   *
+   * Đây là điểm xuất phát của shop.
+   */
+  latitude: 16.06778,
+  longitude: 108.22083,
 };
 
 /*
@@ -75,21 +55,19 @@ SHIPPING CONFIG
 
 export const SHIPPING_CONFIG = {
   /*
-   * Ngưỡng miễn phí theo giá trị đơn hàng.
+   * Đơn từ 500.000đ miễn phí.
    */
   freeShippingThreshold: 500000,
 
   /*
-   * Khoảng cách dưới 7 km được miễn phí.
+   * Dưới 7 km miễn phí.
    *
-   * Lưu ý:
-   * < 7 km mới miễn phí.
-   * Đúng 7 km không được xem là miễn phí theo khoảng cách.
+   * Đúng 7 km KHÔNG thuộc diện miễn phí theo khoảng cách.
    */
   freeShippingDistanceKm: 7,
 
   /*
-   * Phí của 3 hình thức giao hàng.
+   * Phí 3 hình thức giao hàng.
    */
   deliveryFees: {
     [DELIVERY_MODE.ECONOMY]: 20000,
@@ -98,52 +76,47 @@ export const SHIPPING_CONFIG = {
   },
 
   /*
-   * Đà Nẵng là khu vực đang hỗ trợ.
+   * Hiện tại Đà Nẵng.
    *
-   * Sau này có thể thêm:
+   * Sau này có thể mở rộng:
    *
-   * deliveryProvinceKeywords: [
+   * [
    *   "da nang",
    *   "hue",
-   *   "quang nam",
+   *   "ha noi",
+   *   "ho chi minh",
    *   ...
    * ]
    */
   deliveryProvinceKeywords: ["da nang"],
 
   /*
-   * Tối đa số ngày đặt trước.
+   * Số ngày được đặt trước.
    */
   maxAdvanceDays: 30,
 
   /*
-   * Giao hỏa tốc chỉ giao trong ngày.
+   * Giao hỏa tốc chỉ nhận trong ngày.
    */
   expressCutoffHour: 17,
 
   /*
-   * Tối thiểu 120 phút để chuẩn bị giao hỏa tốc.
+   * Tối thiểu 120 phút chuẩn bị.
    */
   expressMinimumLeadMinutes: 120,
 
   /*
-   * API geocoding.
-   *
-   * Photon:
-   * - không cần API key
-   * - dùng để chuyển địa chỉ thành tọa độ.
+   * Photon geocoding.
    */
   geocodingUrl: "https://photon.komoot.io/api/",
 
   /*
-   * API routing.
-   *
-   * OSRM trả về khoảng cách đường bộ.
+   * OSRM routing.
    */
   routingUrl: "https://router.project-osrm.org/route/v1/driving",
 
   /*
-   * Timeout API.
+   * Timeout.
    */
   requestTimeoutMs: 10000,
 
@@ -229,7 +202,9 @@ export const formatDateKey = (date) => {
   }
 
   const year = target.getFullYear();
+
   const month = String(target.getMonth() + 1).padStart(2, "0");
+
   const day = String(target.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
@@ -271,6 +246,48 @@ export const getMaxDeliveryDate = () => {
 
 /*
 ============================================================
+ESTIMATED DELIVERY
+============================================================
+*/
+
+export const getEstimatedDeliveryTime = (
+  deliveryMode,
+  deliveryDate,
+  deliveryTimeSlot
+) => {
+  if (!deliveryDate) {
+    return "";
+  }
+
+  const slot = SHIPPING_CONFIG.deliveryTimeSlots.find(
+    (item) => String(item.id) === String(deliveryTimeSlot)
+  );
+
+  if (deliveryMode === DELIVERY_MODE.EXPRESS) {
+    if (slot) {
+      return `Trong ngày, ${slot.label}`;
+    }
+
+    return "Trong ngày";
+  }
+
+  if (deliveryMode === DELIVERY_MODE.ECONOMY) {
+    if (slot) {
+      return `Dự kiến trong 2 ngày, ${slot.label}`;
+    }
+
+    return "Dự kiến trong 2 ngày";
+  }
+
+  if (slot) {
+    return `Dự kiến trong 1 ngày, ${slot.label}`;
+  }
+
+  return "Dự kiến trong 1 ngày";
+};
+
+/*
+============================================================
 ZONE
 ============================================================
 */
@@ -281,8 +298,11 @@ export const getShippingZone = (address = {}) => {
   if (!provinceName) {
     return {
       zone: SHIPPING_ZONE.NON_DELIVERY,
+
       label: "Chưa xác định khu vực giao hàng",
+
       available: false,
+
       reason: "Vui lòng chọn tỉnh/thành phố.",
     };
   }
@@ -294,22 +314,26 @@ export const getShippingZone = (address = {}) => {
   if (!supported) {
     return {
       zone: SHIPPING_ZONE.NON_DELIVERY,
+
       label: "Ngoài khu vực giao hàng",
+
       available: false,
-      reason:
-        "Hiện tại Flower Shop đang hỗ trợ giao hàng tại Đà Nẵng. Hệ thống được thiết kế để mở rộng thêm các tỉnh/thành phố trong giai đoạn tiếp theo.",
+
+      reason: "Địa chỉ hiện chưa thuộc khu vực giao hàng.",
     };
   }
 
   /*
-   * Không phân biệt Phường/Xã để tính phí.
-   *
-   * Tất cả địa chỉ thuộc Đà Nẵng hiện được xem là nội thành.
+   * Tất cả Phường/Xã của Đà Nẵng
+   * hiện được xem là nội thành.
    */
   return {
     zone: SHIPPING_ZONE.INTRA_CITY,
+
     label: "Nội thành Đà Nẵng",
+
     available: true,
+
     reason: "",
   };
 };
@@ -353,14 +377,16 @@ export const getAvailableDeliveryTimeSlots = (
 
   /*
    * Ngày tương lai:
-   * toàn bộ khung giờ đều có thể chọn.
+   * toàn bộ khung giờ.
    */
   if (deliveryDate !== today) {
     return allSlots;
   }
 
   const currentHour = now.getHours();
+
   const currentMinute = now.getMinutes();
+
   const currentMinutes = currentHour * 60 + currentMinute;
 
   /*
@@ -372,22 +398,22 @@ export const getAvailableDeliveryTimeSlots = (
     }
 
     return allSlots.filter((slot) => {
-      const slotStartMinutes = slot.startHour * 60;
+      const startMinutes = slot.startHour * 60;
 
       return (
-        slotStartMinutes >
+        startMinutes >
         currentMinutes + SHIPPING_CONFIG.expressMinimumLeadMinutes
       );
     });
   }
 
   /*
-   * Tiêu chuẩn / tiết kiệm giao trong ngày.
+   * Tiêu chuẩn / tiết kiệm.
    */
   return allSlots.filter((slot) => {
-    const slotStartMinutes = slot.startHour * 60;
+    const startMinutes = slot.startHour * 60;
 
-    return slotStartMinutes > currentMinutes + 30;
+    return startMinutes > currentMinutes + 30;
   });
 };
 
@@ -435,23 +461,26 @@ export const validateDeliveryMode = (
 
 /*
 ============================================================
-FETCH JSON WITH TIMEOUT
+FETCH JSON
 ============================================================
 */
 
 const fetchJsonWithTimeout = async (url) => {
   const controller = new AbortController();
 
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, SHIPPING_CONFIG.requestTimeoutMs);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    SHIPPING_CONFIG.requestTimeoutMs
+  );
 
   try {
     const response = await fetch(url, {
       method: "GET",
+
       headers: {
         Accept: "application/json",
       },
+
       signal: controller.signal,
     });
 
@@ -467,7 +496,7 @@ const fetchJsonWithTimeout = async (url) => {
 
 /*
 ============================================================
-GEOCODE
+ADDRESS QUERY
 ============================================================
 */
 
@@ -483,9 +512,11 @@ const buildAddressQuery = (address = {}) => {
   return parts.join(", ");
 };
 
-const buildShopQuery = () => {
-  return `${SHOP_LOCATION.address}, Việt Nam`;
-};
+/*
+============================================================
+GEOCODING
+============================================================
+*/
 
 const getCoordinatesFromPhoton = (data) => {
   const feature = data?.features?.[0];
@@ -497,6 +528,7 @@ const getCoordinatesFromPhoton = (data) => {
   }
 
   const longitude = Number(coordinates[0]);
+
   const latitude = Number(coordinates[1]);
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
@@ -506,6 +538,7 @@ const getCoordinatesFromPhoton = (data) => {
   return {
     latitude,
     longitude,
+
     displayName: feature?.properties?.name || feature?.properties?.street || "",
   };
 };
@@ -529,30 +562,28 @@ export const geocodeAddress = async (address) => {
 
   if (!coordinates) {
     throw new Error(
-      "Không xác định được vị trí của địa chỉ nhận hàng. Vui lòng kiểm tra lại số nhà và tên đường."
+      "Không xác định được vị trí địa chỉ nhận hàng. Vui lòng kiểm tra lại số nhà và tên đường."
     );
   }
 
   return coordinates;
 };
 
-export const geocodeShop = async () => {
-  const url =
-    `${SHIPPING_CONFIG.geocodingUrl}` +
-    `?q=${encodeURIComponent(buildShopQuery())}` +
-    `&limit=1` +
-    `&lang=vi`;
+/*
+============================================================
+SHOP COORDINATES
+============================================================
 
-  const data = await fetchJsonWithTimeout(url);
+Không gọi geocoding API cho shop nữa.
+Điểm shop được cấu hình cố định.
+============================================================
+*/
 
-  const coordinates = getCoordinatesFromPhoton(data);
+export const getShopCoordinates = () => ({
+  latitude: SHOP_LOCATION.latitude,
 
-  if (!coordinates) {
-    throw new Error("Không xác định được vị trí của cửa hàng.");
-  }
-
-  return coordinates;
-};
+  longitude: SHOP_LOCATION.longitude,
+});
 
 /*
 ============================================================
@@ -580,6 +611,7 @@ export const calculateHaversineDistanceKm = (pointA, pointB) => {
   );
 
   const latitudeA = toRadians(Number(pointA.latitude));
+
   const latitudeB = toRadians(Number(pointB.latitude));
 
   const a =
@@ -633,12 +665,23 @@ CALCULATE DISTANCE
 */
 
 export const calculateDeliveryDistance = async (address) => {
-  const [shopCoordinates, customerCoordinates] = await Promise.all([
-    geocodeShop(),
-    geocodeAddress(address),
-  ]);
+  /*
+   * Shop dùng tọa độ cố định.
+   * Chỉ geocode địa chỉ khách.
+   */
+  const shopCoordinates = getShopCoordinates();
 
-  let distanceKm = null;
+  const customerCoordinates = await geocodeAddress(address);
+
+  /*
+   * Không khởi tạo null.
+   *
+   * Điều này cũng xử lý cảnh báo:
+   * "The value assigned to distanceKm
+   * is not used in subsequent statement".
+   */
+  let distanceKm;
+
   let distanceType = "road";
 
   try {
@@ -663,22 +706,18 @@ export const calculateDeliveryDistance = async (address) => {
 
   return {
     distanceKm: Number(distanceKm.toFixed(2)),
+
     distanceType,
 
     shopCoordinates,
+
     customerCoordinates,
   };
 };
 
 /*
 ============================================================
-ASYNC SHIPPING CALCULATION
-============================================================
-
-Đây là hàm Checkout sử dụng.
-
-Không dùng calculateShipping() đồng bộ
-để tránh việc UI tính phí trước khi biết số km.
+CALCULATE SHIPPING ASYNC
 ============================================================
 */
 
@@ -698,11 +737,17 @@ export const calculateShippingAsync = async ({
   if (!zoneResult.available) {
     return {
       success: false,
+
       message: zoneResult.reason,
+
       zone: zoneResult.zone,
+
       zoneLabel: zoneResult.label,
+
       shippingFee: 0,
+
       subtotal: normalizedSubtotal,
+
       total: normalizedSubtotal,
     };
   }
@@ -736,6 +781,7 @@ export const calculateShippingAsync = async ({
   }
 
   const today = getTodayDateKey();
+
   const maxDate = getMaxDeliveryDate();
 
   if (deliveryDate < today) {
@@ -748,9 +794,7 @@ export const calculateShippingAsync = async ({
   if (deliveryDate > maxDate) {
     return {
       success: false,
-      message:
-        `Chỉ có thể đặt giao hàng tối đa ` +
-        `${SHIPPING_CONFIG.maxAdvanceDays} ngày.`,
+      message: `Chỉ có thể đặt giao hàng tối đa ${SHIPPING_CONFIG.maxAdvanceDays} ngày.`,
     };
   }
 
@@ -795,7 +839,7 @@ export const calculateShippingAsync = async ({
   }
 
   /*
-   * Xác định khoảng cách.
+   * Tính khoảng cách.
    */
   let distanceResult;
 
@@ -806,9 +850,10 @@ export const calculateShippingAsync = async ({
 
     return {
       success: false,
+
       message:
-        distanceError?.message ||
-        "Không thể xác định khoảng cách giao hàng. Vui lòng kiểm tra lại địa chỉ.",
+        distanceError?.message || "Không thể xác định khoảng cách giao hàng.",
+
       distanceAvailable: false,
     };
   }
@@ -816,11 +861,11 @@ export const calculateShippingAsync = async ({
   const distanceKm = Number(distanceResult.distanceKm) || 0;
 
   /*
-   * MIỄN PHÍ:
+   * Miễn phí:
    *
-   * 1. Đơn >= 500.000đ
+   * - đơn >= 500.000đ
    * HOẶC
-   * 2. Khoảng cách < 7km
+   * - khoảng cách < 7 km
    */
   const freeBySubtotal =
     normalizedSubtotal >= SHIPPING_CONFIG.freeShippingThreshold;
@@ -846,6 +891,12 @@ export const calculateShippingAsync = async ({
 
   const total = normalizedSubtotal + shippingFee;
 
+  const estimatedDeliveryTime = getEstimatedDeliveryTime(
+    deliveryMode,
+    deliveryDate,
+    selectedSlot.id
+  );
+
   return {
     success: true,
 
@@ -855,15 +906,20 @@ export const calculateShippingAsync = async ({
 
     address: {
       provinceCode: address?.provinceCode || "",
+
       provinceName: address?.provinceName || "",
+
       wardCode: address?.wardCode || "",
+
       wardName: address?.wardName || "",
+
       houseNumber: address?.houseNumber || "",
+
       street: address?.street || "",
     },
 
     /*
-     * Thông tin khoảng cách.
+     * Khoảng cách.
      */
     distanceKm,
 
@@ -887,6 +943,8 @@ export const calculateShippingAsync = async ({
     deliveryTimeSlot: selectedSlot.id,
 
     deliveryTimeSlotLabel: selectedSlot.label,
+
+    estimatedDeliveryTime,
 
     /*
      * Phí.
@@ -917,16 +975,7 @@ export const calculateShippingAsync = async ({
 
 /*
 ============================================================
-BACKWARD-COMPATIBLE SYNC FUNCTION
-============================================================
-
-Giữ lại export cũ để các file khác không bị lỗi import.
-
-Lưu ý:
-Hàm này chỉ dùng cho những trường hợp không cần
-xác định khoảng cách.
-
-Checkout phải dùng calculateShippingAsync().
+BACKWARD COMPATIBLE SYNC FUNCTION
 ============================================================
 */
 
@@ -946,21 +995,19 @@ export const calculateShipping = ({
   if (!zoneResult.available) {
     return {
       success: false,
+
       message: zoneResult.reason,
+
       shippingFee: 0,
+
       subtotal: normalizedSubtotal,
+
       total: normalizedSubtotal,
     };
   }
 
   const deliveryFee = getDeliveryModeFee(deliveryMode);
 
-  /*
-   * Không thể xác định free-by-distance
-   * trong hàm synchronous.
-   *
-   * Chỉ áp dụng free-by-order-value ở đây.
-   */
   const freeShippingApplied =
     normalizedSubtotal >= SHIPPING_CONFIG.freeShippingThreshold;
 
@@ -1025,7 +1072,7 @@ export const createShippingSnapshot = (calculation) => {
   }
 
   return {
-    version: 2,
+    version: 3,
 
     zone: calculation.zone || "",
 
@@ -1037,9 +1084,6 @@ export const createShippingSnapshot = (calculation) => {
       ...(calculation.address || {}),
     },
 
-    /*
-     * Khoảng cách là dữ liệu snapshot quan trọng.
-     */
     distanceKm: Number(calculation.distanceKm) || 0,
 
     distanceType: calculation.distanceType || "",
@@ -1048,9 +1092,6 @@ export const createShippingSnapshot = (calculation) => {
 
     customerCoordinates: calculation.customerCoordinates || null,
 
-    /*
-     * Hình thức giao.
-     */
     deliveryMode: calculation.deliveryMode || "",
 
     deliveryModeLabel: calculation.deliveryModeLabel || "",
@@ -1061,9 +1102,8 @@ export const createShippingSnapshot = (calculation) => {
 
     deliveryTimeSlotLabel: calculation.deliveryTimeSlotLabel || "",
 
-    /*
-     * Phí.
-     */
+    estimatedDeliveryTime: calculation.estimatedDeliveryTime || "",
+
     originalDeliveryFee: Number(calculation.originalDeliveryFee) || 0,
 
     deliveryFee: Number(calculation.deliveryFee) || 0,
