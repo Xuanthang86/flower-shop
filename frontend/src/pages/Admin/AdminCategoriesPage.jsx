@@ -434,12 +434,6 @@ const AdminCategoriesPage = () => {
     setMessage("");
 
     try {
-      /*
-       * Lưu Product trước.
-       *
-       * Nếu lưu Category thất bại, category nguồn vẫn còn,
-       * do đó không tạo Product trỏ tới category không tồn tại.
-       */
       await saveProductsAsync(nextProducts);
 
       let nextCategories = categories;
@@ -572,16 +566,26 @@ const AdminCategoriesPage = () => {
 
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-[1050px] w-full">
+            <table className="w-full min-w-0 table-fixed">
               <thead className="border-b border-gray-100 bg-gray-50">
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="px-5 py-4">Danh mục</th>
-                  <th className="px-5 py-4">Slug / URL</th>
-                  <th className="px-5 py-4">Sản phẩm</th>
-                  <th className="px-5 py-4">SEO</th>
-                  <th className="px-5 py-4">Thứ tự</th>
-                  <th className="px-5 py-4">Trạng thái</th>
-                  <th className="px-5 py-4 text-right">Thao tác</th>
+                  <th className="w-[26%] px-3 py-4 whitespace-nowrap">
+                    Danh mục
+                  </th>
+                  <th className="w-[17%] px-3 py-4 whitespace-nowrap">
+                    Slug / URL
+                  </th>
+                  <th className="w-[8%] px-3 py-4 whitespace-nowrap">
+                    Sản phẩm
+                  </th>
+                  <th className="w-[18%] px-3 py-4 whitespace-nowrap">SEO</th>
+                  <th className="w-[7%] px-3 py-4 whitespace-nowrap">Thứ tự</th>
+                  <th className="w-[11%] px-3 py-4 whitespace-nowrap">
+                    Trạng thái
+                  </th>
+                  <th className="w-[13%] px-3 py-4 whitespace-nowrap">
+                    Thao tác
+                  </th>
                 </tr>
               </thead>
 
@@ -594,8 +598,8 @@ const AdminCategoriesPage = () => {
                       key={category.id}
                       className="align-top transition hover:bg-gray-50/70"
                     >
-                      <td className="px-5 py-4">
-                        <div className="flex min-w-[250px] items-start gap-3">
+                      <td className="px-3 py-4">
+                        <div className="flex min-w-0 items-start gap-3">
                           <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-pink-50">
                             {category.image ? (
                               <img
@@ -611,7 +615,7 @@ const AdminCategoriesPage = () => {
                           </div>
 
                           <div className="min-w-0">
-                            <p className="font-semibold text-gray-900">
+                            <p className="truncate font-semibold text-gray-900">
                               {category.name}
                             </p>
 
@@ -624,8 +628,8 @@ const AdminCategoriesPage = () => {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <p className="font-mono text-sm text-gray-700">
+                      <td className="px-3 py-4">
+                        <p className="truncate font-mono text-sm text-gray-700">
                           {category.slug}
                         </p>
 
@@ -634,31 +638,31 @@ const AdminCategoriesPage = () => {
                         </p>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700">
                           {productCount}
                         </span>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <p className="max-w-[230px] truncate text-sm font-medium text-gray-700">
+                      <td className="px-3 py-4">
+                        <p className="truncate text-sm font-medium text-gray-700">
                           {category.seoTitle || "—"}
                         </p>
 
-                        <p className="mt-1 line-clamp-2 max-w-[230px] text-xs leading-5 text-gray-500">
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
                           {category.seoDescription || "—"}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span className="font-semibold text-gray-700">
                           {category.sortOrder}
                         </span>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
                             category.active
                               ? "bg-green-50 text-green-700"
                               : "bg-gray-100 text-gray-500"
@@ -668,12 +672,12 @@ const AdminCategoriesPage = () => {
                         </span>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <div className="flex min-w-[250px] flex-wrap justify-end gap-2">
+                      <td className="px-3 py-4">
+                        <div className="flex min-w-0 flex-wrap items-center justify-start gap-1.5">
                           <button
                             type="button"
                             onClick={() => openEditModal(category)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-pink-200 hover:text-pink-600"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-semibold text-gray-700 transition hover:border-pink-200 hover:text-pink-600"
                           >
                             <FiEdit2 size={14} />
                             Sửa
@@ -683,7 +687,7 @@ const AdminCategoriesPage = () => {
                             <button
                               type="button"
                               onClick={() => openTransferModal(category)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                             >
                               <FiRefreshCw size={14} />
                               Chuyển SP
@@ -693,7 +697,7 @@ const AdminCategoriesPage = () => {
                           <button
                             type="button"
                             onClick={() => openDeleteModal(category)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
                           >
                             <FiTrash2 size={14} />
                             Xóa
@@ -708,7 +712,7 @@ const AdminCategoriesPage = () => {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-5 py-12 text-center text-sm text-gray-500"
+                      className="px-3 py-12 text-center text-sm text-gray-500"
                     >
                       Chưa có danh mục nào.
                     </td>
@@ -828,7 +832,7 @@ const AdminCategoriesPage = () => {
                       }))
                     }
                     rows={3}
-                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-pink-100"
                     placeholder="Mô tả ngắn cho danh mục..."
                   />
                 </div>
@@ -899,7 +903,7 @@ const AdminCategoriesPage = () => {
                     }
                     rows={4}
                     maxLength={320}
-                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400 focus:ring-pink-100"
                     placeholder="Mô tả SEO cho trang danh mục..."
                   />
                 </div>
@@ -977,7 +981,7 @@ const AdminCategoriesPage = () => {
                       className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                     />
 
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="whitespace-nowrap text-sm font-medium text-gray-700">
                       Danh mục đang hoạt động
                     </span>
                   </label>
