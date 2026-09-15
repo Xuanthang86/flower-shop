@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCart } from "@/context/CartContext";
@@ -7,10 +7,23 @@ import { OrderContext } from "@/context/OrderContext";
 import AddressForm from "@/components/checkout/AddressForm";
 import PaymentMethod from "@/components/checkout/PaymentMethod";
 
+import {
+  calculateShipping,
+  createShippingSnapshot,
+  DELIVERY_MODE,
+  DELIVERY_MODE_LABELS,
+  formatShippingMoney,
+  getAvailableDeliveryTimeSlots,
+  getDefaultDeliveryDate,
+  getMaxDeliveryDate,
+  getTodayDateKey,
+} from "@/services/shipping";
+
 const CheckoutPage = () => {
   const navigate = useNavigate();
 
   const { cartItems, cartTotal, clearCart } = useCart();
+
   const { createOrder } = useContext(OrderContext);
 
   const [formData, setFormData] = useState({
@@ -30,14 +43,82 @@ const CheckoutPage = () => {
     },
 
     note: "",
+
     paymentMethod: "cod",
   });
 
+  const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
+
+  const [deliveryDate, setDeliveryDate] = useState(getDefaultDeliveryDate());
+
+  const [deliveryTimeSlot, setDeliveryTimeSlot] = useState("");
+
   const [error, setError] = useState("");
 
-  // ==========================================
-  // INPUT THÔNG TIN KHÁCH HÀNG
-  // ==========================================
+  /*
+  ==========================================================
+  KHUNG GIỜ KHẢ DỤNG
+  ==========================================================
+  */
+
+  const availableTimeSlots = useMemo(() => {
+    return getAvailableDeliveryTimeSlots(deliveryDate, deliveryMode);
+  }, [deliveryDate, deliveryMode]);
+
+  /*
+  ==========================================================
+  TỰ CHỌN KHUNG GIỜ HỢP LỆ
+  ==========================================================
+  */
+
+  useEffect(() => {
+    const stillAvailable = availableTimeSlots.some(
+      (slot) => String(slot.id) === String(deliveryTimeSlot)
+    );
+
+    if (!stillAvailable) {
+      setDeliveryTimeSlot(availableTimeSlots[0]?.id || "");
+    }
+  }, [availableTimeSlots, deliveryTimeSlot]);
+
+  /*
+  ==========================================================
+  CHUYỂN HÌNH THỨC GIAO
+  ==========================================================
+  */
+
+  const handleDeliveryModeChange = (mode) => {
+    setError("");
+
+    setDeliveryMode(mode);
+
+    /*
+     * Same-day và Express bắt buộc giao hôm nay.
+     */
+    if (mode === DELIVERY_MODE.SAME_DAY || mode === DELIVERY_MODE.EXPRESS) {
+      setDeliveryDate(getTodayDateKey());
+
+      return;
+    }
+
+    /*
+     * Nếu chuyển về giao tiêu chuẩn từ
+     * ngày hôm nay, giữ ngày hiện tại.
+     *
+     * Nếu ngày đã quá hạn thì dùng ngày mai.
+     */
+    const today = getTodayDateKey();
+
+    if (!deliveryDate || deliveryDate < today) {
+      setDeliveryDate(getDefaultDeliveryDate());
+    }
+  };
+
+  /*
+  ==========================================================
+  INPUT THÔNG TIN KHÁCH HÀNG
+  ==========================================================
+  */
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -48,13 +129,16 @@ const CheckoutPage = () => {
     }));
   };
 
-  // ==========================================
-  // ĐỊA CHỈ
-  // ==========================================
+  /*
+  ==========================================================
+  ĐỊA CHỈ
+  ==========================================================
+  */
 
   const handleAddressChange = (address) => {
     setFormData((currentData) => ({
       ...currentData,
+
       address: {
         provinceCode: address?.provinceCode || "",
         provinceName: address?.provinceName || "",
@@ -66,11 +150,15 @@ const CheckoutPage = () => {
         street: address?.street || "",
       },
     }));
+
+    setError("");
   };
 
-  // ==========================================
-  // THANH TOÁN
-  // ==========================================
+  /*
+  ==========================================================
+  THANH TOÁN
+  ==========================================================
+  */
 
   const handlePaymentChange = (event) => {
     setFormData((currentData) => ({
@@ -79,9 +167,48 @@ const CheckoutPage = () => {
     }));
   };
 
-  // ==========================================
-  // ĐẶT HÀNG
-  // ==========================================
+  /*
+  ==========================================================
+  TÍNH SHIPPING TRƯỚC KHI ĐẶT
+  ==========================================================
+  */
+
+  const shippingCalculation = useMemo(() => {
+    return calculateShipping({
+      address: formData.address,
+
+      subtotal: Number(cartTotal) || 0,
+
+      deliveryDate,
+
+      deliveryTimeSlot,
+
+      deliveryMode,
+
+      deliveryNote: formData.note,
+
+      now: new Date(),
+    });
+  }, [
+    formData.address,
+    formData.note,
+    cartTotal,
+    deliveryDate,
+    deliveryTimeSlot,
+    deliveryMode,
+  ]);
+
+  const shippingFee = shippingCalculation.success
+    ? Number(shippingCalculation.shippingFee) || 0
+    : 0;
+
+  const grandTotal = (Number(cartTotal) || 0) + shippingFee;
+
+  /*
+  ==========================================================
+  ĐẶT HÀNG
+  ==========================================================
+  */
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -126,6 +253,48 @@ const CheckoutPage = () => {
       return;
     }
 
+    /*
+     * TÍNH LẠI SHIPPING NGAY TRƯỚC KHI ĐẶT
+     *
+     * Không sử dụng kết quả cũ trên giao diện.
+     */
+    const finalShippingCalculation = calculateShipping({
+      address: formData.address,
+
+      subtotal: Number(cartTotal) || 0,
+
+      deliveryDate,
+
+      deliveryTimeSlot,
+
+      deliveryMode,
+
+      deliveryNote: formData.note,
+
+      now: new Date(),
+    });
+
+    if (!finalShippingCalculation.success) {
+      setError(
+        finalShippingCalculation.message ||
+          "Không thể xác định phí giao hàng. Vui lòng kiểm tra lại thông tin giao hàng."
+      );
+
+      return;
+    }
+
+    const shippingSnapshot = createShippingSnapshot(finalShippingCalculation);
+
+    if (!shippingSnapshot) {
+      setError("Không thể tạo thông tin giao hàng. Vui lòng thử lại.");
+
+      return;
+    }
+
+    const finalGrandTotal =
+      (Number(cartTotal) || 0) +
+      Number(finalShippingCalculation.shippingFee || 0);
+
     try {
       const result = await createOrder({
         customer: {
@@ -158,13 +327,46 @@ const CheckoutPage = () => {
 
         items: cartItems.map((item) => ({
           id: item.id,
+
           name: item.name,
+
           price: Number(item.price) || 0,
+
           quantity: Number(item.quantity) || 0,
+
           image: item.image || "",
         })),
 
-        total: Number(cartTotal) || 0,
+        /*
+         * Tổng hàng hóa trước phí giao.
+         */
+        subtotal: Number(cartTotal) || 0,
+
+        /*
+         * Phí giao tại thời điểm đặt.
+         */
+        shippingFee: Number(finalShippingCalculation.shippingFee) || 0,
+
+        /*
+         * Tổng cuối cùng khách phải thanh toán.
+         */
+        total: finalGrandTotal,
+
+        /*
+         * Giữ shipping snapshot nguyên vẹn trong order.
+         */
+        shippingSnapshot,
+
+        /*
+         * Các trường tiện dụng để đọc nhanh.
+         */
+        deliveryMode: finalShippingCalculation.deliveryMode,
+
+        deliveryDate: finalShippingCalculation.deliveryDate,
+
+        deliveryTimeSlot: finalShippingCalculation.deliveryTimeSlot,
+
+        deliveryNote: finalShippingCalculation.deliveryNote,
 
         status: "pending",
       });
@@ -202,9 +404,11 @@ const CheckoutPage = () => {
     }
   };
 
-  // ==========================================
-  // GIỎ HÀNG TRỐNG
-  // ==========================================
+  /*
+  ==========================================================
+  GIỎ HÀNG TRỐNG
+  ==========================================================
+  */
 
   if (!cartItems || cartItems.length === 0) {
     return (
@@ -257,96 +461,271 @@ const CheckoutPage = () => {
               THÔNG TIN NHẬN HÀNG
           ====================================== */}
 
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm p-6 md:p-8">
-            <h2 className="text-xl font-semibold text-gray-800">
-              Thông tin nhận hàng
-            </h2>
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Thông tin nhận hàng
+              </h2>
 
-            <div className="mt-6 space-y-5">
-              {/* HỌ TÊN */}
+              <div className="mt-6 space-y-5">
+                {/* HỌ TÊN */}
 
-              <div>
-                <label
-                  htmlFor="fullName"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                <div>
+                  <label
+                    htmlFor="fullName"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Họ và tên *
+                  </label>
+
+                  <input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="Nhập họ và tên"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  />
+                </div>
+
+                {/* SỐ ĐIỆN THOẠI */}
+
+                <div>
+                  <label
+                    htmlFor="phone"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Số điện thoại *
+                  </label>
+
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="Nhập số điện thoại"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  />
+                </div>
+
+                {/* EMAIL */}
+
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Email
+                  </label>
+
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="example@gmail.com"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  />
+                </div>
+
+                {/* ĐỊA CHỈ */}
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    Địa chỉ nhận hàng
+                  </h3>
+
+                  <AddressForm
+                    value={formData.address}
+                    onChange={handleAddressChange}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* =====================================
+                GIAO HÀNG
+            ====================================== */}
+
+            <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Giao hàng
+                </h2>
+
+                <p className="text-sm text-gray-500">
+                  Phí giao được tính ngay trước khi đặt hàng.
+                </p>
+              </div>
+
+              {/* KHU VỰC */}
+
+              {formData.address.provinceName && formData.address.wardName && (
+                <div
+                  className={`mt-5 rounded-xl border p-4 ${
+                    shippingCalculation.success
+                      ? "border-green-200 bg-green-50"
+                      : "border-orange-200 bg-orange-50"
+                  }`}
                 >
-                  Họ và tên *
+                  <p className="text-sm font-semibold text-gray-800">
+                    Khu vực giao hàng
+                  </p>
+
+                  <p className="mt-1 text-sm text-gray-600">
+                    {shippingCalculation.success
+                      ? shippingCalculation.zoneLabel
+                      : shippingCalculation.message}
+                  </p>
+                </div>
+              )}
+
+              {/* HÌNH THỨC GIAO */}
+
+              <div className="mt-6">
+                <p className="text-sm font-semibold text-gray-700 mb-3">
+                  Hình thức giao hàng
+                </p>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    DELIVERY_MODE.STANDARD,
+                    DELIVERY_MODE.SAME_DAY,
+                    DELIVERY_MODE.EXPRESS,
+                  ].map((mode) => {
+                    const checked = deliveryMode === mode;
+
+                    return (
+                      <label
+                        key={mode}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                          checked
+                            ? "border-pink-500 bg-pink-50"
+                            : "border-gray-200 bg-white hover:border-pink-200"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="deliveryMode"
+                          value={mode}
+                          checked={checked}
+                          onChange={() => handleDeliveryModeChange(mode)}
+                          className="mt-1 h-4 w-4 text-pink-600 focus:ring-pink-500"
+                        />
+
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-gray-800">
+                              {DELIVERY_MODE_LABELS[mode]}
+                            </span>
+
+                            {mode === DELIVERY_MODE.STANDARD && (
+                              <span className="text-sm text-gray-500">
+                                Theo phí khu vực
+                              </span>
+                            )}
+
+                            {mode === DELIVERY_MODE.SAME_DAY && (
+                              <span className="text-sm font-medium text-pink-600">
+                                +20.000 ₫
+                              </span>
+                            )}
+
+                            {mode === DELIVERY_MODE.EXPRESS && (
+                              <span className="text-sm font-medium text-pink-600">
+                                +40.000 ₫
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            {mode === DELIVERY_MODE.STANDARD &&
+                              "Giao theo ngày và khung giờ bạn lựa chọn."}
+
+                            {mode === DELIVERY_MODE.SAME_DAY &&
+                              "Nhận giao trong ngày nếu đặt trước giờ giới hạn."}
+
+                            {mode === DELIVERY_MODE.EXPRESS &&
+                              "Ưu tiên giao hỏa tốc trong ngày."}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* NGÀY GIAO */}
+
+              <div className="mt-6">
+                <label
+                  htmlFor="deliveryDate"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
+                >
+                  Ngày giao hàng
                 </label>
 
                 <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="Nhập họ và tên"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  id="deliveryDate"
+                  type="date"
+                  min={getTodayDateKey()}
+                  max={getMaxDeliveryDate()}
+                  value={deliveryDate}
+                  disabled={
+                    deliveryMode === DELIVERY_MODE.SAME_DAY ||
+                    deliveryMode === DELIVERY_MODE.EXPRESS
+                  }
+                  onChange={(event) => setDeliveryDate(event.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:text-gray-500 focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                 />
+
+                {(deliveryMode === DELIVERY_MODE.SAME_DAY ||
+                  deliveryMode === DELIVERY_MODE.EXPRESS) && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Hình thức này chỉ áp dụng cho ngày hôm nay.
+                  </p>
+                )}
               </div>
 
-              {/* SỐ ĐIỆN THOẠI */}
+              {/* KHUNG GIỜ */}
 
-              <div>
+              <div className="mt-6">
                 <label
-                  htmlFor="phone"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  htmlFor="deliveryTimeSlot"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  Số điện thoại *
+                  Khung giờ giao hàng
                 </label>
 
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Nhập số điện thoại"
+                <select
+                  id="deliveryTimeSlot"
+                  value={deliveryTimeSlot}
+                  onChange={(event) => setDeliveryTimeSlot(event.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
-                />
-              </div>
-
-              {/* EMAIL */}
-
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  Email
-                </label>
-
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="example@gmail.com"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
-                />
+                  {availableTimeSlots.length === 0 ? (
+                    <option value="">Không còn khung giờ phù hợp</option>
+                  ) : (
+                    availableTimeSlots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {slot.label}
+                      </option>
+                    ))
+                  )}
+                </select>
               </div>
 
-              {/* ĐỊA CHỈ */}
+              {/* GHI CHÚ GIAO HÀNG */}
 
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Địa chỉ nhận hàng
-                </h3>
-
-                <AddressForm
-                  value={formData.address}
-                  onChange={handleAddressChange}
-                />
-              </div>
-
-              {/* GHI CHÚ */}
-
-              <div>
+              <div className="mt-6">
                 <label
                   htmlFor="note"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  Ghi chú đơn hàng
+                  Ghi chú giao hàng
                 </label>
 
                 <textarea
@@ -354,14 +733,80 @@ const CheckoutPage = () => {
                   name="note"
                   value={formData.note}
                   onChange={handleChange}
-                  placeholder="Ví dụ: Giao giờ hành chính..."
+                  placeholder="Ví dụ: Gọi trước khi giao, giao tại quầy lễ tân..."
                   rows="3"
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none resize-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                 />
               </div>
 
-              {/* THANH TOÁN */}
+              {/* SHIPPING SUMMARY */}
 
+              <div className="mt-6 rounded-xl bg-gray-50 p-4">
+                <div className="flex justify-between gap-4 text-sm text-gray-600">
+                  <span>Phí giao cơ bản</span>
+
+                  <span>
+                    {shippingCalculation.success
+                      ? shippingCalculation.freeShippingApplied
+                        ? "Miễn phí"
+                        : formatShippingMoney(
+                            shippingCalculation.originalBaseFee
+                          )
+                      : "—"}
+                  </span>
+                </div>
+
+                {shippingCalculation.success &&
+                  shippingCalculation.surcharge > 0 && (
+                    <div className="mt-2 flex justify-between gap-4 text-sm text-gray-600">
+                      <span>Phụ phí dịch vụ</span>
+
+                      <span>
+                        {formatShippingMoney(shippingCalculation.surcharge)}
+                      </span>
+                    </div>
+                  )}
+
+                <div className="mt-3 border-t border-gray-200 pt-3 flex justify-between gap-4 font-semibold text-gray-800">
+                  <span>Phí giao hàng</span>
+
+                  <span className="text-pink-600">
+                    {shippingCalculation.success
+                      ? shippingFee === 0
+                        ? "Miễn phí"
+                        : formatShippingMoney(shippingFee)
+                      : "Chưa xác định"}
+                  </span>
+                </div>
+
+                {shippingCalculation.success &&
+                  !shippingCalculation.freeShippingApplied &&
+                  Number(cartTotal) <
+                    Number(shippingCalculation.freeShippingThreshold) && (
+                    <p className="mt-3 text-xs text-gray-500">
+                      Đơn từ{" "}
+                      {formatShippingMoney(
+                        shippingCalculation.freeShippingThreshold
+                      )}{" "}
+                      sẽ được miễn phí giao hàng cơ bản.
+                    </p>
+                  )}
+
+                {!shippingCalculation.success &&
+                  formData.address.provinceName &&
+                  formData.address.wardName && (
+                    <p className="mt-3 text-sm text-orange-600">
+                      {shippingCalculation.message}
+                    </p>
+                  )}
+              </div>
+            </div>
+
+            {/* =====================================
+                THANH TOÁN
+            ====================================== */}
+
+            <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
               <PaymentMethod
                 value={formData.paymentMethod}
                 onChange={handlePaymentChange}
@@ -373,7 +818,7 @@ const CheckoutPage = () => {
               TÓM TẮT ĐƠN HÀNG
           ====================================== */}
 
-          <div className="bg-white rounded-2xl shadow-sm p-6 h-fit">
+          <div className="bg-white rounded-2xl shadow-sm p-6 h-fit lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-gray-800">
               Đơn hàng của bạn
             </h2>
@@ -412,17 +857,40 @@ const CheckoutPage = () => {
                 <span>{Number(cartTotal).toLocaleString("vi-VN")} ₫</span>
               </div>
 
-              <div className="flex justify-between mt-3 text-lg font-bold text-gray-800">
-                <span>Tổng cộng</span>
+              <div className="flex justify-between mt-3 text-gray-600">
+                <span>Phí giao hàng</span>
 
-                <span className="text-pink-600">
-                  {Number(cartTotal).toLocaleString("vi-VN")} ₫
+                <span>
+                  {shippingCalculation.success
+                    ? shippingFee === 0
+                      ? "Miễn phí"
+                      : formatShippingMoney(shippingFee)
+                    : "—"}
                 </span>
               </div>
 
+              <div className="flex justify-between mt-4 pt-4 border-t border-gray-200 text-lg font-bold text-gray-800">
+                <span>Tổng cộng</span>
+
+                <span className="text-pink-600">
+                  {shippingCalculation.success
+                    ? grandTotal.toLocaleString("vi-VN")
+                    : Number(cartTotal).toLocaleString("vi-VN")}{" "}
+                  ₫
+                </span>
+              </div>
+
+              {!shippingCalculation.success && (
+                <p className="mt-3 text-xs leading-5 text-orange-600">
+                  Vui lòng hoàn tất địa chỉ và lựa chọn giao hàng để hệ thống
+                  xác định tổng tiền chính xác.
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="w-full mt-6 bg-pink-600 text-white py-3.5 rounded-xl font-semibold hover:bg-pink-700 transition"
+                disabled={!shippingCalculation.success}
+                className="w-full mt-6 bg-pink-600 text-white py-3.5 rounded-xl font-semibold hover:bg-pink-700 transition disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 Đặt hàng
               </button>
