@@ -11,12 +11,25 @@ export const PRODUCT_EXCEL_HEADERS = [
   "Hình ảnh",
 ];
 
+const MAX_EXCEL_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 5000;
+
 const IMAGE_FILE_PATTERN =
   /^[^<>:"/\\|?*]+\.(?:jpe?g|png|webp|gif|bmp|avif|svg)$/i;
 
 const normalizeText = (value) =>
   String(value ?? "")
     .replace(/\uFEFF/g, "")
+    .replace(/[\u200B-\u200D\u2060]/g, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+
+const normalizeMultilineText = (value) =>
+  String(value ?? "")
+    .replace(/\uFEFF/g, "")
+    .replace(/[\u200B-\u200D\u2060]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\r\n?/g, "\n")
     .trim();
 
 const normalizeHeader = (value) =>
@@ -77,7 +90,7 @@ const normalizeImageReference = (value) => {
       value: "",
       type: "empty",
       valid: true,
-      warning: false,
+      warning: true,
       fileName: "",
     };
   }
@@ -97,7 +110,7 @@ const normalizeImageReference = (value) => {
       };
     }
   } catch {
-    // Không phải URL → tiếp tục kiểm tra tên file ảnh local.
+    // Không phải URL → tiếp tục kiểm tra tên file.
   }
 
   if (IMAGE_FILE_PATTERN.test(image)) {
@@ -147,39 +160,62 @@ const findCategory = (value, categories) => {
   );
 };
 
-const createStatus = (code, label, level) => ({
+const createStatus = (code, label, level, details = []) => ({
   code,
   label,
   level,
+  details,
 });
 
+const createImportIdentityKey = (name, category) =>
+  `${normalizeHeader(name)}::${String(category || "")
+    .trim()
+    .toLowerCase()}`;
+
 const getStatus = ({ name, price, category, image, oldPrice, hasOldPrice }) => {
+  const errors = [];
+
   if (!name) {
-    return createStatus("missing_name", "❌ Thiếu tên", "error");
+    errors.push("Thiếu tên sản phẩm.");
+  } else if (name.length > 200) {
+    errors.push("Tên sản phẩm không được vượt quá 200 ký tự.");
   }
 
   if (!Number.isFinite(price) || price <= 0) {
-    return createStatus("invalid_price", "❌ Giá không hợp lệ", "error");
+    errors.push("Giá phải là số lớn hơn 0.");
   }
 
   if (!category) {
-    return createStatus(
-      "invalid_category",
-      "❌ Danh mục không tồn tại",
-      "error"
-    );
+    errors.push("Danh mục không tồn tại hoặc đang để trống.");
   }
 
   if (hasOldPrice && (!Number.isFinite(oldPrice) || oldPrice <= price)) {
-    return createStatus("invalid_price", "❌ Giá không hợp lệ", "error");
+    errors.push("Giá cũ phải lớn hơn Giá hiện tại.");
+  }
+
+  if (!image.valid) {
+    errors.push("Hình ảnh phải là URL http/https hoặc tên file ảnh hợp lệ.");
+  }
+
+  if (errors.length > 0) {
+    return createStatus(
+      "invalid_row",
+      `❌ ${errors.length} lỗi dữ liệu`,
+      "error",
+      errors
+    );
   }
 
   if (image.type === "filename") {
-    return createStatus("image_pending_upload", "⚠️ Ảnh chờ tải", "warning");
+    return createStatus("image_pending_upload", "⚠️ Ảnh chờ tải", "warning", [
+      "Ảnh sẽ được tìm và upload lên Cloudinary.",
+    ]);
   }
 
-  if (image.warning) {
-    return createStatus("invalid_image", "⚠️ Hình ảnh không hợp lệ", "warning");
+  if (image.type === "empty") {
+    return createStatus("image_missing", "⚠️ Chưa có ảnh", "warning", [
+      "Sản phẩm chưa có hình ảnh.",
+    ]);
   }
 
   return createStatus("valid", "✅ Hợp lệ", "success");
@@ -198,7 +234,7 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
   const category = findCategory(row["Danh mục"], categories);
 
-  const description = normalizeText(row["Tóm tắt"]);
+  const description = normalizeMultilineText(row["Tóm tắt"]);
 
   const image = normalizeImageReference(row["Hình ảnh"]);
 
@@ -211,6 +247,8 @@ export const createProductFromExcelRow = (row, categories, index) => {
     hasOldPrice,
   });
 
+  const categorySlug = category?.slug || "";
+
   return {
     rowNumber: index + 2,
 
@@ -220,7 +258,7 @@ export const createProductFromExcelRow = (row, categories, index) => {
 
     oldPrice: hasOldPrice && Number.isFinite(oldPrice) ? oldPrice : null,
 
-    category: category?.slug || "",
+    category: categorySlug,
 
     categoryName: category?.name || "",
 
@@ -231,6 +269,8 @@ export const createProductFromExcelRow = (row, categories, index) => {
     imageType: image.type,
 
     imageFileName: image.fileName,
+
+    importIdentityKey: createImportIdentityKey(name, categorySlug),
 
     status,
 
@@ -247,6 +287,28 @@ export const parseProductExcel = async (file, categories) => {
 
   if (!fileName.endsWith(".xlsx")) {
     throw new Error("Chỉ hỗ trợ file Excel .xlsx.");
+  }
+
+  if (file.size > MAX_EXCEL_FILE_SIZE) {
+    throw new Error(
+      "File Excel quá lớn. Vui lòng sử dụng file không quá 20MB."
+    );
+  }
+
+  if (
+    file.type &&
+    ![
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/octet-stream",
+    ].includes(file.type)
+  ) {
+    throw new Error("File được chọn không có định dạng Excel .xlsx hợp lệ.");
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    throw new Error(
+      "Hệ thống chưa có danh mục sản phẩm để kiểm tra file Excel."
+    );
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -286,18 +348,49 @@ export const parseProductExcel = async (file, categories) => {
     throw new Error(`Thiếu cột bắt buộc: ${missingHeaders.join(", ")}.`);
   }
 
-  const rows = rawRows
+  const headerCount = new Map();
+
+  rawHeaders.forEach((header) => {
+    if (!header) {
+      return;
+    }
+
+    headerCount.set(header, (headerCount.get(header) || 0) + 1);
+  });
+
+  const duplicateHeaders = [...headerCount.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([header]) => header);
+
+  if (duplicateHeaders.length > 0) {
+    throw new Error(
+      `File Excel có cột bị trùng: ${duplicateHeaders.join(", ")}.`
+    );
+  }
+
+  const dataRows = rawRows
     .slice(1)
-    .filter((row) => row.some((value) => normalizeText(value) !== ""))
-    .map((values, index) => {
-      const row = {};
+    .filter((row) => row.some((value) => normalizeText(value) !== ""));
 
-      rawHeaders.forEach((header, columnIndex) => {
-        row[header] = values[columnIndex] ?? "";
-      });
+  if (dataRows.length === 0) {
+    throw new Error("File Excel không có dòng sản phẩm.");
+  }
 
-      return createProductFromExcelRow(row, categories, index);
+  if (dataRows.length > MAX_IMPORT_ROWS) {
+    throw new Error(
+      `File Excel có ${dataRows.length} dòng. Giới hạn một lần nhập là ${MAX_IMPORT_ROWS} dòng.`
+    );
+  }
+
+  const rows = dataRows.map((values, index) => {
+    const row = {};
+
+    rawHeaders.forEach((header, columnIndex) => {
+      row[header] = values[columnIndex] ?? "";
     });
+
+    return createProductFromExcelRow(row, categories, index);
+  });
 
   return {
     rows,
@@ -328,19 +421,16 @@ export const downloadProductExcelTemplate = () => {
     ["Giá", "Bắt buộc. Nhập số, ví dụ 450000."],
     ["Giá cũ", "Không bắt buộc. Nếu nhập phải là số và lớn hơn Giá."],
     ["Danh mục", "Nhập đúng tên danh mục hoặc slug đang có trong hệ thống."],
-    ["Tóm tắt", "Nội dung ngắn dùng làm mô tả sản phẩm."],
-    [
-      "Hình ảnh",
-      "Có thể nhập tên file ảnh, ví dụ hoa-hong-do.jpg; hoặc URL http/https nếu ảnh đã có sẵn trên Cloudinary.",
-    ],
+    ["Tóm tắt", "Có thể chứa nhiều đoạn. Hệ thống giữ nguyên xuống dòng."],
+    ["Hình ảnh", "Có thể nhập tên file ảnh hoặc URL http/https."],
     [],
     [
       "Cách nhập ảnh hàng loạt",
-      "Đặt toàn bộ ảnh sản phẩm trong một thư mục. Trong Excel, cột Hình ảnh chỉ ghi đúng tên file, ví dụ hoa-hong-do.jpg. Khi nhập Excel, chọn thư mục ảnh; hệ thống sẽ tự tìm ảnh, upload lên Cloudinary và gắn URL vào sản phẩm.",
+      "Đặt toàn bộ ảnh sản phẩm trong một thư mục. Trong Excel, cột Hình ảnh chỉ ghi đúng tên file.",
     ],
     [
       "Ví dụ thư mục",
-      "flower-shop/images/hoa-hong-do.jpg; flower-shop/images/hoa-huong-duong.jpg; flower-shop/images/tulip-hong.jpg",
+      "flower-shop/images/hoa-hong-do.jpg; flower-shop/images/hoa-huong-duong.jpg",
     ],
     [
       "Không dùng",
@@ -348,12 +438,9 @@ export const downloadProductExcelTemplate = () => {
     ],
     [
       "URL Cloudinary",
-      "Nếu ảnh đã được upload trước đó, có thể nhập trực tiếp URL https://res.cloudinary.com/... và hệ thống sẽ không upload lại.",
+      "Nếu ảnh đã được upload trước đó, có thể nhập trực tiếp URL https://res.cloudinary.com/...",
     ],
-    [
-      "Nhiều ảnh",
-      "Phiên bản hiện tại nhập 1 ảnh chính cho mỗi sản phẩm. Hỗ trợ nhiều ảnh sẽ triển khai ở giai đoạn sau.",
-    ],
+    ["Nhiều ảnh", "Phiên bản hiện tại nhập 1 ảnh chính cho mỗi sản phẩm."],
   ]);
 
   guideWorksheet["!cols"] = [{ wch: 24 }, { wch: 110 }];
