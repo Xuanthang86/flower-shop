@@ -1,18 +1,13 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
-  FiChevronDown,
   FiChevronLeft,
   FiChevronRight,
-  FiChevronUp,
   FiDownload,
   FiEdit2,
-  FiEye,
-  FiEyeOff,
   FiImage,
   FiPlus,
   FiSearch,
-  FiTag,
   FiTrash2,
   FiUpload,
   FiX,
@@ -24,11 +19,8 @@ import {
   saveProducts,
   saveProductsAsync,
   readCategories,
-  saveCategories,
   CATEGORY_UPDATED_EVENT,
 } from "@/services/catalog";
-
-import { slugifyCategory } from "@/constants/productCategories";
 
 import { uploadImageFile } from "@/services/media";
 
@@ -46,13 +38,6 @@ const EMPTY_PRODUCT = {
   description: "",
   image: "",
   salesCount: 0,
-};
-
-const EMPTY_CATEGORY = {
-  name: "",
-  summary: "",
-  image: "",
-  active: true,
 };
 
 const inputClass =
@@ -121,21 +106,13 @@ const AdminProductsPage = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [showCategories, setShowCategories] = useState(false);
-
   const [showProductModal, setShowProductModal] = useState(false);
-
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [showExcelImportModal, setShowExcelImportModal] = useState(false);
 
   const [editingProduct, setEditingProduct] = useState(null);
 
-  const [editingCategory, setEditingCategory] = useState(null);
-
   const [productForm, setProductForm] = useState(EMPTY_PRODUCT);
-
-  const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY);
 
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -205,14 +182,6 @@ const AdminProductsPage = () => {
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
 
-  /*
-   * Không dùng useEffect để setCurrentPage khi totalPages thay đổi.
-   *
-   * safePage bảo đảm UI luôn dùng một trang hợp lệ ngay cả khi:
-   * - xóa sản phẩm cuối cùng của trang hiện tại;
-   * - tìm kiếm làm giảm số trang;
-   * - nhập Excel làm thay đổi số lượng sản phẩm.
-   */
   const safePage = Math.min(currentPage, totalPages);
 
   const startIndex =
@@ -266,40 +235,7 @@ const AdminProductsPage = () => {
     setProductForm(EMPTY_PRODUCT);
   };
 
-  const openCreateCategory = () => {
-    clearMessages();
-
-    setEditingCategory(null);
-
-    setCategoryForm(EMPTY_CATEGORY);
-
-    setShowCategoryModal(true);
-  };
-
-  const openEditCategory = (category) => {
-    clearMessages();
-
-    setEditingCategory(category);
-
-    setCategoryForm({
-      name: category.name || "",
-      summary: category.summary || "",
-      image: category.image || "",
-      active: category.active !== false,
-    });
-
-    setShowCategoryModal(true);
-  };
-
-  const closeCategoryModal = () => {
-    setShowCategoryModal(false);
-
-    setEditingCategory(null);
-
-    setCategoryForm(EMPTY_CATEGORY);
-  };
-
-  const handleImageUpload = async (event, target) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
 
     event.target.value = "";
@@ -314,180 +250,22 @@ const AdminProductsPage = () => {
 
     try {
       const image = await uploadImageFile(file, {
-        folder:
-          target === "product"
-            ? "flower-shop/products"
-            : "flower-shop/categories",
-
-        maxWidth: target === "product" ? 1400 : 1100,
-
-        maxHeight: target === "product" ? 1000 : 800,
-
+        folder: "flower-shop/products",
+        maxWidth: 1400,
+        maxHeight: 1000,
         quality: 0.82,
       });
 
-      if (target === "product") {
-        setProductForm((current) => ({
-          ...current,
-          image,
-        }));
-      } else {
-        setCategoryForm((current) => ({
-          ...current,
-          image,
-        }));
-      }
+      setProductForm((current) => ({
+        ...current,
+        image,
+      }));
 
       setMessage("Đã tải hình ảnh lên kho ảnh dùng chung.");
     } catch (uploadError) {
       setError(uploadError.message || "Không thể tải hình ảnh.");
     } finally {
       setUploadingImage(false);
-    }
-  };
-
-  const saveCategory = (event) => {
-    event.preventDefault();
-
-    clearMessages();
-
-    const name = categoryForm.name.trim();
-
-    if (!name) {
-      setError("Vui lòng nhập tên danh mục.");
-
-      return;
-    }
-
-    const slug = slugifyCategory(name);
-
-    if (!slug) {
-      setError("Tên danh mục không hợp lệ.");
-
-      return;
-    }
-
-    const duplicate = categories.some(
-      (category) =>
-        category.slug === slug &&
-        String(category.id) !== String(editingCategory?.id)
-    );
-
-    if (duplicate) {
-      setError("Danh mục này đã tồn tại.");
-
-      return;
-    }
-
-    const nextCategory = {
-      id: editingCategory?.id || slug,
-
-      name,
-
-      slug,
-
-      label: name,
-
-      query: slug,
-
-      summary: categoryForm.summary.trim(),
-
-      image: categoryForm.image || "",
-
-      active: categoryForm.active !== false,
-
-      sortOrder: editingCategory?.sortOrder || categories.length + 1,
-    };
-
-    try {
-      const updated = editingCategory
-        ? categories.map((category) =>
-            String(category.id) === String(editingCategory.id)
-              ? nextCategory
-              : category
-          )
-        : [...categories, nextCategory];
-
-      const saved = saveCategories(updated);
-
-      setCategories(saved);
-
-      closeCategoryModal();
-
-      setMessage(
-        editingCategory ? "Đã cập nhật danh mục." : "Đã thêm danh mục."
-      );
-    } catch (saveError) {
-      setError(saveError.message || "Không thể lưu danh mục.");
-    }
-  };
-
-  const moveCategory = (categoryId, direction) => {
-    const ordered = [...categoriesSorted];
-
-    const index = ordered.findIndex(
-      (category) => String(category.id) === String(categoryId)
-    );
-
-    if (index < 0) {
-      return;
-    }
-
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-
-    if (targetIndex < 0 || targetIndex >= ordered.length) {
-      return;
-    }
-
-    [ordered[index], ordered[targetIndex]] = [
-      ordered[targetIndex],
-      ordered[index],
-    ];
-
-    const normalized = ordered.map((category, itemIndex) => ({
-      ...category,
-      sortOrder: itemIndex + 1,
-    }));
-
-    try {
-      const saved = saveCategories(normalized);
-
-      setCategories(saved);
-
-      setMessage("Đã cập nhật thứ tự danh mục.");
-
-      setError("");
-    } catch (saveError) {
-      setError(saveError.message || "Không thể cập nhật thứ tự danh mục.");
-    }
-  };
-
-  const toggleCategory = (category) => {
-    try {
-      const saved = saveCategories(
-        categories.map((item) =>
-          String(item.id) === String(category.id)
-            ? {
-                ...item,
-                active: item.active === false,
-              }
-            : item
-        )
-      );
-
-      setCategories(saved);
-
-      setMessage(
-        category.active === false
-          ? `Đã hiển thị danh mục "${category.name}".`
-          : `Đã ẩn danh mục "${category.name}".`
-      );
-
-      setError("");
-    } catch (toggleError) {
-      setError(
-        toggleError.message || "Không thể cập nhật trạng thái danh mục."
-      );
     }
   };
 
@@ -540,17 +318,11 @@ const AdminProductsPage = () => {
 
     const data = {
       name,
-
       price,
-
       oldPrice,
-
       category: productForm.category,
-
-      description: productForm.description.trim(),
-
+      description: productForm.description,
       image: productForm.image || "",
-
       salesCount: Math.floor(salesCount),
     };
 
@@ -575,11 +347,8 @@ const AdminProductsPage = () => {
             id: `product-${Date.now()}-${Math.random()
               .toString(36)
               .slice(2, 8)}`,
-
             ...data,
-
             isNew: true,
-
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -607,12 +376,6 @@ const AdminProductsPage = () => {
 
     clearMessages();
 
-    /*
-     * Lấy snapshot trực tiếp từ external catalog store.
-     *
-     * Không dùng readProducts() ở đây vì readProducts()
-     * có fallback seed khi IndexedDB chưa hydrate xong.
-     */
     const currentProducts = getProductsSnapshot();
 
     const importTimestamp = Date.now();
@@ -635,13 +398,15 @@ const AdminProductsPage = () => {
 
       category: String(row.category || "").trim(),
 
-      description: String(row.description || "").trim(),
+      description: String(row.description || ""),
 
       image: String(row.image || "").trim(),
 
-      salesCount: 0,
+      salesCount: Number(row.salesCount || 0),
 
-      isNew: true,
+      isNew: row.isNew !== false,
+
+      badge: String(row.badge || "").trim(),
 
       createdAt: new Date().toISOString(),
 
@@ -685,29 +450,8 @@ const AdminProductsPage = () => {
 
   const requestDeleteProduct = (product) => {
     setConfirmDelete({
-      type: "product",
       id: product.id,
       name: product.name,
-    });
-  };
-
-  const requestDeleteCategory = (category) => {
-    const count = products.filter(
-      (product) => String(product.category) === String(category.slug)
-    ).length;
-
-    if (count > 0) {
-      setError(
-        `Không thể xóa "${category.name}" vì đang có ${count} sản phẩm sử dụng danh mục này.`
-      );
-
-      return;
-    }
-
-    setConfirmDelete({
-      type: "category",
-      id: category.id,
-      name: category.name,
     });
   };
 
@@ -717,32 +461,13 @@ const AdminProductsPage = () => {
     }
 
     try {
-      if (confirmDelete.type === "product") {
-        saveProducts(
-          products.filter(
-            (product) => String(product.id) !== String(confirmDelete.id)
-          )
-        );
+      saveProducts(
+        products.filter(
+          (product) => String(product.id) !== String(confirmDelete.id)
+        )
+      );
 
-        setMessage("Đã xóa sản phẩm.");
-      }
-
-      if (confirmDelete.type === "category") {
-        const saved = saveCategories(
-          categories
-            .filter(
-              (category) => String(category.id) !== String(confirmDelete.id)
-            )
-            .map((category, index) => ({
-              ...category,
-              sortOrder: index + 1,
-            }))
-        );
-
-        setCategories(saved);
-
-        setMessage("Đã xóa danh mục.");
-      }
+      setMessage("Đã xóa sản phẩm.");
 
       setConfirmDelete(null);
 
@@ -750,7 +475,7 @@ const AdminProductsPage = () => {
     } catch (deleteError) {
       setConfirmDelete(null);
 
-      setError(deleteError.message || "Không thể xóa dữ liệu.");
+      setError(deleteError.message || "Không thể xóa sản phẩm.");
     }
   };
 
@@ -776,7 +501,7 @@ const AdminProductsPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Quản lý sản phẩm</h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Quản lý sản phẩm, danh mục, hình ảnh, giá và số lượng đã bán.
+            Quản lý sản phẩm, hình ảnh, giá và số lượng đã bán.
           </p>
         </header>
 
@@ -791,154 +516,6 @@ const AdminProductsPage = () => {
             {error || message}
           </div>
         )}
-
-        <section className="mb-5 overflow-hidden rounded-2xl bg-white shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowCategories((value) => !value)}
-            className="flex w-full items-center justify-between p-5 text-left"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-pink-600">
-                <FiTag />
-              </span>
-
-              <span>
-                <span className="block text-lg font-bold text-gray-900">
-                  Danh mục sản phẩm
-                </span>
-
-                <span className="text-sm text-gray-500">
-                  {categories.length} danh mục
-                </span>
-              </span>
-            </div>
-
-            <FiChevronDown className={showCategories ? "rotate-180" : ""} />
-          </button>
-
-          {showCategories && (
-            <div className="border-t border-gray-100 p-5">
-              <div className="mb-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={openCreateCategory}
-                  className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
-                >
-                  <FiPlus />
-                  Thêm danh mục
-                </button>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {categoriesSorted.map((category, index) => (
-                  <article
-                    key={category.id}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white"
-                  >
-                    <div className="flex h-36 items-center justify-center bg-gray-50 p-4">
-                      {category.image ? (
-                        <img
-                          src={category.image}
-                          alt={category.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="max-h-full max-w-full rounded-lg object-contain"
-                        />
-                      ) : (
-                        <FiImage size={36} className="text-gray-300" />
-                      )}
-                    </div>
-
-                    <div className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-800">
-                            {category.name}
-                          </h3>
-
-                          <p className="mt-1 text-[11px] font-medium text-gray-400">
-                            Thứ tự: {index + 1}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => toggleCategory(category)}
-                          className={`rounded-lg border p-2 ${
-                            category.active !== false
-                              ? "border-green-100 text-green-600 hover:bg-green-50"
-                              : "border-gray-200 text-gray-400 hover:bg-gray-50"
-                          }`}
-                          title={
-                            category.active !== false
-                              ? "Ẩn danh mục"
-                              : "Hiện danh mục"
-                          }
-                          aria-label={
-                            category.active !== false
-                              ? `Ẩn danh mục ${category.name}`
-                              : `Hiện danh mục ${category.name}`
-                          }
-                        >
-                          {category.active !== false ? (
-                            <FiEye size={15} />
-                          ) : (
-                            <FiEyeOff size={15} />
-                          )}
-                        </button>
-                      </div>
-
-                      <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                        {category.summary || "Chưa có mô tả danh mục."}
-                      </p>
-
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => moveCategory(category.id, "up")}
-                          disabled={index === 0}
-                          className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
-                          title="Đưa lên"
-                          aria-label={`Đưa danh mục ${category.name} lên`}
-                        >
-                          <FiChevronUp size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => moveCategory(category.id, "down")}
-                          disabled={index === categoriesSorted.length - 1}
-                          className="rounded-lg border border-gray-200 p-2 text-gray-600 disabled:opacity-30"
-                          title="Đưa xuống"
-                          aria-label={`Đưa danh mục ${category.name} xuống`}
-                        >
-                          <FiChevronDown size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => openEditCategory(category)}
-                          className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50"
-                        >
-                          Sửa
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => requestDeleteCategory(category)}
-                          className="flex-1 rounded-lg border border-red-100 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
 
         <section className="rounded-2xl bg-white p-5 shadow-sm">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1296,7 +873,7 @@ const AdminProductsPage = () => {
                   id="product-image"
                   selected={Boolean(productForm.image)}
                   disabled={uploadingImage}
-                  onChange={(event) => handleImageUpload(event, "product")}
+                  onChange={handleImageUpload}
                 />
 
                 {productForm.image && (
@@ -1328,109 +905,6 @@ const AdminProductsPage = () => {
                 className="rounded-lg bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-50"
               >
                 Lưu sản phẩm
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showCategoryModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4">
-          <form
-            onSubmit={saveCategory}
-            className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">
-                {editingCategory ? "Chỉnh sửa danh mục" : "Thêm danh mục"}
-              </h2>
-
-              <button
-                type="button"
-                onClick={closeCategoryModal}
-                className="rounded-full p-2 hover:bg-gray-100"
-                aria-label="Đóng"
-              >
-                <FiX />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <input
-                value={categoryForm.name}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Tên danh mục"
-                className={inputClass}
-              />
-
-              <textarea
-                rows={3}
-                value={categoryForm.summary}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    summary: event.target.value,
-                  }))
-                }
-                placeholder="Tóm tắt danh mục"
-                className={inputClass}
-              />
-
-              <FilePicker
-                id="category-image"
-                selected={Boolean(categoryForm.image)}
-                disabled={uploadingImage}
-                onChange={(event) => handleImageUpload(event, "category")}
-              />
-
-              {categoryForm.image && (
-                <div className="flex h-32 w-44 items-center justify-center overflow-hidden rounded-xl border bg-gray-50 p-2">
-                  <img
-                    src={categoryForm.image}
-                    alt="Xem trước danh mục"
-                    loading="lazy"
-                    decoding="async"
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-              )}
-
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={categoryForm.active !== false}
-                  onChange={(event) =>
-                    setCategoryForm((current) => ({
-                      ...current,
-                      active: event.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 rounded border-gray-300 text-pink-600"
-                />
-                Hiển thị danh mục
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={closeCategoryModal}
-                className="rounded-lg border border-gray-200 px-5 py-2.5"
-              >
-                Hủy
-              </button>
-
-              <button
-                type="submit"
-                disabled={uploadingImage}
-                className="rounded-lg bg-pink-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50"
-              >
-                Lưu danh mục
               </button>
             </div>
           </form>
