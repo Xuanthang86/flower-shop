@@ -28,11 +28,24 @@ import {
 export const PRODUCT_STORAGE_KEY = "flower-shop-products";
 
 export const PRODUCT_UPDATED_EVENT = "flower-shop-products-updated";
+
 let productsCache = null;
 
 let productsPersistencePromise = Promise.resolve();
 
 let productsHydrationPromise = null;
+
+/*
+ * Dùng để tránh race condition giữa:
+ *
+ * - quá trình hydrate IndexedDB
+ * - thao tác thêm/sửa/xóa sản phẩm
+ *
+ * Nếu một thao tác thay đổi sản phẩm xảy ra trong lúc
+ * IndexedDB đang được hydrate, hydration cũ không được phép
+ * ghi đè dữ liệu mới lên productsCache.
+ */
+let productsMutationVersion = 0;
 
 export { CATEGORY_UPDATED_EVENT };
 
@@ -297,25 +310,26 @@ const createProductPersistenceError = (error) => {
   );
 };
 
+const removeLegacyProductStorage = () => {
+  try {
+    localStorage.removeItem(PRODUCT_STORAGE_KEY);
+  } catch (removeError) {
+    console.warn(
+      "Không thể xóa dữ liệu sản phẩm cũ khỏi localStorage:",
+      removeError
+    );
+  }
+};
+
 const persistProducts = async (products) => {
   try {
     await saveProductsToIndexedDB(products);
 
     /*
-     * Sau khi IndexedDB đã xác nhận lưu thành công,
-     * localStorage cũ không còn cần thiết nữa.
-     *
-     * Việc xóa key này giúp giải phóng quota localStorage
-     * đã có thể bị chiếm bởi danh sách sản phẩm cũ.
+     * Chỉ xóa localStorage cũ SAU KHI IndexedDB xác nhận
+     * ghi thành công.
      */
-    try {
-      localStorage.removeItem(PRODUCT_STORAGE_KEY);
-    } catch (removeError) {
-      console.warn(
-        `Không thể xóa dữ liệu sản phẩm cũ khỏi localStorage:`,
-        removeError
-      );
-    }
+    removeLegacyProductStorage();
 
     return products;
   } catch (error) {
@@ -324,11 +338,39 @@ const persistProducts = async (products) => {
 };
 
 const hydrateProductsFromIndexedDB = async () => {
+  /*
+   * Ghi nhớ phiên bản dữ liệu tại thời điểm bắt đầu hydrate.
+   *
+   * Nếu trong lúc chờ IndexedDB phản hồi có thao tác
+   * thêm/sửa/xóa sản phẩm, hydration cũ không được phép
+   * ghi đè dữ liệu mới.
+   */
+  const hydrationVersion = productsMutationVersion;
+
   try {
     const indexedProducts = await readProductsFromIndexedDB();
 
+    /*
+     * Có thao tác dữ liệu mới trong lúc hydration đang chạy.
+     * Không dùng kết quả IndexedDB cũ để ghi đè cache.
+     */
+    if (productsMutationVersion !== hydrationVersion) {
+      return productsCache;
+    }
+
+    /*
+     * Trường hợp IndexedDB đã có dữ liệu:
+     *
+     * Đây chính là dữ liệu chính thức của catalog.
+     */
     if (Array.isArray(indexedProducts)) {
       productsCache = normalizeProducts(indexedProducts, defaultProducts);
+
+      /*
+       * Nếu localStorage vẫn còn bản cũ thì xóa để tránh
+       * giữ một bản catalog cũ song song với IndexedDB.
+       */
+      removeLegacyProductStorage();
 
       window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -343,18 +385,20 @@ const hydrateProductsFromIndexedDB = async () => {
      */
     const legacyProducts = getInitialProductsFromLocalStorage();
 
+    /*
+     * Kiểm tra lại một lần nữa trước khi migrate.
+     * Nếu có mutation xảy ra trong lúc đọc localStorage,
+     * không được ghi bản dữ liệu cũ vào IndexedDB.
+     */
+    if (productsMutationVersion !== hydrationVersion) {
+      return productsCache;
+    }
+
     productsCache = legacyProducts;
 
     await saveProductsToIndexedDB(legacyProducts);
 
-    try {
-      localStorage.removeItem(PRODUCT_STORAGE_KEY);
-    } catch (removeError) {
-      console.warn(
-        `Không thể xóa danh sách sản phẩm cũ khỏi localStorage:`,
-        removeError
-      );
-    }
+    removeLegacyProductStorage();
 
     window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -393,16 +437,36 @@ export const readProducts = () => {
 export const saveProducts = (products) => {
   const normalized = normalizeProducts(products, defaultProducts);
 
+  productsMutationVersion += 1;
+
   productsCache = normalized;
 
   /*
    * API đồng bộ cũ vẫn được giữ để không phá các màn hình
    * đang gọi saveProducts() hiện tại.
    *
-   * Việc ghi bền vững vào IndexedDB được quản lý qua
-   * saveProductsAsync() bên dưới.
+   * Tuy nhiên việc ghi bền vững được xếp hàng sau hydration
+   * và các lần persistence trước đó.
    */
-  productsPersistencePromise = persistProducts(normalized);
+  const nextPersistence = productsPersistencePromise
+    .catch(() => undefined)
+    .then(() => hydrateProducts())
+    .then(() => persistProducts(normalized));
+
+  productsPersistencePromise = nextPersistence;
+
+  /*
+   * saveProducts() là API đồng bộ cũ nên không await được.
+   *
+   * Gắn catch vào nhánh xử lý để tránh tạo
+   * unhandled promise rejection trong trình duyệt.
+   *
+   * waitForProductsPersistence() vẫn có thể nhận được
+   * promise gốc và phát hiện lỗi khi cần.
+   */
+  nextPersistence.catch((error) => {
+    console.error("Không thể lưu danh sách sản phẩm:", error);
+  });
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -410,13 +474,35 @@ export const saveProducts = (products) => {
 };
 
 export const saveProductsAsync = async (products) => {
+  /*
+   * Phải hoàn tất hydration trước khi tính danh sách mới.
+   *
+   * Đây là điểm quan trọng để không xảy ra tình trạng:
+   *
+   * IndexedDB đang có 128 sản phẩm
+   * nhưng cache tạm thời vẫn là 28 sản phẩm seed.
+   */
+  await hydrateProducts();
+
   const normalized = normalizeProducts(products, defaultProducts);
+
+  productsMutationVersion += 1;
 
   productsCache = normalized;
 
-  productsPersistencePromise = persistProducts(normalized);
+  /*
+   * Xếp hàng tuần tự các lần ghi IndexedDB.
+   *
+   * Nếu một lần ghi trước đó lỗi, lần ghi mới vẫn có
+   * cơ hội thực hiện thay vì bị reject dây chuyền.
+   */
+  const nextPersistence = productsPersistencePromise
+    .catch(() => undefined)
+    .then(() => persistProducts(normalized));
 
-  await productsPersistencePromise;
+  productsPersistencePromise = nextPersistence;
+
+  await nextPersistence;
 
   window.dispatchEvent(new Event(PRODUCT_UPDATED_EVENT));
 
@@ -426,6 +512,23 @@ export const saveProductsAsync = async (products) => {
 export const waitForProductsPersistence = async () => {
   await productsPersistencePromise;
 };
+
+/*
+ * QUAN TRỌNG:
+ *
+ * Khởi động quá trình hydrate ngay khi catalog service được
+ * import lần đầu.
+ *
+ * Nếu không có dòng này:
+ *
+ * - saveProductsAsync() vẫn có thể lưu 128 sản phẩm vào IndexedDB;
+ * - Admin đang mở vẫn thấy 128;
+ * - nhưng sau reload readProducts() sẽ không tự đọc IndexedDB;
+ * - kết quả sẽ quay về defaultProducts (28 sản phẩm).
+ *
+ * Đây chính là nguyên nhân của lỗi 128 -> 28 đã xảy ra.
+ */
+hydrateProducts();
 
 export const getProductById = (productId, products = readProducts()) =>
   products.find((product) => String(product.id) === String(productId)) || null;
