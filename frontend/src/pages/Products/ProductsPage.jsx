@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import {
   getProductsSnapshot,
@@ -14,6 +14,8 @@ import ProductCard from "@/components/product/ProductCard";
 const PRODUCTS_PER_PAGE = 20;
 
 const ProductsPage = () => {
+  const { categorySlug: routeCategorySlug } = useParams();
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const products = useSyncExternalStore(
@@ -26,7 +28,9 @@ const ProductsPage = () => {
 
   const keyword = searchParams.get("search") || "";
 
-  const category = searchParams.get("category") || "";
+  const queryCategory = searchParams.get("category") || "";
+
+  const category = routeCategorySlug || queryCategory || "";
 
   const pageParam = Number(searchParams.get("page") || 1);
 
@@ -48,6 +52,10 @@ const ProductsPage = () => {
       window.removeEventListener("storage", refreshCategories);
     };
   }, []);
+
+  const currentCategory = categories.find(
+    (item) => String(item.slug) === String(category)
+  );
 
   const visibleFilteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -81,20 +89,19 @@ const ProductsPage = () => {
 
   const paginatedProducts = visibleFilteredProducts.slice(startIndex, endIndex);
 
-  const currentCategory = categories.find(
-    (item) => String(item.slug) === String(category)
-  );
-
   useEffect(() => {
-    const title = currentCategory?.name
-      ? `${currentCategory.name} | Flower Shop`
-      : keyword
-        ? `Tìm kiếm "${keyword}" | Flower Shop`
-        : "Tất cả sản phẩm | Flower Shop";
+    const title = currentCategory?.seoTitle
+      ? currentCategory.seoTitle
+      : currentCategory?.name
+        ? `${currentCategory.name} | Flower Shop`
+        : keyword
+          ? `Tìm kiếm "${keyword}" | Flower Shop`
+          : "Tất cả sản phẩm | Flower Shop";
 
     document.title = title;
 
     const description =
+      currentCategory?.seoDescription ||
       currentCategory?.summary ||
       "Khám phá những mẫu hoa tươi được thiết kế phù hợp với nhiều dịp đặc biệt tại Flower Shop.";
 
@@ -109,6 +116,30 @@ const ProductsPage = () => {
     }
 
     meta.setAttribute("content", description);
+
+    const canonicalPath = currentCategory?.slug
+      ? `/products/category/${currentCategory.slug}`
+      : "/products";
+
+    const canonicalUrl = `${window.location.origin}${canonicalPath}`;
+
+    let canonical = document.querySelector('link[rel="canonical"]');
+
+    if (!canonical) {
+      canonical = document.createElement("link");
+
+      canonical.setAttribute("rel", "canonical");
+
+      document.head.appendChild(canonical);
+    }
+
+    canonical.setAttribute("href", canonicalUrl);
+
+    return () => {
+      if (canonical?.parentNode) {
+        canonical.parentNode.removeChild(canonical);
+      }
+    };
   }, [currentCategory, keyword]);
 
   const updateParams = (updater) => {
@@ -124,13 +155,15 @@ const ProductsPage = () => {
   const handleCategoryChange = (event) => {
     const value = event.target.value;
 
-    updateParams((params) => {
-      if (value) {
-        params.set("category", value);
-      } else {
-        params.delete("category");
-      }
-    });
+    if (value) {
+      setSearchParams({
+        category: value,
+      });
+
+      return;
+    }
+
+    setSearchParams({});
   };
 
   const goToPage = (page) => {
@@ -162,6 +195,38 @@ const ProductsPage = () => {
   return (
     <section className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-5 flex flex-wrap items-center gap-2 text-sm"
+        >
+          <Link to="/" className="text-gray-500 transition hover:text-pink-600">
+            Trang chủ
+          </Link>
+
+          <span className="text-gray-300">/</span>
+
+          <Link
+            to="/products"
+            className={`transition ${
+              currentCategory
+                ? "text-gray-500 hover:text-pink-600"
+                : "font-medium text-gray-800"
+            }`}
+          >
+            Sản phẩm
+          </Link>
+
+          {currentCategory && (
+            <>
+              <span className="text-gray-300">/</span>
+
+              <span className="font-medium text-gray-800">
+                {currentCategory.name}
+              </span>
+            </>
+          )}
+        </nav>
+
         <div className="mb-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
@@ -188,7 +253,7 @@ const ProductsPage = () => {
 
               <select
                 id="product-category"
-                value={category}
+                value={routeCategorySlug ? routeCategorySlug : queryCategory}
                 onChange={handleCategoryChange}
                 className="w-full rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm outline-none transition focus:ring-2 focus:ring-pink-100 md:w-auto"
               >

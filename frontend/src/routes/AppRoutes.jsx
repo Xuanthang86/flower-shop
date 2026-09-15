@@ -36,6 +36,7 @@ import AdminPage from "@/pages/Admin/AdminPage";
 import AdminOrderDetailPage from "@/pages/Admin/AdminOrderDetailPage";
 import AdminUsersPage from "@/pages/Admin/AdminUsersPage";
 import AdminProductsPage from "@/pages/Admin/AdminProductsPage";
+import AdminCategoriesPage from "@/pages/Admin/AdminCategoriesPage";
 import AdminAppearancePage from "@/pages/Admin/AdminAppearancePage";
 import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
 import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
@@ -151,17 +152,6 @@ const AdminSubPage = ({ children }) => {
 };
 
 const AppRoutes = () => {
-  /*
-   * Dùng pathname làm key cho ProductDetailPage.
-   *
-   * Khi chuyển trực tiếp từ:
-   * /products/A
-   * sang:
-   * /products/B
-   *
-   * React sẽ tạo lại instance ProductDetailPage,
-   * tránh giữ state/DOM của sản phẩm trước.
-   */
   const location = useLocation();
 
   return (
@@ -285,6 +275,17 @@ const AppRoutes = () => {
               <PermissionRoute permission={PERMISSIONS.MANAGE_PRODUCTS}>
                 <AdminSubPage>
                   <AdminProductsPage />
+                </AdminSubPage>
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/admin/categories"
+            element={
+              <PermissionRoute permission={PERMISSIONS.MANAGE_PRODUCTS}>
+                <AdminSubPage>
+                  <AdminCategoriesPage />
                 </AdminSubPage>
               </PermissionRoute>
             }

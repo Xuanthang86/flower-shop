@@ -3,24 +3,22 @@
 FLOWER SHOP — PRODUCT CATEGORIES
 ============================================================
 
-Mục đích:
-- Là nguồn dữ liệu chuẩn duy nhất cho danh mục sản phẩm.
-- Không tạo danh mục riêng trong homeData.js.
-- Hỗ trợ:
-  + Tên danh mục
-  + Slug
-  + Tóm tắt
-  + Hình ảnh
-  + Trạng thái hoạt động
-  + Thứ tự hiển thị
+Nguồn dữ liệu chuẩn duy nhất cho danh mục sản phẩm.
 
-TƯƠNG THÍCH:
-- name / slug: chuẩn mới.
-- label / query: tương thích với các component hiện tại.
+Schema:
+- id
+- name
+- slug
+- summary
+- seoTitle
+- seoDescription
+- image
+- active
+- sortOrder
+- updatedAt
 
-Dữ liệu quản trị sau này có thể được lưu vào localStorage
-hoặc thay thế bằng API/database mà không phải thay đổi
-cấu trúc component.
+Tương thích:
+- label / query vẫn được giữ để không phá component hiện tại.
 ============================================================
 */
 
@@ -40,17 +38,23 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
     name: "Hoa khai trương",
     slug: "hoa-khai-truong",
 
-    // Tương thích code hiện tại
     label: "Hoa khai trương",
     query: "hoa-khai-truong",
 
     summary:
       "Những mẫu hoa khai trương sang trọng, mang ý nghĩa chúc mừng thành công và phát triển.",
 
+    seoTitle: "Hoa khai trương đẹp, sang trọng | Flower Shop",
+
+    seoDescription:
+      "Khám phá các mẫu hoa khai trương đẹp, sang trọng, ý nghĩa chúc mừng thành công và phát triển tại Flower Shop.",
+
     image: openingImage,
 
     active: true,
     sortOrder: 1,
+
+    updatedAt: null,
   },
 
   {
@@ -64,10 +68,17 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
     summary:
       "Những bó hoa tươi đẹp dành tặng người thân, bạn bè và những người bạn yêu thương.",
 
+    seoTitle: "Hoa sinh nhật đẹp, ý nghĩa | Flower Shop",
+
+    seoDescription:
+      "Các mẫu hoa sinh nhật đẹp, tươi mới và ý nghĩa dành tặng người thân, bạn bè và những người bạn yêu thương.",
+
     image: birthdayImage,
 
     active: true,
     sortOrder: 2,
+
+    updatedAt: null,
   },
 
   {
@@ -81,10 +92,17 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
     summary:
       "Hoa cưới tinh tế, lãng mạn dành cho cô dâu, chú rể và những khoảnh khắc trọng đại.",
 
+    seoTitle: "Hoa cưới đẹp, tinh tế và lãng mạn | Flower Shop",
+
+    seoDescription:
+      "Khám phá các mẫu hoa cưới tinh tế, lãng mạn dành cho cô dâu, chú rể và những khoảnh khắc trọng đại.",
+
     image: weddingImage,
 
     active: true,
     sortOrder: 3,
+
+    updatedAt: null,
   },
 
   {
@@ -98,10 +116,17 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
     summary:
       "Những mẫu hoa tươi trẻ, rực rỡ dành để chúc mừng thành quả học tập.",
 
+    seoTitle: "Hoa tốt nghiệp đẹp, rực rỡ | Flower Shop",
+
+    seoDescription:
+      "Các mẫu hoa tốt nghiệp tươi trẻ, rực rỡ dành để chúc mừng thành quả học tập và những cột mốc đáng nhớ.",
+
     image: graduationImage,
 
     active: true,
     sortOrder: 4,
+
+    updatedAt: null,
   },
 
   {
@@ -115,10 +140,17 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
     summary:
       "Các kệ hoa trang trọng, thanh lịch thể hiện sự thành kính và chia sẻ.",
 
+    seoTitle: "Hoa chia buồn trang trọng, thành kính | Flower Shop",
+
+    seoDescription:
+      "Các mẫu hoa chia buồn trang trọng, thanh lịch thể hiện sự thành kính và chia sẻ trong những thời khắc mất mát.",
+
     image: funeralImage,
 
     active: true,
     sortOrder: 5,
+
+    updatedAt: null,
   },
 ];
 
@@ -142,9 +174,6 @@ export const slugifyCategory = (value = "") =>
 ============================================================
 NORMALIZE CATEGORY
 ============================================================
-
-Đảm bảo dữ liệu cũ và dữ liệu mới luôn có cùng cấu trúc.
-============================================================
 */
 
 export const normalizeCategory = (category = {}, index = 0) => {
@@ -155,6 +184,8 @@ export const normalizeCategory = (category = {}, index = 0) => {
   const slug =
     String(category.slug || category.query || "").trim() ||
     slugifyCategory(name);
+
+  const sortOrder = Number(category.sortOrder);
 
   return {
     id: String(category.id || slug || `category-${index + 1}`),
@@ -169,13 +200,20 @@ export const normalizeCategory = (category = {}, index = 0) => {
 
     summary: String(category.summary || "").trim(),
 
+    seoTitle: String(category.seoTitle || `${name} | Flower Shop`).trim(),
+
+    seoDescription: String(
+      category.seoDescription || category.summary || ""
+    ).trim(),
+
     image: category.image || "",
 
     active: category.active !== false,
 
-    sortOrder: Number.isFinite(Number(category.sortOrder))
-      ? Number(category.sortOrder)
-      : index + 1,
+    sortOrder:
+      Number.isFinite(sortOrder) && sortOrder >= 0 ? sortOrder : index + 1,
+
+    updatedAt: category.updatedAt || null,
   };
 };
 
@@ -203,7 +241,7 @@ export const normalizeCategories = (categories) => {
 
       return true;
     })
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 };
 
 /*
@@ -269,9 +307,10 @@ HELPERS
 export const findCategoryBySlug = (
   slug,
   categories = readProductCategories()
-) => categories.find((category) => category.slug === String(slug)) || null;
+) =>
+  categories.find((category) => String(category.slug) === String(slug)) || null;
 
 export const getActiveCategories = (categories = readProductCategories()) =>
   categories
     .filter((category) => category.active !== false)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));

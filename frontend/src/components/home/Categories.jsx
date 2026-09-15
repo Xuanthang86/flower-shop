@@ -69,7 +69,7 @@ const Categories = () => {
           {categories.map((category) => (
             <Link
               key={category.id}
-              to={`/products?category=${encodeURIComponent(category.slug)}`}
+              to={`/products/category/${encodeURIComponent(category.slug)}`}
               className="group block"
             >
               <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">

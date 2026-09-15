@@ -1,5 +1,6 @@
 import {
   FiBox,
+  FiFolder,
   FiImage,
   FiLayout,
   FiMail,
@@ -43,8 +44,16 @@ const AdminManagementPage = () => {
     canManageProducts && {
       to: "/admin/products",
       title: "Quản lý sản phẩm",
-      description: "Thêm, sửa, xóa và quản lý danh mục sản phẩm.",
+      description: "Thêm, sửa, xóa và quản lý sản phẩm trong cửa hàng.",
       icon: FiBox,
+    },
+
+    canManageProducts && {
+      to: "/admin/categories",
+      title: "Quản lý danh mục hoa",
+      description:
+        "Thêm, sửa, xóa, sắp xếp, SEO và chuyển sản phẩm giữa các danh mục.",
+      icon: FiFolder,
     },
 
     canManageContent && {
