@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   FiAlignCenter,
@@ -82,22 +82,19 @@ const AdminContentManagementPage = () => {
 
   const { notifySuccess, notifyError } = useNotification();
 
-  useEffect(() => {
-    document.title = "Quản lý nội dung website | Flower Shop";
+  useLayoutEffect(() => {
+    const editor = blogEditorRef.current;
 
-    let robots = document.querySelector('meta[name="robots"]');
-
-    if (!robots) {
-      robots = document.createElement("meta");
-      robots.name = "robots";
-      document.head.appendChild(robots);
+    if (!editor || !editor.isConnected) {
+      return;
     }
 
-    robots.content = "noindex,nofollow";
+    const html =
+      settings.blog?.defaultShopInfoHtml || DEFAULT_BLOG_SHOP_INFO_HTML;
 
-    return () => {
-      robots.content = "index,follow";
-    };
+    if (editor.innerHTML.trim() !== String(html).trim()) {
+      editor.innerHTML = html;
+    }
   }, []);
 
   useEffect(() => {
@@ -261,21 +258,17 @@ const AdminContentManagementPage = () => {
     saveSettings(settings, "Đã lưu nội dung trang chủ.");
   };
 
-  const syncBlogEditor = () => {
+  const getBlogEditorHtml = () => {
     const editor = blogEditorRef.current;
 
     if (!editor || !editor.isConnected) {
-      return;
+      return DEFAULT_BLOG_SHOP_INFO_HTML;
     }
 
-    setSettings((current) => ({
-      ...current,
-
-      blog: {
-        ...(current.blog || {}),
-        defaultShopInfoHtml: stripDefaultMarkerStyles(editor.innerHTML || ""),
-      },
-    }));
+    return (
+      stripDefaultMarkerStyles(editor.innerHTML || "") ||
+      DEFAULT_BLOG_SHOP_INFO_HTML
+    );
   };
 
   const executeBlogFormat = (command, value = null) => {
@@ -288,8 +281,6 @@ const AdminContentManagementPage = () => {
     editor.focus();
 
     document.execCommand(command, false, value);
-
-    syncBlogEditor();
   };
 
   const createBlogLink = () => {
@@ -310,8 +301,7 @@ const AdminContentManagementPage = () => {
     }
 
     editor.innerHTML = DEFAULT_BLOG_SHOP_INFO_HTML;
-
-    syncBlogEditor();
+    editor.focus();
   };
 
   const branding = settings.branding || {};
@@ -627,7 +617,7 @@ const AdminContentManagementPage = () => {
               </p>
             </div>
 
-            <div className="mt-5 max-w-md">
+            <div className="mt-5 max-w-4xl">
               <label
                 htmlFor="deliveryDateNextDayCutoffHour"
                 className="mb-2 block text-sm font-semibold text-gray-700"
@@ -635,7 +625,7 @@ const AdminContentManagementPage = () => {
                 Giờ chuyển sang ngày giao kế tiếp
               </label>
 
-              <div className="flex items-center gap-3">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <input
                   id="deliveryDateNextDayCutoffHour"
                   type="number"
@@ -911,8 +901,8 @@ const AdminContentManagementPage = () => {
                 suppressContentEditableWarning
                 role="textbox"
                 aria-label="Nội dung Shop mặc định trong bài viết"
-                onInput={syncBlogEditor}
-                className="admin-default-blog-editor min-h-[300px] w-full overflow-x-hidden p-5 outline-none"
+                className="admin-default-blog-editor min-h-[360px] w-full overflow-x-hidden p-5 outline-none"
+                spellCheck
               />
             </div>
 
@@ -920,31 +910,18 @@ const AdminContentManagementPage = () => {
               <button
                 type="button"
                 onClick={() => {
-                  syncBlogEditor();
+                  const editorHtml = getBlogEditorHtml();
 
-                  const next = {
-                    ...settings,
-                  };
-
-                  setTimeout(() => {
-                    const current = readSiteSettings();
-
-                    saveSettings(
-                      {
-                        ...current,
-                        blog: {
-                          ...(current.blog || {}),
-                          defaultShopInfoHtml: blogEditorRef.current
-                            ? stripDefaultMarkerStyles(
-                                blogEditorRef.current.innerHTML
-                              )
-                            : next.blog?.defaultShopInfoHtml ||
-                              DEFAULT_BLOG_SHOP_INFO_HTML,
-                        },
+                  saveSettings(
+                    {
+                      ...settings,
+                      blog: {
+                        ...(settings.blog || {}),
+                        defaultShopInfoHtml: editorHtml,
                       },
-                      "Đã lưu thông tin Shop mặc định cho bài viết."
-                    );
-                  }, 0);
+                    },
+                    "Đã lưu thông tin Shop mặc định cho bài viết."
+                  );
                 }}
                 className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
               >

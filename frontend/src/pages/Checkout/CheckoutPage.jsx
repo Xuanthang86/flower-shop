@@ -804,6 +804,24 @@ const CheckoutPage = () => {
       return;
     }
 
+    if (!formData.sender.name.trim()) {
+      setError("Vui lòng nhập họ và tên người gửi.");
+
+      return;
+    }
+
+    if (!formData.sender.phone.trim()) {
+      setError("Vui lòng nhập số điện thoại người gửi.");
+
+      return;
+    }
+
+    if (!formData.sender.email.trim()) {
+      setError("Vui lòng nhập email người gửi.");
+
+      return;
+    }
+
     if (!formData.recipient.fullName.trim()) {
       setError("Vui lòng nhập họ và tên người nhận.");
 
@@ -1349,8 +1367,12 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-pink-100 bg-pink-50 p-4">
+                <label
+                  htmlFor="hideSenderInfo"
+                  className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-pink-100 bg-pink-50 p-4"
+                >
                   <input
+                    id="hideSenderInfo"
                     type="checkbox"
                     checked={formData.sender.isHiddenFromRecipient}
                     onChange={handleSenderHiddenChange}
@@ -1361,7 +1383,8 @@ const CheckoutPage = () => {
                     <strong>Ẩn thông tin người gửi với người nhận</strong>
                     <br />
                     Shop vẫn lưu thông tin để phục vụ giao hàng và liên hệ khi
-                    cần, nhưng không hiển thị cho người nhận.
+                    cần, nhưng không hiển thị thông tin người gửi cho người
+                    nhận.
                   </span>
                 </label>
               </div>
@@ -1598,16 +1621,6 @@ const CheckoutPage = () => {
 
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-gray-600">Phí giao hàng</span>
-
-                        {discountAmount > 0 && (
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-gray-600">Giảm giá</span>
-
-                            <span className="font-semibold text-green-600">
-                              -{formatShippingMoney(discountAmount)}
-                            </span>
-                          </div>
-                        )}
 
                         <span
                           className={`font-semibold ${
@@ -1865,6 +1878,16 @@ const CheckoutPage = () => {
                         : "Chưa tính"}
                     </span>
                   </div>
+
+                  {discountAmount > 0 && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-600">Giảm giá</span>
+
+                      <span className="font-semibold text-green-600">
+                        -{formatShippingMoney(discountAmount)}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-3">
                     <span className="font-semibold text-gray-800">

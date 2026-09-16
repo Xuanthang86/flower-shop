@@ -581,95 +581,148 @@ const AdminCouponsPage = () => {
                   return (
                     <div
                       key={coupon.id}
-                      className="rounded-2xl border border-gray-100 p-5"
+                      className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-pink-100 hover:shadow-md"
                     >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-lg bg-pink-50 px-3 py-1.5 font-bold text-pink-600">
-                              {coupon.code}
-                            </span>
+                      <div className="flex flex-col gap-5">
+                        {/* HEADER */}
+                        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-lg bg-pink-50 px-3 py-1.5 font-bold text-pink-600">
+                                {coupon.code}
+                              </span>
 
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                coupon.active
-                                  ? "bg-green-50 text-green-700"
-                                  : "bg-gray-100 text-gray-500"
-                              }`}
-                            >
-                              {coupon.active ? "Đang hoạt động" : "Tắt"}
-                            </span>
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                  coupon.active
+                                    ? "bg-green-50 text-green-700"
+                                    : "bg-gray-100 text-gray-500"
+                                }`}
+                              >
+                                {coupon.active ? "Đang hoạt động" : "Tắt"}
+                              </span>
+                            </div>
+
+                            <h3 className="mt-3 text-base font-bold text-gray-900">
+                              {coupon.name}
+                            </h3>
+
+                            <p className="mt-1 text-sm text-gray-500">
+                              Giảm{" "}
+                              <span className="font-semibold text-pink-600">
+                                {coupon.type === COUPON_TYPES.PERCENTAGE
+                                  ? `${coupon.value}%`
+                                  : formatMoney(coupon.value)}
+                              </span>
+                            </p>
                           </div>
 
-                          <h3 className="mt-3 font-bold text-gray-900">
-                            {coupon.name}
-                          </h3>
+                          {/* 3 NÚT LUÔN TRÊN 1 DÒNG */}
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(coupon)}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            >
+                              <FiCheckCircle />
+                              {coupon.active ? "Tắt" : "Bật"}
+                            </button>
 
-                          <p className="mt-1 text-sm text-gray-500">
-                            Giảm{" "}
-                            {coupon.type === COUPON_TYPES.PERCENTAGE
-                              ? `${coupon.value}%`
-                              : formatMoney(coupon.value)}
-                          </p>
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(coupon)}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-pink-200 px-3 text-sm font-medium text-pink-600 transition hover:bg-pink-50"
+                            >
+                              <FiEdit2 />
+                              Sửa
+                            </button>
 
-                          <div className="mt-3 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
-                            <span>
-                              Đơn tối thiểu:{" "}
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(coupon)}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                            >
+                              <FiTrash2 />
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* THÔNG TIN COUPON */}
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl bg-gray-50 px-4 py-3">
+                            <p className="text-xs font-medium text-gray-500">
+                              Đơn tối thiểu
+                            </p>
+
+                            <p className="mt-1 font-semibold text-gray-800">
                               {coupon.minimumOrder
                                 ? formatMoney(coupon.minimumOrder)
-                                : "Không"}
-                            </span>
+                                : "Không giới hạn"}
+                            </p>
+                          </div>
 
-                            <span>
-                              Giảm tối đa:{" "}
+                          <div className="rounded-xl bg-gray-50 px-4 py-3">
+                            <p className="text-xs font-medium text-gray-500">
+                              Giảm tối đa
+                            </p>
+
+                            <p className="mt-1 font-semibold text-gray-800">
                               {coupon.maximumDiscount
                                 ? formatMoney(coupon.maximumDiscount)
-                                : "Không"}
-                            </span>
+                                : "Không giới hạn"}
+                            </p>
+                          </div>
 
-                            <span>
-                              Thời gian: {formatDate(coupon.startDate)} →{" "}
-                              {formatDate(coupon.endDate)}
-                            </span>
+                          <div className="rounded-xl bg-gray-50 px-4 py-3">
+                            <p className="text-xs font-medium text-gray-500">
+                              Lượt sử dụng
+                            </p>
 
-                            <span>
-                              Lượt dùng: {usage.total}
+                            <p className="mt-1 font-semibold text-gray-800">
+                              {usage.total}
                               {coupon.usageLimit
                                 ? ` / ${coupon.usageLimit}`
-                                : ""}
-                            </span>
+                                : " / Không giới hạn"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-gray-50 px-4 py-3 sm:col-span-2 xl:col-span-1">
+                            <p className="text-xs font-medium text-gray-500">
+                              Thời gian
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold leading-5 text-gray-800">
+                              {formatDate(coupon.startDate)}
+                            </p>
+
+                            <p className="mt-1 text-xs text-gray-500">đến</p>
+
+                            <p className="mt-1 text-sm font-semibold leading-5 text-gray-800">
+                              {formatDate(coupon.endDate)}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleActive(coupon)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            <FiCheckCircle />
+                        {/* GIỚI HẠN */}
+                        {(coupon.categoryRestriction?.length > 0 ||
+                          coupon.productRestriction?.length > 0) && (
+                          <div className="border-t border-gray-100 pt-4">
+                            <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                              {coupon.categoryRestriction?.length > 0 && (
+                                <span className="rounded-full bg-purple-50 px-3 py-1 text-purple-700">
+                                  {coupon.categoryRestriction.length} danh mục
+                                </span>
+                              )}
 
-                            {coupon.active ? "Tắt" : "Bật"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(coupon)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-pink-200 px-3 py-2 text-sm font-medium text-pink-600 hover:bg-pink-50"
-                          >
-                            <FiEdit2 />
-                            Sửa
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(coupon)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                          >
-                            <FiTrash2 />
-                            Xóa
-                          </button>
-                        </div>
+                              {coupon.productRestriction?.length > 0 && (
+                                <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                                  {coupon.productRestriction.length} sản phẩm
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
