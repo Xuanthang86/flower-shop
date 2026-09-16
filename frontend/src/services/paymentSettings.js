@@ -227,32 +227,34 @@ export const savePaymentSettings = async (paymentSettings = {}) => {
   });
 
   /*
-   * Lưu local trước để khi mở lại trang cấu hình,
-   * các thông tin vừa nhập vẫn được hiển thị.
+   * Lưu local trước.
+   * Đây là nguồn cấu hình tức thời của frontend.
    */
   const saved = writeStoredPaymentSettings(next);
 
   /*
-   * Đồng bộ backend để Payment Intent/Webhook sử dụng
-   * cùng một tài khoản nhận tiền.
+   * Thông báo ngay cho các component đang mở.
+   * Checkout sẽ cập nhật QR/thông tin ngân hàng ngay cả khi
+   * backend đang tạm thời không kết nối được.
+   */
+  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+
+  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
+
+  /*
+   * Đồng bộ backend.
    */
   try {
     await syncPaymentSettingsToBackend(saved);
   } catch (error) {
-    /*
-     * Nếu backend chưa chạy, không xóa cấu hình local.
-     * Tuy nhiên ném lỗi để giao diện Admin không báo
-     * "đã lưu thành công" khi backend chưa đồng bộ.
-     */
     throw new Error(
       error?.message ||
-        "Đã lưu trên trình duyệt nhưng chưa đồng bộ được backend."
+        "Đã lưu trên trình duyệt nhưng chưa đồng bộ được backend.",
+      {
+        cause: error,
+      }
     );
   }
-
-  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
-
-  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
 
   return saved;
 };

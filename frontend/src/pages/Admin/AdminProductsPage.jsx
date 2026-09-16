@@ -143,6 +143,10 @@ const AdminProductsPage = () => {
 
   const [keyword, setKeyword] = useState("");
 
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  const [stockFilter, setStockFilter] = useState("all");
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showProductModal, setShowProductModal] = useState(false);
@@ -204,18 +208,25 @@ const AdminProductsPage = () => {
   const filteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
 
-    if (!query) {
-      return products;
-    }
+    return products.filter((product) => {
+      const matchesKeyword =
+        !query ||
+        [product.name, product.category, product.description]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
 
-    return products.filter((product) =>
-      [product.name, product.category, product.description]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
-  }, [products, keyword]);
+      const matchesCategory =
+        categoryFilter === "all" ||
+        String(product.category || "") === String(categoryFilter);
+
+      const matchesStock =
+        stockFilter === "all" || getStockStatus(product) === stockFilter;
+
+      return matchesKeyword && matchesCategory && matchesStock;
+    });
+  }, [products, keyword, categoryFilter, stockFilter]);
 
   const totalProducts = filteredProducts.length;
 
@@ -643,6 +654,61 @@ const AdminProductsPage = () => {
                   placeholder="Tìm sản phẩm..."
                   className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pink-400 sm:w-64"
                 />
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => {
+                    setCategoryFilter(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-pink-400 sm:w-52"
+                >
+                  <option value="all">Tất cả danh mục</option>
+
+                  {categoriesSorted.map((category) => (
+                    <option key={category.id} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={stockFilter}
+                  onChange={(event) => {
+                    setStockFilter(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-pink-400 sm:w-48"
+                >
+                  <option value="all">Tất cả trạng thái</option>
+
+                  <option value={STOCK_STATUS.IN_STOCK}>Còn hàng</option>
+
+                  <option value={STOCK_STATUS.LOW_STOCK}>Sắp hết</option>
+
+                  <option value={STOCK_STATUS.OUT_OF_STOCK}>Hết hàng</option>
+
+                  <option value={STOCK_STATUS.SOLD_OUT}>Đã bán hết</option>
+
+                  <option value={STOCK_STATUS.DISABLED}>Ngừng bán</option>
+                </select>
+
+                {(keyword ||
+                  categoryFilter !== "all" ||
+                  stockFilter !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword("");
+                      setCategoryFilter("all");
+                      setStockFilter("all");
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    <FiX />
+                    Xóa bộ lọc
+                  </button>
+                )}
               </label>
 
               <button

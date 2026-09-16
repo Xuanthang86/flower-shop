@@ -9,6 +9,7 @@ import AddressForm from "@/components/checkout/AddressForm";
 import PaymentMethod from "@/components/checkout/PaymentMethod";
 
 import {
+  addDaysToDateKey,
   calculateShippingAsync,
   createShippingSnapshot,
   DELIVERY_MODE,
@@ -79,6 +80,7 @@ const CheckoutPage = () => {
   const [paymentSettings, setPaymentSettings] = useState(() =>
     readPaymentSettings()
   );
+  const [paymentQrVersion, setPaymentQrVersion] = useState(() => Date.now());
 
   const [formData, setFormData] = useState({
     sender: {
@@ -110,7 +112,10 @@ const CheckoutPage = () => {
 
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
-  const [deliveryDate, setDeliveryDate] = useState(getDefaultDeliveryDate());
+  const getInitialDeliveryDate = () =>
+    addDaysToDateKey(getTodayDateKey(), 1) || getDefaultDeliveryDate();
+
+  const [deliveryDate, setDeliveryDate] = useState(getInitialDeliveryDate);
 
   const [deliveryTimeSlot, setDeliveryTimeSlot] = useState("");
 
@@ -148,7 +153,13 @@ const CheckoutPage = () => {
   useEffect(() => {
     const refreshPaymentSettings = () => {
       setPaymentSettings(readPaymentSettings());
+      setPaymentQrVersion(Date.now());
     };
+
+    window.addEventListener(
+      "flower-shop-payment-settings-updated",
+      refreshPaymentSettings
+    );
 
     window.addEventListener(
       "flower-shop-site-settings-updated",
@@ -158,6 +169,11 @@ const CheckoutPage = () => {
     window.addEventListener("storage", refreshPaymentSettings);
 
     return () => {
+      window.removeEventListener(
+        "flower-shop-payment-settings-updated",
+        refreshPaymentSettings
+      );
+
       window.removeEventListener(
         "flower-shop-site-settings-updated",
         refreshPaymentSettings
@@ -631,8 +647,24 @@ const CheckoutPage = () => {
     transferContent,
   });
 
-  const qrCodeUrl =
-    dynamicQrUrl || paymentSettings?.bankTransfer?.qrCodeUrl || "";
+  const addQrCacheBust = (url, version) => {
+    const normalizedUrl = String(url || "").trim();
+
+    if (!normalizedUrl) {
+      return "";
+    }
+
+    const separator = normalizedUrl.includes("?") ? "&" : "?";
+
+    return `${normalizedUrl}${separator}v=${version}`;
+  };
+
+  const qrCodeUrl = dynamicQrUrl
+    ? addQrCacheBust(dynamicQrUrl, paymentQrVersion)
+    : addQrCacheBust(
+        paymentSettings?.bankTransfer?.qrCodeUrl,
+        paymentQrVersion
+      );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1276,6 +1308,15 @@ const CheckoutPage = () => {
                 <div className="mt-6 rounded-xl border border-gray-200 p-4">
                   {shippingCalculation.success ? (
                     <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-gray-600">Ngày giao hàng</span>
+
+                        <span className="font-semibold text-gray-800">
+                          {formatDeliveryDateDisplay(
+                            shippingCalculation.deliveryDate
+                          )}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-gray-600">Số km</span>
 
