@@ -617,21 +617,54 @@ const AdminContentManagementPage = () => {
               </p>
             </div>
 
-            <div className="mt-5 max-w-4xl">
-              <label
-                htmlFor="deliveryDateNextDayCutoffHour"
-                className="mb-2 block text-sm font-semibold text-gray-700"
-              >
-                Giờ chuyển sang ngày giao kế tiếp
-              </label>
+            <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
+                    🕘
+                  </div>
 
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <input
+                  <div>
+                    <h3 className="font-semibold text-gray-800">
+                      Mốc chuyển sang ngày giao tiếp theo
+                    </h3>
+
+                    <p className="mt-1 text-sm leading-6 text-gray-500">
+                      Khi khách đặt hàng từ mốc giờ này trở đi, hệ thống sẽ mặc
+                      định ngày giao hàng là ngày hôm sau.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-pink-100 bg-white p-4">
+                  <p className="text-sm text-gray-500">Cấu hình hiện tại</p>
+
+                  <p className="mt-1 text-lg font-bold text-pink-600">
+                    Từ{" "}
+                    {String(
+                      Number(shipping.deliveryDateNextDayCutoffHour ?? 21)
+                    ).padStart(2, "0")}
+                    :00
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    Ví dụ: chọn 21:00 thì từ 21:00 trở đi đơn hàng sẽ mặc định
+                    giao vào ngày hôm sau.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <label
+                  htmlFor="deliveryDateNextDayCutoffHour"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Giờ áp dụng
+                </label>
+
+                <select
                   id="deliveryDateNextDayCutoffHour"
-                  type="number"
-                  min="0"
-                  max="23"
-                  value={shipping.deliveryDateNextDayCutoffHour}
+                  value={String(shipping.deliveryDateNextDayCutoffHour ?? 21)}
                   onChange={(event) => {
                     const value = Number(event.target.value);
 
@@ -640,24 +673,26 @@ const AdminContentManagementPage = () => {
 
                       shipping: {
                         ...(current.shipping || {}),
-                        deliveryDateNextDayCutoffHour: Math.min(
-                          23,
-                          Math.max(0, Number.isFinite(value) ? value : 21)
-                        ),
+
+                        deliveryDateNextDayCutoffHour: Number.isFinite(value)
+                          ? Math.min(23, Math.max(0, value))
+                          : 21,
                       },
                     }));
                   }}
                   className={inputClass}
-                />
+                >
+                  {Array.from({ length: 24 }, (_, hour) => (
+                    <option key={hour} value={hour}>
+                      {String(hour).padStart(2, "0")}:00
+                    </option>
+                  ))}
+                </select>
 
-                <span className="text-sm text-gray-500">giờ 00–23</span>
+                <p className="mt-2 text-xs leading-5 text-gray-500">
+                  Có thể thay đổi bất kỳ lúc nào. Không cần sửa code.
+                </p>
               </div>
-
-              <p className="mt-2 text-xs leading-5 text-gray-500">
-                Ví dụ đặt 21 thì từ 21:00 trở đi hệ thống mặc định ngày giao
-                hàng là ngày hôm sau. Có thể thay đổi thành 20, 22 hoặc giờ khác
-                mà không cần sửa code.
-              </p>
             </div>
 
             <div className="mt-5 flex justify-center">

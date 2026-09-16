@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 import { formatCouponDiscount, validateCoupon } from "@/services/coupon";
@@ -158,6 +158,8 @@ const CheckoutPage = () => {
     useState(false);
 
   const [paymentIntent, setPaymentIntent] = useState(EMPTY_PAYMENT_INTENT);
+
+  const paymentIntentAmountRef = useRef(null);
 
   const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
@@ -537,14 +539,32 @@ const CheckoutPage = () => {
       return undefined;
     }
 
+    const normalizedAmount = Math.round(Number(grandTotal) || 0);
+
+    /*
+     * Nếu Payment Intent hiện tại đã được tạo cho đúng số tiền
+     * thì KHÔNG tạo lại.
+     *
+     * Điều này giúp mã đơn hàng / mã thanh toán giữ nguyên
+     * trong suốt thời gian khách đang thanh toán.
+     */
+    if (
+      paymentIntent?.id &&
+      paymentIntent?.orderCode &&
+      Number(paymentIntent.amount) === normalizedAmount &&
+      paymentIntentAmountRef.current === normalizedAmount
+    ) {
+      return undefined;
+    }
+
+    paymentIntentAmountRef.current = normalizedAmount;
+
     setPaymentIntentLoading(true);
-
     setPaymentError("");
-
     setPaymentVerified(false);
 
     createBankTransferPaymentIntent({
-      amount: grandTotal,
+      amount: normalizedAmount,
     })
       .then((result) => {
         if (cancelled) {
@@ -564,6 +584,8 @@ const CheckoutPage = () => {
           return;
         }
 
+        paymentIntentAmountRef.current = null;
+
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
         setPaymentError(
@@ -580,7 +602,15 @@ const CheckoutPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [formData.paymentMethod, shippingCalculation.success, grandTotal]);
+  }, [
+    formData.paymentMethod,
+    paymentSettings?.bankTransfer?.enabled,
+    shippingCalculation.success,
+    grandTotal,
+    paymentIntent?.id,
+    paymentIntent?.orderCode,
+    paymentIntent?.amount,
+  ]);
 
   /*
   ==========================================================
@@ -889,7 +919,7 @@ const CheckoutPage = () => {
       !paymentVerified
     ) {
       setError(
-        "Shop chưa xác nhận giao dịch chuyển khoản thành công. Vui lòng hoàn tất thanh toán và chờ hệ thống xác nhận."
+        "Hệ thống đang xác nhận giao dịch chuyển khoản, xin vui lòng đợi…"
       );
 
       return;
@@ -1026,7 +1056,9 @@ const CheckoutPage = () => {
         if (latestPayment?.paymentIntent?.status !== "paid") {
           setPaymentVerified(false);
 
-          setError("Backend chưa xác nhận giao dịch chuyển khoản thành công.");
+          setError(
+            "Hệ thống đang xác nhận giao dịch chuyển khoản, xin vui lòng đợi…"
+          );
 
           return;
         }
@@ -1314,7 +1346,7 @@ const CheckoutPage = () => {
                       htmlFor="senderName"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Họ và tên người gửi
+                      Họ và tên người gửi *
                     </label>
 
                     <input
@@ -1333,7 +1365,7 @@ const CheckoutPage = () => {
                       htmlFor="senderPhone"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Số điện thoại người gửi
+                      Số điện thoại người gửi *
                     </label>
 
                     <input
@@ -1352,7 +1384,7 @@ const CheckoutPage = () => {
                       htmlFor="senderEmail"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Email người gửi
+                      Email người gửi *
                     </label>
 
                     <input
@@ -1903,8 +1935,8 @@ const CheckoutPage = () => {
                 {formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
                   !paymentVerified && (
                     <p className="mt-4 text-sm text-orange-600">
-                      Chỉ có thể đặt hàng sau khi backend xác nhận giao dịch
-                      chuyển khoản thành công.
+                      Hệ thống đang xác nhận giao dịch chuyển khoản, xin vui
+                      lòng đợi…
                     </p>
                   )}
 

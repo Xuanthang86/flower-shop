@@ -362,20 +362,18 @@ export const calculateCouponDiscount = ({
     return 0;
   }
 
-  let discount = 0;
+  const baseDiscount =
+    coupon.type === COUPON_TYPE.PERCENTAGE
+      ? (eligibleAmount * Number(coupon.value || 0)) / 100
+      : Number(coupon.value || 0);
 
-  if (coupon.type === COUPON_TYPE.PERCENTAGE) {
-    discount = (eligibleAmount * Number(coupon.value || 0)) / 100;
-  } else {
-    discount = Number(coupon.value || 0);
-  }
-
-  if (coupon.maximumDiscount > 0) {
-    discount = Math.min(discount, Number(coupon.maximumDiscount));
-  }
+  const cappedDiscount =
+    coupon.maximumDiscount > 0
+      ? Math.min(baseDiscount, Number(coupon.maximumDiscount))
+      : baseDiscount;
 
   return Math.min(
-    Math.max(0, discount),
+    Math.max(0, cappedDiscount),
     Math.max(0, Number(subtotal) || 0),
     eligibleAmount
   );
