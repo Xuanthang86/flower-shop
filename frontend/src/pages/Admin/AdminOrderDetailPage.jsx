@@ -10,7 +10,6 @@ import {
   STATUS_OPTIONS,
   normalizeOrderStatus,
   getStatusLabel,
-  getStatusClass,
 } from "@/utils/orderStatus";
 
 const formatDate = (date) => {
@@ -192,6 +191,7 @@ const AdminOrderDetailPage = () => {
             <div className="mt-5 space-y-4">
               <div>
                 <p className="text-sm text-gray-500">Họ và tên</p>
+
                 <p className="mt-1 font-medium">
                   {customer.fullName || customer.name || "—"}
                 </p>
@@ -199,11 +199,13 @@ const AdminOrderDetailPage = () => {
 
               <div>
                 <p className="text-sm text-gray-500">Số điện thoại</p>
+
                 <p className="mt-1 font-medium">{customer.phone || "—"}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-500">Email</p>
+
                 <p className="mt-1 break-all font-medium">
                   {customer.email || "—"}
                 </p>
@@ -212,6 +214,7 @@ const AdminOrderDetailPage = () => {
               {customer.note && (
                 <div>
                   <p className="text-sm text-gray-500">Ghi chú</p>
+
                   <p className="mt-1 font-medium">{customer.note}</p>
                 </div>
               )}
