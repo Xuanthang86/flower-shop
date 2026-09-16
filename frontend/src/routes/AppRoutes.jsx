@@ -43,6 +43,7 @@ import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
 import AdminContactManagementPage from "@/pages/Admin/AdminContactManagementPage";
 import AdminContentManagementPage from "@/pages/Admin/AdminContentManagementPage";
 import AdminPaymentSettingsPage from "@/pages/Admin/AdminPaymentSettingsPage";
+import AdminCouponsPage from "@/pages/Admin/AdminCouponsPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
@@ -309,6 +310,17 @@ const AppRoutes = () => {
               <AdminOnlyRoute>
                 <AdminSubPage>
                   <AdminPaymentSettingsPage />
+                </AdminSubPage>
+              </AdminOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/admin/coupons"
+            element={
+              <AdminOnlyRoute>
+                <AdminSubPage>
+                  <AdminCouponsPage />
                 </AdminSubPage>
               </AdminOnlyRoute>
             }

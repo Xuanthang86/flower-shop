@@ -1,4 +1,9 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+
+import { formatCouponDiscount, validateCoupon } from "@/services/coupon";
+
+import { getProductById, getProductsSnapshot } from "@/services/catalog";
 
 import { useNavigate } from "react-router-dom";
 
@@ -20,6 +25,7 @@ import {
   getDefaultDeliveryDate,
   getMaxDeliveryDate,
   getTodayDateKey,
+  getDeliveryDateNextDayCutoffHour,
 } from "@/services/shipping";
 
 import {
@@ -77,6 +83,8 @@ const CheckoutPage = () => {
 
   const { createOrder } = useContext(OrderContext);
 
+  const { user } = useAuth();
+
   const [paymentSettings, setPaymentSettings] = useState(() =>
     readPaymentSettings()
   );
@@ -115,7 +123,7 @@ const CheckoutPage = () => {
   const getInitialDeliveryDate = () => {
     const now = new Date();
 
-    if (now.getHours() >= 21) {
+    if (now.getHours() >= getDeliveryDateNextDayCutoffHour()) {
       return (
         addDaysToDateKey(getTodayDateKey(now), 1) || getDefaultDeliveryDate()
       );
@@ -135,6 +143,14 @@ const CheckoutPage = () => {
   const [shippingLoading, setShippingLoading] = useState(false);
 
   const [error, setError] = useState("");
+
+  const [couponCode, setCouponCode] = useState("");
+
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const [couponMessage, setCouponMessage] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -157,7 +173,12 @@ const CheckoutPage = () => {
     ? Number(shippingCalculation.shippingFee) || 0
     : 0;
 
-  const grandTotal = subtotal + shippingFee;
+  const discountAmount = Math.min(
+    subtotal,
+    Math.max(0, Number(appliedCoupon?.discountAmount) || 0)
+  );
+
+  const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount);
 
   useEffect(() => {
     const refreshPaymentSettings = () => {
@@ -672,6 +693,102 @@ const CheckoutPage = () => {
     ? addQrCacheBust(dynamicQrUrl, paymentQrVersion)
     : "";
 
+  const handleApplyCoupon = () => {
+    const code = couponCode.trim();
+
+    if (!code) {
+      setCouponMessage("Vui lòng nhập mã giảm giá.");
+
+      setAppliedCoupon(null);
+
+      return;
+    }
+
+    setCouponLoading(true);
+
+    try {
+      const products = getProductsSnapshot();
+
+      const result = validateCoupon({
+        code,
+
+        items: cartItems,
+
+        subtotal,
+
+        userId: user?.id,
+
+        productLookup: (productId) => getProductById(productId, products),
+      });
+
+      if (!result.success) {
+        setAppliedCoupon(null);
+
+        setCouponMessage(result.message || "Mã giảm giá không hợp lệ.");
+
+        return;
+      }
+
+      setAppliedCoupon(result);
+
+      setCouponMessage(
+        result.message || `Đã áp dụng mã ${result.coupon.code}.`
+      );
+
+      setError("");
+    } catch (couponError) {
+      setAppliedCoupon(null);
+
+      setCouponMessage(
+        couponError?.message || "Không thể kiểm tra mã giảm giá."
+      );
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode("");
+
+    setAppliedCoupon(null);
+
+    setCouponMessage("");
+  };
+
+  useEffect(() => {
+    if (!appliedCoupon?.coupon?.code) {
+      return;
+    }
+
+    const products = getProductsSnapshot();
+
+    const result = validateCoupon({
+      code: appliedCoupon.coupon.code,
+
+      items: cartItems,
+
+      subtotal,
+
+      userId: user?.id,
+
+      productLookup: (productId) => getProductById(productId, products),
+    });
+
+    if (!result.success) {
+      setAppliedCoupon(null);
+
+      setCouponMessage(
+        result.message || "Mã giảm giá không còn áp dụng cho đơn hàng hiện tại."
+      );
+
+      return;
+    }
+
+    setAppliedCoupon(result);
+
+    setCouponMessage(result.message || `Đã áp dụng mã ${result.coupon.code}.`);
+  }, [cartItems, subtotal, user?.id]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -824,7 +941,56 @@ const CheckoutPage = () => {
       const finalShippingFee =
         Number(finalShippingCalculation.shippingFee) || 0;
 
-      const finalGrandTotal = subtotal + finalShippingFee;
+      let finalCouponResult = null;
+
+      if (couponCode.trim()) {
+        const products = getProductsSnapshot();
+
+        finalCouponResult = validateCoupon({
+          code: couponCode,
+
+          items: cartItems,
+
+          subtotal,
+
+          userId: user?.id,
+
+          productLookup: (productId) => getProductById(productId, products),
+        });
+
+        if (!finalCouponResult.success) {
+          setAppliedCoupon(null);
+
+          setCouponMessage(
+            finalCouponResult.message || "Mã giảm giá không còn hợp lệ."
+          );
+
+          setError(
+            finalCouponResult.message || "Mã giảm giá không còn hợp lệ."
+          );
+
+          return;
+        }
+
+        setAppliedCoupon(finalCouponResult);
+      }
+
+      const finalDiscountAmount = Math.min(
+        subtotal,
+        Math.max(
+          0,
+          Number(
+            finalCouponResult?.discountAmount ??
+              appliedCoupon?.discountAmount ??
+              0
+          )
+        )
+      );
+
+      const finalGrandTotal = Math.max(
+        0,
+        subtotal + finalShippingFee - finalDiscountAmount
+      );
 
       if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
         if (!paymentIntent?.id || !paymentIntent?.orderCode) {
@@ -930,6 +1096,16 @@ const CheckoutPage = () => {
         subtotal,
 
         shippingFee: finalShippingFee,
+
+        discountAmount: finalDiscountAmount,
+
+        couponCode:
+          finalCouponResult?.coupon?.code || appliedCoupon?.coupon?.code || "",
+
+        couponSnapshot:
+          finalCouponResult?.couponSnapshot ||
+          appliedCoupon?.couponSnapshot ||
+          null,
 
         total: finalGrandTotal,
 
@@ -1042,6 +1218,77 @@ const CheckoutPage = () => {
                   bật ẩn thông tin, người nhận sẽ không được hiển thị thông tin
                   người gửi.
                 </p>
+
+                <div className="mt-6 rounded-xl border border-pink-100 bg-pink-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏷️</span>
+
+                    <h3 className="font-semibold text-gray-800">Mã giảm giá</h3>
+                  </div>
+
+                  {!appliedCoupon ? (
+                    <>
+                      <div className="mt-3 flex gap-2">
+                        <input
+                          value={couponCode}
+                          onChange={(event) =>
+                            setCouponCode(event.target.value.toUpperCase())
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              handleApplyCoupon();
+                            }
+                          }}
+                          placeholder="Nhập mã giảm giá"
+                          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleApplyCoupon}
+                          disabled={couponLoading}
+                          className="rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          {couponLoading ? "..." : "Áp dụng"}
+                        </button>
+                      </div>
+
+                      {couponMessage && (
+                        <p className="mt-2 text-sm text-gray-600">
+                          {couponMessage}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-green-700">
+                            {appliedCoupon.coupon.code}
+                          </p>
+
+                          <p className="mt-1 text-sm text-green-700">
+                            {appliedCoupon.coupon.name}
+                          </p>
+
+                          <p className="mt-1 text-sm font-semibold text-green-700">
+                            Giảm{" "}
+                            {formatCouponDiscount(appliedCoupon.discountAmount)}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-6 grid gap-5 md:grid-cols-2">
                   <div>
@@ -1351,6 +1598,16 @@ const CheckoutPage = () => {
 
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-gray-600">Phí giao hàng</span>
+
+                        {discountAmount > 0 && (
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-gray-600">Giảm giá</span>
+
+                            <span className="font-semibold text-green-600">
+                              -{formatShippingMoney(discountAmount)}
+                            </span>
+                          </div>
+                        )}
 
                         <span
                           className={`font-semibold ${

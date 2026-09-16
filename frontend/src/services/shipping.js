@@ -5,6 +5,8 @@ NỘI DUNG 14 — SHIPPING / GIAO HOA
 ============================================================
 */
 
+import { readSiteSettings } from "@/services/siteSettings";
+
 export const SHIPPING_ZONE = {
   INTRA_CITY: "intra_city",
   NON_DELIVERY: "non_delivery",
@@ -158,6 +160,24 @@ export const SHIPPING_CONFIG = {
       endHour: 21,
     },
   ],
+};
+
+export const getDeliveryDateNextDayCutoffHour = () => {
+  const settings = readSiteSettings();
+
+  const configuredHour = Number(
+    settings?.shipping?.deliveryDateNextDayCutoffHour
+  );
+
+  if (
+    Number.isFinite(configuredHour) &&
+    configuredHour >= 0 &&
+    configuredHour <= 23
+  ) {
+    return configuredHour;
+  }
+
+  return 21;
 };
 
 /*

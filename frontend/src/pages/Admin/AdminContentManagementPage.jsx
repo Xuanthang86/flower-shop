@@ -340,6 +340,10 @@ const AdminContentManagementPage = () => {
     ? settings.announcementMessages
     : [];
 
+  const shipping = settings.shipping || {
+    deliveryDateNextDayCutoffHour: 21,
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 py-5">
       <div className="mx-auto max-w-7xl px-4">
@@ -607,6 +611,75 @@ const AdminContentManagementPage = () => {
               >
                 <FiSave />
                 Lưu nội dung trang chủ
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Cấu hình giao hàng
+              </h2>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Thiết lập thời điểm sau đó đơn hàng sẽ mặc định giao vào ngày kế
+                tiếp.
+              </p>
+            </div>
+
+            <div className="mt-5 max-w-md">
+              <label
+                htmlFor="deliveryDateNextDayCutoffHour"
+                className="mb-2 block text-sm font-semibold text-gray-700"
+              >
+                Giờ chuyển sang ngày giao kế tiếp
+              </label>
+
+              <div className="flex items-center gap-3">
+                <input
+                  id="deliveryDateNextDayCutoffHour"
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={shipping.deliveryDateNextDayCutoffHour}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+
+                    setSettings((current) => ({
+                      ...current,
+
+                      shipping: {
+                        ...(current.shipping || {}),
+                        deliveryDateNextDayCutoffHour: Math.min(
+                          23,
+                          Math.max(0, Number.isFinite(value) ? value : 21)
+                        ),
+                      },
+                    }));
+                  }}
+                  className={inputClass}
+                />
+
+                <span className="text-sm text-gray-500">giờ 00–23</span>
+              </div>
+
+              <p className="mt-2 text-xs leading-5 text-gray-500">
+                Ví dụ đặt 21 thì từ 21:00 trở đi hệ thống mặc định ngày giao
+                hàng là ngày hôm sau. Có thể thay đổi thành 20, 22 hoặc giờ khác
+                mà không cần sửa code.
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={() =>
+                  saveSettings(settings, "Đã lưu cấu hình giao hàng.")
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu cấu hình giao hàng
               </button>
             </div>
           </section>

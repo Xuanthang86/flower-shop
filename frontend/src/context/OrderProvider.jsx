@@ -99,6 +99,45 @@ const normalizeOrder = (order) => {
   return {
     ...order,
 
+    couponSnapshot:
+      order?.couponSnapshot && typeof order.couponSnapshot === "object"
+        ? {
+            ...order.couponSnapshot,
+
+            code: String(order.couponSnapshot.code || "")
+              .trim()
+              .toUpperCase(),
+
+            discountAmount: Math.max(
+              0,
+              Number(order.couponSnapshot.discountAmount) || 0
+            ),
+
+            eligibleSubtotal: Math.max(
+              0,
+              Number(order.couponSnapshot.eligibleSubtotal) || 0
+            ),
+
+            categoryRestriction: Array.isArray(
+              order.couponSnapshot.categoryRestriction
+            )
+              ? [...order.couponSnapshot.categoryRestriction]
+              : [],
+
+            productRestriction: Array.isArray(
+              order.couponSnapshot.productRestriction
+            )
+              ? [...order.couponSnapshot.productRestriction]
+              : [],
+          }
+        : null,
+
+    discountAmount: Math.max(0, Number(order?.discountAmount) || 0),
+
+    couponCode: String(order?.couponCode || order?.couponSnapshot?.code || "")
+      .trim()
+      .toUpperCase(),
+
     id,
 
     orderId: id,

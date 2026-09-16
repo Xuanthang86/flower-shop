@@ -443,6 +443,10 @@ export const DEFAULT_SITE_SETTINGS = {
     copyright: "© 2026 Flower Shop. All Rights Reserved.",
   },
 
+  shipping: {
+    deliveryDateNextDayCutoffHour: 21,
+  },
+
   contact: {
     title: "Liên hệ",
 
@@ -743,6 +747,23 @@ const mergeSettings = (input = {}) => {
       : [],
 
     blogPosts: normalizedBlogPosts,
+
+    shipping: {
+      ...defaults.shipping,
+
+      ...(source.shipping || {}),
+
+      deliveryDateNextDayCutoffHour: Math.min(
+        23,
+        Math.max(
+          0,
+          Number(
+            source.shipping?.deliveryDateNextDayCutoffHour ??
+              defaults.shipping.deliveryDateNextDayCutoffHour
+          )
+        )
+      ),
+    },
   };
 };
 

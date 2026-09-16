@@ -7,6 +7,7 @@ import {
   FiMail,
   FiPackage,
   FiPenTool,
+  FiTag,
   FiUser,
 } from "react-icons/fi";
 
@@ -92,6 +93,14 @@ const AdminManagementPage = () => {
       description:
         "Cấu hình tài khoản nhận chuyển khoản, mã QR và nội dung thanh toán.",
       icon: FiCreditCard,
+    },
+
+    isAdmin && {
+      to: "/admin/coupons",
+      title: "Quản lý khuyến mãi",
+      description:
+        "Tạo, chỉnh sửa và quản lý mã giảm giá, điều kiện áp dụng và giới hạn sử dụng.",
+      icon: FiTag,
     },
 
     isAdmin && {
