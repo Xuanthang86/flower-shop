@@ -31,17 +31,17 @@ SHOP LOCATION
 export const SHOP_LOCATION = {
   name: "Flower Shop",
 
-  address: "40 Nguyễn Chí Thanh, Đà Nẵng, Việt Nam",
+  address: "40 Nguyễn Chí Thanh, phường Hải Châu, thành phố Đà Nẵng",
+
+  provinceCode: "48",
 
   provinceName: "Đà Nẵng",
 
   /*
-   * Tọa độ trung tâm dùng làm fallback.
+   * Tọa độ fallback của shop.
    *
-   * Khi routing API hoạt động, hệ thống sẽ dùng
-   * tọa độ chính xác được cấu hình dưới đây.
-   *
-   * Đây là điểm xuất phát của shop.
+   * Hệ thống ưu tiên geocode lại địa chỉ shop.
+   * Nếu geocode thất bại thì dùng tọa độ này.
    */
   latitude: 16.06778,
   longitude: 108.22083,
@@ -62,12 +62,13 @@ export const SHIPPING_CONFIG = {
   /*
    * Dưới 7 km miễn phí.
    *
-   * Đúng 7 km KHÔNG thuộc diện miễn phí theo khoảng cách.
+   * Đúng 7 km không thuộc diện miễn phí
+   * theo điều kiện khoảng cách.
    */
   freeShippingDistanceKm: 7,
 
   /*
-   * Phí 3 hình thức giao hàng.
+   * Phí giao hàng.
    */
   deliveryFees: {
     [DELIVERY_MODE.ECONOMY]: 20000,
@@ -76,17 +77,26 @@ export const SHIPPING_CONFIG = {
   },
 
   /*
-   * Hiện tại Đà Nẵng.
+   * Các tỉnh/thành được phép giao.
    *
-   * Sau này có thể mở rộng:
+   * Hiện tại chỉ Đà Nẵng.
    *
-   * [
-   *   "da nang",
-   *   "hue",
-   *   "ha noi",
-   *   "ho chi minh",
-   *   ...
-   * ]
+   * Khi mở rộng toàn quốc có thể bổ sung:
+   * {
+   *   code: "46",
+   *   keywords: ["hue", "thua thien hue"]
+   * }
+   */
+  deliveryProvinces: [
+    {
+      code: "48",
+      keywords: ["da nang"],
+    },
+  ],
+
+  /*
+   * Giữ lại API cũ để tương thích nếu có code
+   * khác trong hệ thống đang sử dụng.
    */
   deliveryProvinceKeywords: ["da nang"],
 
@@ -96,29 +106,39 @@ export const SHIPPING_CONFIG = {
   maxAdvanceDays: 30,
 
   /*
-   * Giao hỏa tốc chỉ nhận trong ngày.
+   * Hỏa tốc chỉ nhận trong ngày.
    */
   expressCutoffHour: 17,
 
   /*
-   * Tối thiểu 120 phút chuẩn bị.
+   * Tối thiểu 120 phút chuẩn bị cho hỏa tốc.
    */
   expressMinimumLeadMinutes: 120,
 
   /*
-   * Photon geocoding.
+   * API geocoding chính.
    */
   geocodingUrl: "https://photon.komoot.io/api/",
 
   /*
-   * OSRM routing.
+   * API geocoding dự phòng.
+   */
+  fallbackGeocodingUrl: "https://nominatim.openstreetmap.org/search",
+
+  /*
+   * API routing.
    */
   routingUrl: "https://router.project-osrm.org/route/v1/driving",
 
   /*
-   * Timeout.
+   * Timeout cho từng request.
    */
   requestTimeoutMs: 10000,
+
+  /*
+   * Giới hạn kết quả geocoding.
+   */
+  geocodingLimit: 5,
 
   /*
    * Khung giờ giao.
@@ -169,12 +189,14 @@ TEXT
 ============================================================
 */
 
-const normalizeText = (value = "") =>
-  String(value)
+const normalizeText = (value = "") => {
+  return String(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/\s+/g, " ")
     .trim();
+};
 
 /*
 ============================================================
@@ -288,14 +310,56 @@ export const getEstimatedDeliveryTime = (
 
 /*
 ============================================================
-ZONE
+PROVINCE / ZONE
 ============================================================
 */
 
-export const getShippingZone = (address = {}) => {
+/*
+ * Xác định Đà Nẵng bằng cả mã tỉnh và tên.
+ *
+ * Mã 48 là mã tỉnh/thành phố Đà Nẵng trong
+ * bộ dữ liệu địa giới hiện tại của project.
+ */
+const isDaNangAddress = (address = {}) => {
+  const provinceCode = String(address?.provinceCode || "").trim();
+
   const provinceName = normalizeText(address?.provinceName);
 
-  if (!provinceName) {
+  if (provinceCode === "48") {
+    return true;
+  }
+
+  if (provinceName === "da nang" || provinceName.includes("da nang")) {
+    return true;
+  }
+
+  return false;
+};
+
+const findSupportedProvince = (address = {}) => {
+  const provinceCode = String(address?.provinceCode || "").trim();
+
+  const provinceName = normalizeText(address?.provinceName);
+
+  return (
+    SHIPPING_CONFIG.deliveryProvinces.find((province) => {
+      if (provinceCode && String(province.code) === provinceCode) {
+        return true;
+      }
+
+      return province.keywords.some((keyword) =>
+        provinceName.includes(normalizeText(keyword))
+      );
+    }) || null
+  );
+};
+
+export const getShippingZone = (address = {}) => {
+  const provinceCode = String(address?.provinceCode || "").trim();
+
+  const provinceName = normalizeText(address?.provinceName);
+
+  if (!provinceCode && !provinceName) {
     return {
       zone: SHIPPING_ZONE.NON_DELIVERY,
 
@@ -307,34 +371,51 @@ export const getShippingZone = (address = {}) => {
     };
   }
 
-  const supported = SHIPPING_CONFIG.deliveryProvinceKeywords.some((keyword) =>
-    provinceName.includes(normalizeText(keyword))
-  );
-
-  if (!supported) {
+  /*
+   * Đà Nẵng luôn được phép giao.
+   *
+   * Không phân biệt phường hay xã để tính vùng phí.
+   * Khoảng cách thực tế mới quyết định miễn phí.
+   */
+  if (isDaNangAddress(address)) {
     return {
-      zone: SHIPPING_ZONE.NON_DELIVERY,
+      zone: SHIPPING_ZONE.INTRA_CITY,
 
-      label: "Ngoài khu vực giao hàng",
+      label: "Nội thành Đà Nẵng",
 
-      available: false,
+      available: true,
 
-      reason: "Địa chỉ hiện chưa thuộc khu vực giao hàng.",
+      reason: "",
     };
   }
 
   /*
-   * Tất cả Phường/Xã của Đà Nẵng
-   * hiện được xem là nội thành.
+   * Kiểm tra kiến trúc mở rộng cho các tỉnh/thành sau này.
    */
+  const supportedProvince = findSupportedProvince(address);
+
+  if (supportedProvince) {
+    return {
+      zone: SHIPPING_ZONE.INTRA_CITY,
+
+      label: provinceName
+        ? `Khu vực giao hàng ${address.provinceName}`
+        : "Khu vực giao hàng",
+
+      available: true,
+
+      reason: "",
+    };
+  }
+
   return {
-    zone: SHIPPING_ZONE.INTRA_CITY,
+    zone: SHIPPING_ZONE.NON_DELIVERY,
 
-    label: "Nội thành Đà Nẵng",
+    label: "Ngoài khu vực giao hàng",
 
-    available: true,
+    available: false,
 
-    reason: "",
+    reason: "Địa chỉ hiện chưa thuộc khu vực giao hàng.",
   };
 };
 
@@ -496,89 +577,287 @@ const fetchJsonWithTimeout = async (url) => {
 
 /*
 ============================================================
-ADDRESS QUERY
+ADDRESS VALIDATION
 ============================================================
 */
 
-const buildAddressQuery = (address = {}) => {
-  const parts = [
-    address?.houseNumber,
-    address?.street,
-    address?.wardName,
-    address?.provinceName,
-    "Việt Nam",
-  ].filter(Boolean);
+const getAddressParts = (address = {}) => {
+  return {
+    houseNumber: String(address?.houseNumber || "").trim(),
 
-  return parts.join(", ");
+    street: String(address?.street || "").trim(),
+
+    wardName: String(address?.wardName || "").trim(),
+
+    provinceName: String(address?.provinceName || "").trim(),
+  };
 };
 
 /*
 ============================================================
-GEOCODING
+BUILD GEOCODING QUERIES
+============================================================
+*/
+
+/*
+ * Không chỉ gửi một query.
+ *
+ * Ví dụ:
+ *
+ * 58 Nam Cao, Phường Liên Chiểu, Đà Nẵng, Việt Nam
+ *
+ * nếu Photon không nhận thì thử:
+ *
+ * 58 Nam Cao, Đà Nẵng, Việt Nam
+ *
+ * rồi:
+ *
+ * Nam Cao, Phường Liên Chiểu, Đà Nẵng, Việt Nam
+ *
+ * Điều này giúp xử lý tốt hơn các địa chỉ mà API
+ * chưa cập nhật hoàn toàn tên phường/xã mới.
+ */
+const buildAddressQueries = (address = {}) => {
+  const { houseNumber, street, wardName, provinceName } =
+    getAddressParts(address);
+
+  const province = provinceName || "Đà Nẵng";
+
+  const queries = [];
+
+  if (houseNumber && street && wardName && province) {
+    queries.push(
+      `${houseNumber} ${street}, ${wardName}, ${province}, Việt Nam`
+    );
+  }
+
+  if (houseNumber && street && province) {
+    queries.push(`${houseNumber} ${street}, ${province}, Việt Nam`);
+  }
+
+  if (street && wardName && province) {
+    queries.push(`${street}, ${wardName}, ${province}, Việt Nam`);
+  }
+
+  if (street && province) {
+    queries.push(`${street}, ${province}, Việt Nam`);
+  }
+
+  if (houseNumber && street) {
+    queries.push(`${houseNumber} ${street}, Đà Nẵng, Việt Nam`);
+  }
+
+  return [...new Set(queries.map((query) => query.trim()).filter(Boolean))];
+};
+
+/*
+============================================================
+COORDINATE VALIDATION
+============================================================
+*/
+
+const isValidCoordinate = (latitude, longitude) => {
+  return (
+    Number.isFinite(Number(latitude)) &&
+    Number.isFinite(Number(longitude)) &&
+    Number(latitude) >= -90 &&
+    Number(latitude) <= 90 &&
+    Number(longitude) >= -180 &&
+    Number(longitude) <= 180
+  );
+};
+
+/*
+ * Giới hạn kết quả trong khu vực Đà Nẵng.
+ *
+ * Mục đích:
+ * tránh trường hợp API trả về một đường Nam Cao
+ * hoặc địa điểm cùng tên ở tỉnh khác.
+ */
+const isCoordinateInDaNang = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+
+  if (!isValidCoordinate(lat, lon)) {
+    return false;
+  }
+
+  return lat >= 15.8 && lat <= 16.35 && lon >= 107.85 && lon <= 108.45;
+};
+
+/*
+============================================================
+PHOTON RESULT
 ============================================================
 */
 
 const getCoordinatesFromPhoton = (data) => {
-  const feature = data?.features?.[0];
+  const features = Array.isArray(data?.features) ? data.features : [];
 
-  const coordinates = feature?.geometry?.coordinates;
+  for (const feature of features) {
+    const coordinates = feature?.geometry?.coordinates;
 
-  if (!Array.isArray(coordinates) || coordinates.length < 2) {
-    return null;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      continue;
+    }
+
+    const longitude = Number(coordinates[0]);
+
+    const latitude = Number(coordinates[1]);
+
+    if (!isCoordinateInDaNang(latitude, longitude)) {
+      continue;
+    }
+
+    return {
+      latitude,
+
+      longitude,
+
+      displayName:
+        feature?.properties?.name ||
+        feature?.properties?.street ||
+        feature?.properties?.city ||
+        "",
+    };
   }
 
-  const longitude = Number(coordinates[0]);
-
-  const latitude = Number(coordinates[1]);
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return null;
-  }
-
-  return {
-    latitude,
-    longitude,
-
-    displayName: feature?.properties?.name || feature?.properties?.street || "",
-  };
+  return null;
 };
 
-export const geocodeAddress = async (address) => {
-  const query = buildAddressQuery(address);
+/*
+============================================================
+NOMINATIM RESULT
+============================================================
+*/
 
-  if (!query) {
-    throw new Error("Không có đủ thông tin địa chỉ để xác định vị trí.");
+const getCoordinatesFromNominatim = (data) => {
+  const results = Array.isArray(data) ? data : [];
+
+  for (const result of results) {
+    const latitude = Number(result?.lat);
+
+    const longitude = Number(result?.lon);
+
+    if (!isCoordinateInDaNang(latitude, longitude)) {
+      continue;
+    }
+
+    return {
+      latitude,
+
+      longitude,
+
+      displayName: result?.display_name || "",
+    };
   }
 
+  return null;
+};
+
+/*
+============================================================
+GEOCODE WITH PHOTON
+============================================================
+*/
+
+const geocodeWithPhoton = async (query) => {
   const url =
     `${SHIPPING_CONFIG.geocodingUrl}` +
     `?q=${encodeURIComponent(query)}` +
-    `&limit=1` +
+    `&limit=${SHIPPING_CONFIG.geocodingLimit}` +
     `&lang=vi`;
 
   const data = await fetchJsonWithTimeout(url);
 
-  const coordinates = getCoordinatesFromPhoton(data);
+  return getCoordinatesFromPhoton(data);
+};
 
-  if (!coordinates) {
-    throw new Error(
-      "Không xác định được vị trí địa chỉ nhận hàng. Vui lòng kiểm tra lại số nhà và tên đường."
-    );
+/*
+============================================================
+GEOCODE WITH NOMINATIM
+============================================================
+*/
+
+const geocodeWithNominatim = async (query) => {
+  const url =
+    `${SHIPPING_CONFIG.fallbackGeocodingUrl}` +
+    `?format=jsonv2` +
+    `&addressdetails=1` +
+    `&limit=${SHIPPING_CONFIG.geocodingLimit}` +
+    `&countrycodes=vn` +
+    `&q=${encodeURIComponent(query)}`;
+
+  const data = await fetchJsonWithTimeout(url);
+
+  return getCoordinatesFromNominatim(data);
+};
+
+/*
+============================================================
+GEOCODE ADDRESS
+============================================================
+*/
+
+export const geocodeAddress = async (address) => {
+  const queries = buildAddressQueries(address);
+
+  if (queries.length === 0) {
+    throw new Error("Không có đủ thông tin địa chỉ để xác định vị trí.");
   }
 
-  return coordinates;
+  let lastError = null;
+
+  /*
+   * Thử Photon trước.
+   */
+  for (const query of queries) {
+    try {
+      const coordinates = await geocodeWithPhoton(query);
+
+      if (coordinates) {
+        return coordinates;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  /*
+   * Photon không tìm thấy:
+   * thử Nominatim.
+   */
+  for (const query of queries) {
+    try {
+      const coordinates = await geocodeWithNominatim(query);
+
+      if (coordinates) {
+        return coordinates;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  console.error("Không geocode được địa chỉ:", lastError);
+
+  throw new Error(
+    "Không xác định được vị trí địa chỉ nhận hàng. Vui lòng kiểm tra lại số nhà, tên đường và phường/xã."
+  );
 };
 
 /*
 ============================================================
 SHOP COORDINATES
 ============================================================
-
-Không gọi geocoding API cho shop nữa.
-Điểm shop được cấu hình cố định.
-============================================================
 */
 
+/*
+ * API cũ vẫn trả tọa độ fallback đồng bộ.
+ *
+ * Khi tính khoảng cách thực tế, hệ thống sẽ ưu tiên
+ * geocode địa chỉ shop để lấy vị trí chính xác hơn.
+ */
 export const getShopCoordinates = () => ({
   latitude: SHOP_LOCATION.latitude,
 
@@ -600,29 +879,70 @@ export const calculateHaversineDistanceKm = (pointA, pointB) => {
     return null;
   }
 
+  const latitudeA = Number(pointA.latitude);
+
+  const longitudeA = Number(pointA.longitude);
+
+  const latitudeB = Number(pointB.latitude);
+
+  const longitudeB = Number(pointB.longitude);
+
+  if (
+    !isValidCoordinate(latitudeA, longitudeA) ||
+    !isValidCoordinate(latitudeB, longitudeB)
+  ) {
+    return null;
+  }
+
   const earthRadiusKm = 6371;
 
-  const latitudeDifference = toRadians(
-    Number(pointB.latitude) - Number(pointA.latitude)
-  );
+  const latitudeDifference = toRadians(latitudeB - latitudeA);
 
-  const longitudeDifference = toRadians(
-    Number(pointB.longitude) - Number(pointA.longitude)
-  );
+  const longitudeDifference = toRadians(longitudeB - longitudeA);
 
-  const latitudeA = toRadians(Number(pointA.latitude));
+  const latitudeARadians = toRadians(latitudeA);
 
-  const latitudeB = toRadians(Number(pointB.latitude));
+  const latitudeBRadians = toRadians(latitudeB);
 
   const a =
     Math.sin(latitudeDifference / 2) ** 2 +
-    Math.cos(latitudeA) *
-      Math.cos(latitudeB) *
+    Math.cos(latitudeARadians) *
+      Math.cos(latitudeBRadians) *
       Math.sin(longitudeDifference / 2) ** 2;
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusKm * c;
+};
+
+/*
+============================================================
+GET SHOP GEOCODE
+============================================================
+*/
+
+let shopCoordinatesPromise = null;
+
+const getResolvedShopCoordinates = async () => {
+  /*
+   * Chỉ geocode shop một lần trong một
+   * vòng đời trang.
+   */
+  if (!shopCoordinatesPromise) {
+    shopCoordinatesPromise = geocodeAddress({
+      houseNumber: "40",
+
+      street: "Nguyễn Chí Thanh",
+
+      wardName: "Phường Hải Châu",
+
+      provinceName: "Đà Nẵng",
+    }).catch(() => {
+      return getShopCoordinates();
+    });
+  }
+
+  return shopCoordinatesPromise;
 };
 
 /*
@@ -665,25 +985,24 @@ CALCULATE DISTANCE
 */
 
 export const calculateDeliveryDistance = async (address) => {
-  /*
-   * Shop dùng tọa độ cố định.
-   * Chỉ geocode địa chỉ khách.
-   */
-  const shopCoordinates = getShopCoordinates();
+  const [shopCoordinates, customerCoordinates] = await Promise.all([
+    getResolvedShopCoordinates(),
 
-  const customerCoordinates = await geocodeAddress(address);
+    geocodeAddress(address),
+  ]);
 
   /*
-   * Không khởi tạo null.
-   *
-   * Điều này cũng xử lý cảnh báo:
-   * "The value assigned to distanceKm
-   * is not used in subsequent statement".
+   * Khai báo nhưng không gán giá trị
+   * để tránh cảnh báo biến được gán nhưng
+   * không sử dụng.
    */
   let distanceKm;
 
   let distanceType = "road";
 
+  /*
+   * Ưu tiên khoảng cách đường bộ.
+   */
   try {
     distanceKm = await getRoadDistanceKm(shopCoordinates, customerCoordinates);
   } catch (routeError) {
@@ -723,15 +1042,27 @@ CALCULATE SHIPPING ASYNC
 
 export const calculateShippingAsync = async ({
   address = {},
+
   subtotal = 0,
+
   deliveryDate = "",
+
   deliveryTimeSlot = "",
+
   deliveryMode = DELIVERY_MODE.STANDARD,
+
   deliveryNote = "",
+
   now = new Date(),
 } = {}) => {
   const normalizedSubtotal = Math.max(0, Number(subtotal) || 0);
 
+  /*
+   * Kiểm tra khu vực.
+   *
+   * Đà Nẵng được nhận diện bằng mã 48
+   * hoặc tên Đà Nẵng.
+   */
   const zoneResult = getShippingZone(address);
 
   if (!zoneResult.available) {
@@ -749,55 +1080,98 @@ export const calculateShippingAsync = async ({
       subtotal: normalizedSubtotal,
 
       total: normalizedSubtotal,
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
-  if (!address?.houseNumber?.trim()) {
+  /*
+   * Kiểm tra địa chỉ.
+   */
+  if (!String(address?.houseNumber || "").trim()) {
     return {
       success: false,
+
       message: "Vui lòng nhập số nhà.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
-  if (!address?.street?.trim()) {
+  if (!String(address?.street || "").trim()) {
     return {
       success: false,
+
       message: "Vui lòng nhập tên đường.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
   if (!address?.wardCode || !address?.wardName) {
     return {
       success: false,
+
       message: "Vui lòng chọn phường/xã.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
+  /*
+   * Ngày giao.
+   */
   if (!deliveryDate) {
     return {
       success: false,
+
       message: "Vui lòng chọn ngày giao hàng.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
-  const today = getTodayDateKey();
+  const today = formatDateKey(now);
 
-  const maxDate = getMaxDeliveryDate();
+  const maxDate = addDaysToDateKey(today, SHIPPING_CONFIG.maxAdvanceDays);
 
   if (deliveryDate < today) {
     return {
       success: false,
+
       message: "Ngày giao hàng không hợp lệ.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
   if (deliveryDate > maxDate) {
     return {
       success: false,
+
       message: `Chỉ có thể đặt giao hàng tối đa ${SHIPPING_CONFIG.maxAdvanceDays} ngày.`,
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
+  /*
+   * Kiểm tra hình thức giao.
+   */
   const deliveryValidation = validateDeliveryMode(
     deliveryMode,
     deliveryDate,
@@ -807,10 +1181,18 @@ export const calculateShippingAsync = async ({
   if (!deliveryValidation.success) {
     return {
       success: false,
+
       message: deliveryValidation.message,
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
+  /*
+   * Kiểm tra khung giờ.
+   */
   const availableSlots = getAvailableDeliveryTimeSlots(
     deliveryDate,
     deliveryMode,
@@ -822,7 +1204,12 @@ export const calculateShippingAsync = async ({
   if (!selectedSlot) {
     return {
       success: false,
+
       message: "Vui lòng chọn khung giờ giao hàng.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
@@ -833,13 +1220,18 @@ export const calculateShippingAsync = async ({
   if (!slotAvailable) {
     return {
       success: false,
+
       message:
         "Khung giờ giao hàng đã qua hoặc không còn phù hợp với hình thức giao đã chọn.",
+
+      distanceKm: null,
+
+      distanceAvailable: false,
     };
   }
 
   /*
-   * Tính khoảng cách.
+   * TÍNH KHOẢNG CÁCH.
    */
   let distanceResult;
 
@@ -854,6 +1246,14 @@ export const calculateShippingAsync = async ({
       message:
         distanceError?.message || "Không thể xác định khoảng cách giao hàng.",
 
+      shippingFee: 0,
+
+      subtotal: normalizedSubtotal,
+
+      total: normalizedSubtotal,
+
+      distanceKm: null,
+
       distanceAvailable: false,
     };
   }
@@ -861,11 +1261,11 @@ export const calculateShippingAsync = async ({
   const distanceKm = Number(distanceResult.distanceKm) || 0;
 
   /*
-   * Miễn phí:
+   * MIỄN PHÍ:
    *
-   * - đơn >= 500.000đ
+   * 1. Đơn >= 500.000đ
    * HOẶC
-   * - khoảng cách < 7 km
+   * 2. Khoảng cách < 7 km
    */
   const freeBySubtotal =
     normalizedSubtotal >= SHIPPING_CONFIG.freeShippingThreshold;
@@ -874,10 +1274,16 @@ export const calculateShippingAsync = async ({
 
   const freeShippingApplied = freeBySubtotal || freeByDistance;
 
+  /*
+   * Phí theo hình thức giao.
+   */
   const originalDeliveryFee = getDeliveryModeFee(deliveryMode);
 
   const shippingFee = freeShippingApplied ? 0 : originalDeliveryFee;
 
+  /*
+   * Lý do miễn phí.
+   */
   let freeShippingReason = "";
 
   if (freeBySubtotal && freeByDistance) {
@@ -891,6 +1297,9 @@ export const calculateShippingAsync = async ({
 
   const total = normalizedSubtotal + shippingFee;
 
+  /*
+   * Thời gian giao dự kiến.
+   */
   const estimatedDeliveryTime = getEstimatedDeliveryTime(
     deliveryMode,
     deliveryDate,
@@ -919,11 +1328,13 @@ export const calculateShippingAsync = async ({
     },
 
     /*
-     * Khoảng cách.
+     * KHOẢNG CÁCH
      */
     distanceKm,
 
     distanceType: distanceResult.distanceType,
+
+    distanceAvailable: true,
 
     shopAddress: SHOP_LOCATION.address,
 
@@ -932,7 +1343,7 @@ export const calculateShippingAsync = async ({
     customerCoordinates: distanceResult.customerCoordinates,
 
     /*
-     * Giao hàng.
+     * GIAO HÀNG
      */
     deliveryMode,
 
@@ -947,7 +1358,7 @@ export const calculateShippingAsync = async ({
     estimatedDeliveryTime,
 
     /*
-     * Phí.
+     * PHÍ
      */
     originalDeliveryFee,
 
@@ -981,11 +1392,17 @@ BACKWARD COMPATIBLE SYNC FUNCTION
 
 export const calculateShipping = ({
   address = {},
+
   subtotal = 0,
+
   deliveryDate = "",
+
   deliveryTimeSlot = "",
+
   deliveryMode = DELIVERY_MODE.STANDARD,
+
   deliveryNote = "",
+
   now = new Date(),
 } = {}) => {
   const normalizedSubtotal = Math.max(0, Number(subtotal) || 0);
@@ -1008,6 +1425,12 @@ export const calculateShipping = ({
 
   const deliveryFee = getDeliveryModeFee(deliveryMode);
 
+  /*
+   * Hàm đồng bộ chỉ tính miễn phí
+   * theo giá trị đơn.
+   *
+   * Khoảng cách cần calculateShippingAsync.
+   */
   const freeShippingApplied =
     normalizedSubtotal >= SHIPPING_CONFIG.freeShippingThreshold;
 
@@ -1072,7 +1495,7 @@ export const createShippingSnapshot = (calculation) => {
   }
 
   return {
-    version: 3,
+    version: 4,
 
     zone: calculation.zone || "",
 
@@ -1087,6 +1510,8 @@ export const createShippingSnapshot = (calculation) => {
     distanceKm: Number(calculation.distanceKm) || 0,
 
     distanceType: calculation.distanceType || "",
+
+    distanceAvailable: calculation.distanceAvailable !== false,
 
     shopCoordinates: calculation.shopCoordinates || null,
 
