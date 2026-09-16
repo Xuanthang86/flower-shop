@@ -1,6 +1,7 @@
 import {
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -92,12 +93,33 @@ const syncCartWithProducts = (cartItems, products) => {
     return [];
   }
 
+  /*
+   * Catalog chưa tải dữ liệu:
+   * không được coi đây là giỏ rỗng.
+   */
+  if (!Array.isArray(products) || products.length === 0) {
+    return cartItems.map(normalizeCartItem);
+  }
+
   const nextItems = [];
 
   for (const item of cartItems) {
     const product = getProductById(item.id, products);
 
-    if (!product || !isProductSellable(product)) {
+    /*
+     * Nếu Catalog chưa tìm thấy sản phẩm,
+     * giữ item cũ thay vì xóa ngay.
+     *
+     * Điều này tránh mất giỏ hàng trong
+     * lúc Catalog đang đồng bộ.
+     */
+    if (!product) {
+      nextItems.push(normalizeCartItem(item));
+
+      continue;
+    }
+
+    if (!isProductSellable(product)) {
       continue;
     }
 
@@ -136,15 +158,6 @@ const syncCartWithProducts = (cartItems, products) => {
   return nextItems;
 };
 
-/*
-=========================================================
-CART SESSION
-
-Mỗi user có một CartSession riêng.
-Không dùng useEffect để reset state khi đổi user.
-=========================================================
-*/
-
 const CartSession = ({ user, products, children }) => {
   const userId = user?.id ? String(user.id) : "";
 
@@ -153,15 +166,22 @@ const CartSession = ({ user, products, children }) => {
       return [];
     }
 
-    return syncCartWithProducts(
-      readCart(userId).map(normalizeCartItem),
-      products
-    );
+    const saved = readCart(userId);
+
+    /*
+     * Không đồng bộ với Catalog ngay
+     * nếu Catalog chưa sẵn sàng.
+     */
+    if (!Array.isArray(products) || products.length === 0) {
+      return saved.map(normalizeCartItem);
+    }
+
+    return syncCartWithProducts(saved.map(normalizeCartItem), products);
   });
 
   /*
   ========================================================
-  SAVE CART
+  PERSIST
   ========================================================
   */
 
@@ -188,7 +208,38 @@ const CartSession = ({ user, products, children }) => {
 
   /*
   ========================================================
-  ADD TO CART
+  REHYDRATE KHI CATALOG ĐÃ LOAD
+  ========================================================
+  */
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    /*
+     * Catalog chưa sẵn sàng:
+     * tuyệt đối không reset cart.
+     */
+    if (!Array.isArray(products) || products.length === 0) {
+      return;
+    }
+
+    const savedCart = readCart(userId);
+
+    const nextItems = syncCartWithProducts(
+      savedCart.map(normalizeCartItem),
+      products
+    );
+
+    setCartItems(nextItems);
+
+    persistCart(nextItems);
+  }, [userId, products, persistCart]);
+
+  /*
+  ========================================================
+  ADD
   ========================================================
   */
 
@@ -197,11 +248,20 @@ const CartSession = ({ user, products, children }) => {
       if (!userId) {
         return {
           success: false,
+
           message: "Vui lòng đăng nhập trước khi thêm sản phẩm vào giỏ hàng.",
         };
       }
 
       const currentProduct = getProductById(product?.id, products);
+
+      if (!currentProduct) {
+        return {
+          success: false,
+
+          message: "Không tìm thấy sản phẩm.",
+        };
+      }
 
       const requestedQuantity = Math.floor(Number(quantity));
 
@@ -216,6 +276,7 @@ const CartSession = ({ user, products, children }) => {
 
       let result = {
         success: true,
+
         message: "Đã thêm sản phẩm vào giỏ hàng.",
       };
 
@@ -274,8 +335,10 @@ const CartSession = ({ user, products, children }) => {
 
         const nextItems = [
           ...currentItems,
+
           normalizeCartItem({
             ...currentProduct,
+
             quantity: requestedQuantity,
           }),
         ];
@@ -313,7 +376,7 @@ const CartSession = ({ user, products, children }) => {
 
   /*
   ========================================================
-  UPDATE QUANTITY
+  UPDATE
   ========================================================
   */
 
@@ -326,6 +389,7 @@ const CartSession = ({ user, products, children }) => {
 
         return {
           success: false,
+
           message: "Số lượng không hợp lệ.",
         };
       }
@@ -370,6 +434,7 @@ const CartSession = ({ user, products, children }) => {
 
       return {
         success: true,
+
         message: "Đã cập nhật số lượng.",
       };
     },
@@ -391,6 +456,7 @@ const CartSession = ({ user, products, children }) => {
       if (!item) {
         return {
           success: false,
+
           message: "Không tìm thấy sản phẩm trong giỏ.",
         };
       }
@@ -415,6 +481,7 @@ const CartSession = ({ user, products, children }) => {
       if (!item) {
         return {
           success: false,
+
           message: "Không tìm thấy sản phẩm trong giỏ.",
         };
       }
@@ -426,6 +493,7 @@ const CartSession = ({ user, products, children }) => {
 
         return {
           success: true,
+
           message: "Đã xóa sản phẩm khỏi giỏ hàng.",
         };
       }
@@ -437,7 +505,7 @@ const CartSession = ({ user, products, children }) => {
 
   /*
   ========================================================
-  CLEAR CART
+  CLEAR
   ========================================================
   */
 
@@ -484,21 +552,13 @@ const CartSession = ({ user, products, children }) => {
 
   const cartTotal = useMemo(
     () =>
-      cartItems.reduce((total, item) => {
-        const price = Number(item.price) || 0;
-
-        const quantity = Number(item.quantity) || 0;
-
-        return total + price * quantity;
-      }, 0),
+      cartItems.reduce(
+        (total, item) =>
+          total + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        0
+      ),
     [cartItems]
   );
-
-  /*
-  ========================================================
-  CONTEXT VALUE
-  ========================================================
-  */
 
   const value = useMemo(
     () => ({
@@ -538,12 +598,6 @@ const CartSession = ({ user, products, children }) => {
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };
 
-/*
-=========================================================
-PROVIDER
-=========================================================
-*/
-
 const CartProvider = ({ children }) => {
   const auth = useContext(AuthContext);
 
@@ -558,15 +612,6 @@ const CartProvider = ({ children }) => {
     getProductsSnapshot,
     getProductsSnapshot
   );
-
-  /*
-   * key thay đổi khi user thay đổi.
-   *
-   * Vì vậy CartSession cũ bị unmount và CartSession
-   * của user mới được khởi tạo từ đúng localStorage.
-   *
-   * Không cần useEffect + setCartItems để reset state.
-   */
 
   const sessionKey = user?.id ? String(user.id) : "guest";
 
