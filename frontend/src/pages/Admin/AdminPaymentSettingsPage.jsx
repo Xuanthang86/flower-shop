@@ -5,7 +5,6 @@ import { FiCreditCard, FiImage, FiSave } from "react-icons/fi";
 import { useNotification } from "@/context/NotificationProvider";
 
 import {
-  DEFAULT_PAYMENT_SETTINGS,
   readPaymentSettings,
   savePaymentSettings,
 } from "@/services/paymentSettings";
@@ -49,11 +48,18 @@ const AdminPaymentSettingsPage = () => {
       setSettings(readPaymentSettings());
     };
 
+    window.addEventListener("flower-shop-payment-settings-updated", refresh);
+
     window.addEventListener("flower-shop-site-settings-updated", refresh);
 
     window.addEventListener("storage", refresh);
 
     return () => {
+      window.removeEventListener(
+        "flower-shop-payment-settings-updated",
+        refresh
+      );
+
       window.removeEventListener("flower-shop-site-settings-updated", refresh);
 
       window.removeEventListener("storage", refresh);
@@ -102,7 +108,7 @@ const AdminPaymentSettingsPage = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const accountNumber = String(bankTransfer.accountNumber || "").trim();
 
     const accountName = String(bankTransfer.accountName || "").trim();
@@ -115,38 +121,33 @@ const AdminPaymentSettingsPage = () => {
 
     if (!bankName) {
       notifyError("Vui lòng nhập tên ngân hàng.");
-
       return;
     }
 
     if (!bankCode) {
       notifyError("Vui lòng nhập mã ngân hàng/BIN để hệ thống tạo QR động.");
-
       return;
     }
 
     if (!accountNumber) {
       notifyError("Vui lòng nhập số tài khoản nhận tiền.");
-
       return;
     }
 
     if (!accountName) {
       notifyError("Vui lòng nhập tên chủ tài khoản.");
-
       return;
     }
 
     if (!prefix) {
       notifyError("Vui lòng nhập tiền tố nội dung chuyển khoản.");
-
       return;
     }
 
     setSaving(true);
 
     try {
-      const saved = savePaymentSettings({
+      const saved = await savePaymentSettings({
         ...settings,
 
         bankTransfer: {
@@ -172,9 +173,9 @@ const AdminPaymentSettingsPage = () => {
 
       setSettings(saved);
 
-      notifySuccess("Đã lưu cấu hình thanh toán chuyển khoản.");
+      notifySuccess("Đã lưu và đồng bộ cấu hình thanh toán.");
     } catch (error) {
-      notifyError(error?.message || "Không thể lưu cấu hình thanh toán.");
+      notifyError(error?.message || "Không thể đồng bộ cấu hình thanh toán.");
     } finally {
       setSaving(false);
     }
@@ -373,10 +374,11 @@ const AdminPaymentSettingsPage = () => {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-blue-800">
-              Mã QR động sẽ được tạo theo từng giao dịch với đúng số tiền và nội
-              dung chuyển khoản chứa mã đơn hàng. Nút Đặt hàng tại Checkout chỉ
-              được bật sau khi backend xác minh giao dịch chuyển khoản thành
-              công.
+              Mỗi lần khách hàng chọn thanh toán chuyển khoản, hệ thống tạo một
+              mã giao dịch riêng. Nội dung chuyển khoản luôn chứa mã đơn hàng.
+              Sau khi ngân hàng gửi giao dịch thành công về hệ thống, backend
+              kiểm tra tài khoản nhận, số tiền và mã đơn hàng trước khi xác nhận
+              thanh toán.
             </p>
           </section>
 

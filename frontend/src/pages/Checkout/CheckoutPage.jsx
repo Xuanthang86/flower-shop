@@ -55,6 +55,20 @@ const EMPTY_PAYMENT_INTENT = {
   status: "pending",
 };
 
+const formatDeliveryDateDisplay = (dateKey) => {
+  if (!dateKey) {
+    return "";
+  }
+
+  const [year, month, day] = String(dateKey).split("-");
+
+  if (!year || !month || !day) {
+    return "";
+  }
+
+  return `${day}/${month}/${year}`;
+};
+
 const CheckoutPage = () => {
   const navigate = useNavigate();
 
@@ -118,8 +132,6 @@ const CheckoutPage = () => {
   const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
   const [paymentVerified, setPaymentVerified] = useState(false);
-
-  const [paymentStatus, setPaymentStatus] = useState("idle");
 
   const [paymentError, setPaymentError] = useState("");
 
@@ -318,8 +330,6 @@ const CheckoutPage = () => {
 
     setPaymentVerified(false);
 
-    setPaymentStatus("idle");
-
     setPaymentError("");
 
     setError("");
@@ -337,8 +347,6 @@ const CheckoutPage = () => {
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
     setPaymentVerified(false);
-
-    setPaymentStatus("idle");
 
     setPaymentError("");
 
@@ -489,8 +497,6 @@ const CheckoutPage = () => {
 
     setPaymentVerified(false);
 
-    setPaymentStatus("creating");
-
     createBankTransferPaymentIntent({
       amount: grandTotal,
     })
@@ -506,8 +512,6 @@ const CheckoutPage = () => {
         }
 
         setPaymentIntent(intent);
-
-        setPaymentStatus(intent.status || "pending");
       })
       .catch((intentError) => {
         if (cancelled) {
@@ -515,8 +519,6 @@ const CheckoutPage = () => {
         }
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
-
-        setPaymentStatus("error");
 
         setPaymentError(
           intentError?.message ||
@@ -562,8 +564,6 @@ const CheckoutPage = () => {
         }
 
         const status = result?.paymentIntent?.status || "pending";
-
-        setPaymentStatus(status);
 
         if (status === "paid") {
           setPaymentVerified(true);

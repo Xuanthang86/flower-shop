@@ -1,11 +1,6 @@
-import {
-  DEFAULT_SITE_SETTINGS,
-  readSiteSettings,
-  saveSiteSettings,
-  SITE_SETTINGS_UPDATED_EVENT,
-} from "@/services/siteSettings";
+const PAYMENT_SETTINGS_STORAGE_KEY = "flower-shop-payment-settings";
 
-export const DEFAULT_PAYMENT_SETTINGS = {
+const DEFAULT_PAYMENT_SETTINGS = {
   bankTransfer: {
     enabled: true,
 
@@ -28,46 +23,238 @@ export const DEFAULT_PAYMENT_SETTINGS = {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-export const readPaymentSettings = () => {
-  const settings = readSiteSettings();
+const normalizeSettings = (value = {}) => ({
+  ...clone(DEFAULT_PAYMENT_SETTINGS),
 
-  return {
-    ...clone(DEFAULT_PAYMENT_SETTINGS),
+  ...(value && typeof value === "object" ? value : {}),
 
-    ...(settings?.payment || {}),
+  bankTransfer: {
+    ...clone(DEFAULT_PAYMENT_SETTINGS.bankTransfer),
 
-    bankTransfer: {
-      ...clone(DEFAULT_PAYMENT_SETTINGS.bankTransfer),
+    ...(value?.bankTransfer || {}),
+  },
+});
 
-      ...(settings?.payment?.bankTransfer || {}),
-    },
-  };
+const normalizeApiBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  const base = String(configured).replace(/\/+$/, "");
+
+  return base.endsWith("/api") ? base : `${base}/api`;
 };
 
-export const savePaymentSettings = (paymentSettings = {}) => {
-  const currentSettings = readSiteSettings();
+const API_BASE_URL = normalizeApiBaseUrl();
 
-  const nextPayment = {
-    ...clone(DEFAULT_PAYMENT_SETTINGS),
+const readStoredPaymentSettings = () => {
+  try {
+    const raw = localStorage.getItem(PAYMENT_SETTINGS_STORAGE_KEY);
 
-    ...currentSettings?.payment,
+    if (!raw) {
+      return null;
+    }
+
+    return normalizeSettings(JSON.parse(raw));
+  } catch (error) {
+    console.warn("Không thể đọc cấu hình thanh toán trong trình duyệt:", error);
+
+    return null;
+  }
+};
+
+const writeStoredPaymentSettings = (settings) => {
+  const normalized = normalizeSettings(settings);
+
+  try {
+    localStorage.setItem(
+      PAYMENT_SETTINGS_STORAGE_KEY,
+      JSON.stringify(normalized)
+    );
+  } catch (error) {
+    const storageError = new Error(
+      "Không thể lưu cấu hình thanh toán. Bộ nhớ trình duyệt có thể đã đầy.",
+      {
+        cause: error,
+      }
+    );
+
+    console.error("Không thể lưu cấu hình thanh toán:", storageError);
+
+    throw storageError;
+  }
+
+  return normalized;
+};
+
+const syncPaymentSettingsToBackend = async (paymentSettings) => {
+  const normalized = normalizeSettings(paymentSettings);
+
+  let snapshotResponse;
+
+  try {
+    snapshotResponse = await fetch(`${API_BASE_URL}/data/snapshot`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } catch {
+    throw new Error(
+      "Không thể kết nối backend để đồng bộ cấu hình thanh toán."
+    );
+  }
+
+  const snapshotPayload = await snapshotResponse.json().catch(() => ({}));
+
+  if (!snapshotResponse.ok) {
+    throw new Error(
+      snapshotPayload?.message || "Không thể đọc cấu hình website từ backend."
+    );
+  }
+
+  const currentSnapshot =
+    snapshotPayload?.snapshot && typeof snapshotPayload.snapshot === "object"
+      ? snapshotPayload.snapshot
+      : {};
+
+  const currentSettings =
+    currentSnapshot?.settings && typeof currentSnapshot.settings === "object"
+      ? currentSnapshot.settings
+      : {};
+
+  const nextSettings = {
+    ...currentSettings,
+
+    payment: {
+      ...(currentSettings.payment || {}),
+
+      ...normalized,
+    },
+  };
+
+  let saveResponse;
+
+  try {
+    saveResponse = await fetch(`${API_BASE_URL}/data/snapshot`, {
+      method: "PUT",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        products: Array.isArray(currentSnapshot.products)
+          ? currentSnapshot.products
+          : [],
+
+        categories: Array.isArray(currentSnapshot.categories)
+          ? currentSnapshot.categories
+          : [],
+
+        settings: nextSettings,
+      }),
+    });
+  } catch {
+    throw new Error("Không thể kết nối backend để lưu cấu hình thanh toán.");
+  }
+
+  const savePayload = await saveResponse.json().catch(() => ({}));
+
+  if (!saveResponse.ok) {
+    throw new Error(
+      savePayload?.message || "Backend không thể lưu cấu hình thanh toán."
+    );
+  }
+
+  return normalized;
+};
+
+export const readPaymentSettings = () => {
+  const stored = readStoredPaymentSettings();
+
+  if (stored) {
+    return stored;
+  }
+
+  /*
+   * Migration một lần:
+   * Nếu phiên bản cũ đã lưu payment trong site settings,
+   * lấy lại dữ liệu cũ rồi chuyển sang storage riêng.
+   */
+  try {
+    const rawSiteSettings = localStorage.getItem("flower-shop-site-settings");
+
+    if (rawSiteSettings) {
+      const siteSettings = JSON.parse(rawSiteSettings);
+
+      if (siteSettings?.payment && typeof siteSettings.payment === "object") {
+        const migrated = normalizeSettings(siteSettings.payment);
+
+        try {
+          localStorage.setItem(
+            PAYMENT_SETTINGS_STORAGE_KEY,
+            JSON.stringify(migrated)
+          );
+        } catch (storageError) {
+          console.warn(
+            "Không thể lưu cấu hình thanh toán sau khi migration:",
+            storageError
+          );
+        }
+
+        return migrated;
+      }
+    }
+  } catch (error) {
+    console.warn("Không thể migration cấu hình thanh toán cũ:", error);
+  }
+
+  return clone(DEFAULT_PAYMENT_SETTINGS);
+};
+
+export const savePaymentSettings = async (paymentSettings = {}) => {
+  const current = readPaymentSettings();
+
+  const next = normalizeSettings({
+    ...current,
 
     ...paymentSettings,
 
     bankTransfer: {
-      ...clone(DEFAULT_PAYMENT_SETTINGS.bankTransfer),
-
-      ...(currentSettings?.payment?.bankTransfer || {}),
+      ...current.bankTransfer,
 
       ...(paymentSettings?.bankTransfer || {}),
     },
-  };
-
-  return saveSiteSettings({
-    ...currentSettings,
-
-    payment: nextPayment,
   });
+
+  /*
+   * Lưu local trước để khi mở lại trang cấu hình,
+   * các thông tin vừa nhập vẫn được hiển thị.
+   */
+  const saved = writeStoredPaymentSettings(next);
+
+  /*
+   * Đồng bộ backend để Payment Intent/Webhook sử dụng
+   * cùng một tài khoản nhận tiền.
+   */
+  try {
+    await syncPaymentSettingsToBackend(saved);
+  } catch (error) {
+    /*
+     * Nếu backend chưa chạy, không xóa cấu hình local.
+     * Tuy nhiên ném lỗi để giao diện Admin không báo
+     * "đã lưu thành công" khi backend chưa đồng bộ.
+     */
+    throw new Error(
+      error?.message ||
+        "Đã lưu trên trình duyệt nhưng chưa đồng bộ được backend."
+    );
+  }
+
+  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+
+  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
+
+  return saved;
 };
 
 export const buildTransferContent = (
@@ -127,7 +314,7 @@ export const buildVietQrUrl = ({
   )}-${encodeURIComponent(account)}-compact2.png?${params.toString()}`;
 };
 
-export const getPaymentSettingsUpdatedEvent = SITE_SETTINGS_UPDATED_EVENT;
+export const getPaymentSettingsUpdatedEvent =
+  "flower-shop-payment-settings-updated";
 
-export const getDefaultPaymentSettings = () =>
-  clone(DEFAULT_SITE_SETTINGS?.payment || DEFAULT_PAYMENT_SETTINGS);
+export const getDefaultPaymentSettings = () => clone(DEFAULT_PAYMENT_SETTINGS);
