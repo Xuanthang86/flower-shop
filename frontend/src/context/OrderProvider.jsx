@@ -222,12 +222,6 @@ const OrderProvider = ({ children }) => {
 
   const [orders, setOrders] = useState(() => readOrders());
 
-  /*
-  ========================================================
-  SAVE ORDERS
-  ========================================================
-  */
-
   useEffect(() => {
     try {
       writeOrdersToStorage(orders);
@@ -235,12 +229,6 @@ const OrderProvider = ({ children }) => {
       console.error("Lỗi lưu đơn hàng:", error);
     }
   }, [orders]);
-
-  /*
-  ========================================================
-  CROSS TAB
-  ========================================================
-  */
 
   useEffect(() => {
     const handleStorage = (event) => {
@@ -264,12 +252,6 @@ const OrderProvider = ({ children }) => {
     };
   }, [readOrders]);
 
-  /*
-  ========================================================
-  CREATE ORDER
-  ========================================================
-  */
-
   const createOrder = useCallback(
     async (orderData = {}) => {
       if (!user) {
@@ -287,11 +269,6 @@ const OrderProvider = ({ children }) => {
           message: "Đơn hàng không có sản phẩm.",
         };
       }
-
-      /*
-       * BƯỚC 1:
-       * Kiểm tra và trừ tồn kho bằng Catalog mới nhất.
-       */
 
       const inventoryResult = await consumeStockForItems(items);
 
@@ -346,11 +323,6 @@ const OrderProvider = ({ children }) => {
         address
       );
 
-      /*
-       * BƯỚC 2:
-       * Tạo snapshot sản phẩm.
-       */
-
       const snapshotItems = items.map((item) => {
         const snapshot = inventoryResult.snapshots.find(
           (entry) => String(entry.productId) === String(item.id)
@@ -381,26 +353,20 @@ const OrderProvider = ({ children }) => {
         };
       });
 
-      /*
-       * BƯỚC 3:
-       * Tạo order dựa trên snapshot.
-       *
-       * FIX:
-       * Không dùng:
-       *   let createdOrder = null;
-       *   let nextOrders = null;
-       *
-       * Vì hai biến đều được gán lại trước khi sử dụng.
-       */
-
       const currentOrders = readOrders();
 
-      const orderId = generateOrderCode(currentOrders);
+      const suppliedOrderId = String(orderData.orderId || orderData.id || "")
+        .replace(/^#/, "")
+        .trim();
+
+      const orderId = suppliedOrderId || generateOrderCode(currentOrders);
 
       const createdOrder = normalizeOrder({
         ...orderData,
 
         id: orderId,
+
+        orderId,
 
         createdAt,
 
@@ -443,14 +409,6 @@ const OrderProvider = ({ children }) => {
 
       const nextOrders = [createdOrder, ...currentOrders];
 
-      /*
-       * BƯỚC 4:
-       * Ghi order xuống localStorage trước khi
-       * cập nhật React state.
-       *
-       * Nếu ghi thất bại → hoàn tồn.
-       */
-
       try {
         writeOrdersToStorage(nextOrders);
       } catch (storageError) {
@@ -473,12 +431,6 @@ const OrderProvider = ({ children }) => {
         };
       }
 
-      /*
-       * BƯỚC 5:
-       * Cập nhật React state sau khi order đã được
-       * ghi thành công.
-       */
-
       setOrders(nextOrders);
 
       notifyOrdersUpdated();
@@ -493,12 +445,6 @@ const OrderProvider = ({ children }) => {
     },
     [user, readOrders]
   );
-
-  /*
-  ========================================================
-  GET ORDER
-  ========================================================
-  */
 
   const getOrderById = useCallback(
     (orderId) => {
@@ -517,12 +463,6 @@ const OrderProvider = ({ children }) => {
     [orders]
   );
 
-  /*
-  ========================================================
-  MY ORDERS
-  ========================================================
-  */
-
   const getMyOrders = useCallback(() => {
     if (!user) {
       return [];
@@ -536,12 +476,6 @@ const OrderProvider = ({ children }) => {
       (order) => String(order?.customerId || "") === String(user.id || "")
     );
   }, [orders, user]);
-
-  /*
-  ========================================================
-  CAN VIEW
-  ========================================================
-  */
 
   const canViewOrder = useCallback(
     (order) => {
@@ -557,12 +491,6 @@ const OrderProvider = ({ children }) => {
     },
     [user]
   );
-
-  /*
-  ========================================================
-  UPDATE STATUS
-  ========================================================
-  */
 
   const updateOrderStatus = useCallback(
     async (orderId, newStatus) => {
@@ -592,10 +520,6 @@ const OrderProvider = ({ children }) => {
 
       const currentStatus = normalizeOrderStatus(currentOrder.status);
 
-      /*
-       * Đơn đã hủy không thể quay lại xử lý.
-       */
-
       if (
         currentStatus === ORDER_STATUS.CANCELLED &&
         status !== ORDER_STATUS.CANCELLED
@@ -607,10 +531,6 @@ const OrderProvider = ({ children }) => {
         };
       }
 
-      /*
-       * Nếu trạng thái không thay đổi.
-       */
-
       if (currentStatus === status) {
         return {
           success: true,
@@ -620,19 +540,10 @@ const OrderProvider = ({ children }) => {
         };
       }
 
-      /*
-       * HỦY ĐƠN
-       */
-
       if (
         status === ORDER_STATUS.CANCELLED &&
         currentStatus !== ORDER_STATUS.CANCELLED
       ) {
-        /*
-         * Trường hợp dữ liệu đã ghi nhận hoàn tồn trước đó:
-         * chỉ cập nhật trạng thái, tuyệt đối không hoàn lần 2.
-         */
-
         if (currentOrder.inventoryRestocked) {
           const nextOrders = orders.map((order) => {
             const currentId = String(order?.id || order?.orderId || "").replace(
@@ -678,10 +589,6 @@ const OrderProvider = ({ children }) => {
             };
           }
         }
-
-        /*
-         * Hoàn tồn đúng một lần.
-         */
 
         const restockResult = await restockOrderItems(currentOrder.items);
 
@@ -737,11 +644,6 @@ const OrderProvider = ({ children }) => {
             inventoryRestocked: true,
           };
         } catch (storageError) {
-          /*
-           * Catalog đã được hoàn tồn.
-           * Không được gọi restock thêm lần nữa.
-           */
-
           return {
             success: false,
 
@@ -752,10 +654,6 @@ const OrderProvider = ({ children }) => {
           };
         }
       }
-
-      /*
-       * CÁC TRẠNG THÁI KHÁC
-       */
 
       const nextOrders = orders.map((order) => {
         const currentId = String(order?.id || order?.orderId || "").replace(
@@ -820,12 +718,6 @@ const OrderProvider = ({ children }) => {
     [orders]
   );
 
-  /*
-  ========================================================
-  REMOVE ORDER
-  ========================================================
-  */
-
   const removeOrder = useCallback(
     (orderId) => {
       const normalizedId = String(orderId || "").replace(/^#/, "");
@@ -848,12 +740,6 @@ const OrderProvider = ({ children }) => {
     },
     [orders]
   );
-
-  /*
-  ========================================================
-  VALUE
-  ========================================================
-  */
 
   const value = useMemo(
     () => ({

@@ -42,6 +42,7 @@ import AdminImageManagementPage from "@/pages/Admin/AdminImageManagementPage";
 import AdminBlogManagementPage from "@/pages/Admin/AdminBlogManagementPage";
 import AdminContactManagementPage from "@/pages/Admin/AdminContactManagementPage";
 import AdminContentManagementPage from "@/pages/Admin/AdminContentManagementPage";
+import AdminPaymentSettingsPage from "@/pages/Admin/AdminPaymentSettingsPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
@@ -297,6 +298,17 @@ const AppRoutes = () => {
               <AdminOnlyRoute>
                 <AdminSubPage>
                   <AdminUsersPage />
+                </AdminSubPage>
+              </AdminOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/admin/payment"
+            element={
+              <AdminOnlyRoute>
+                <AdminSubPage>
+                  <AdminPaymentSettingsPage />
                 </AdminSubPage>
               </AdminOnlyRoute>
             }

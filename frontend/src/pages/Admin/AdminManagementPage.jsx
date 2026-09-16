@@ -1,5 +1,6 @@
 import {
   FiBox,
+  FiCreditCard,
   FiFolder,
   FiImage,
   FiLayout,
@@ -83,6 +84,14 @@ const AdminManagementPage = () => {
       title: "Quản lý thông tin liên hệ",
       description: "Thêm, sửa, xóa và cập nhật toàn bộ thông tin liên hệ.",
       icon: FiMail,
+    },
+
+    isAdmin && {
+      to: "/admin/payment",
+      title: "Cấu hình thanh toán",
+      description:
+        "Cấu hình tài khoản nhận chuyển khoản, mã QR và nội dung thanh toán.",
+      icon: FiCreditCard,
     },
 
     isAdmin && {

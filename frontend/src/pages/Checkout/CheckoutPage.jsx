@@ -21,6 +21,17 @@ import {
   getTodayDateKey,
 } from "@/services/shipping";
 
+import {
+  readPaymentSettings,
+  buildTransferContent,
+  buildVietQrUrl,
+} from "@/services/paymentSettings";
+
+import {
+  createBankTransferPaymentIntent,
+  getBankTransferPaymentStatus,
+} from "@/services/payment";
+
 const EMPTY_SHIPPING_RESULT = {
   success: false,
 
@@ -37,20 +48,11 @@ const CHECKOUT_PAYMENT_METHOD = "cod";
 
 const BANK_TRANSFER_PAYMENT_METHOD = "bank_transfer";
 
-/*
- * Không tự bịa thông tin ngân hàng.
- *
- * Shop chỉ cần thay các giá trị này bằng
- * thông tin thật khi triển khai thanh toán.
- */
-const BANK_TRANSFER_INFO = {
-  bankName: "",
-
-  accountNumber: "",
-
-  accountName: "",
-
-  transferContentPrefix: "FLOWERSHOP",
+const EMPTY_PAYMENT_INTENT = {
+  id: "",
+  orderCode: "",
+  amount: 0,
+  status: "pending",
 };
 
 const CheckoutPage = () => {
@@ -60,24 +62,30 @@ const CheckoutPage = () => {
 
   const { createOrder } = useContext(OrderContext);
 
+  const [paymentSettings, setPaymentSettings] = useState(() =>
+    readPaymentSettings()
+  );
+
   const [formData, setFormData] = useState({
-    fullName: "",
+    sender: {
+      name: "",
+      phone: "",
+      email: "",
+      isHiddenFromRecipient: true,
+    },
 
-    phone: "",
-
-    email: "",
+    recipient: {
+      fullName: "",
+      phone: "",
+      email: "",
+    },
 
     address: {
       provinceCode: "",
-
       provinceName: "",
-
       wardCode: "",
-
       wardName: "",
-
       houseNumber: "",
-
       street: "",
     },
 
@@ -105,7 +113,15 @@ const CheckoutPage = () => {
   const [showExpressFallbackModal, setShowExpressFallbackModal] =
     useState(false);
 
-  const [bankTransferConfirmed, setBankTransferConfirmed] = useState(false);
+  const [paymentIntent, setPaymentIntent] = useState(EMPTY_PAYMENT_INTENT);
+
+  const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
+
+  const [paymentVerified, setPaymentVerified] = useState(false);
+
+  const [paymentStatus, setPaymentStatus] = useState("idle");
+
+  const [paymentError, setPaymentError] = useState("");
 
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -117,11 +133,27 @@ const CheckoutPage = () => {
 
   const grandTotal = subtotal + shippingFee;
 
-  /*
-  ==========================================================
-  CURRENT TIME
-  ==========================================================
-  */
+  useEffect(() => {
+    const refreshPaymentSettings = () => {
+      setPaymentSettings(readPaymentSettings());
+    };
+
+    window.addEventListener(
+      "flower-shop-site-settings-updated",
+      refreshPaymentSettings
+    );
+
+    window.addEventListener("storage", refreshPaymentSettings);
+
+    return () => {
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        refreshPaymentSettings
+      );
+
+      window.removeEventListener("storage", refreshPaymentSettings);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -130,12 +162,6 @@ const CheckoutPage = () => {
 
     return () => clearInterval(timer);
   }, []);
-
-  /*
-  ==========================================================
-  EXPRESS CUTOFF
-  ==========================================================
-  */
 
   const showExpressFallback = () => {
     setDeliveryMode(DELIVERY_MODE.STANDARD);
@@ -165,12 +191,6 @@ const CheckoutPage = () => {
     showExpressFallback();
   }, [currentTime, deliveryMode, deliveryDate]);
 
-  /*
-  ==========================================================
-  TIME SLOTS
-  ==========================================================
-  */
-
   const availableTimeSlots = useMemo(
     () =>
       getAvailableDeliveryTimeSlots(deliveryDate, deliveryMode, currentTime),
@@ -186,12 +206,6 @@ const CheckoutPage = () => {
       setDeliveryTimeSlot(availableTimeSlots[0]?.id || "");
     }
   }, [availableTimeSlots, deliveryTimeSlot]);
-
-  /*
-  ==========================================================
-  DELIVERY MODE
-  ==========================================================
-  */
 
   const handleDeliveryModeChange = (mode) => {
     setError("");
@@ -210,38 +224,60 @@ const CheckoutPage = () => {
 
     setDeliveryMode(mode);
 
-    /*
-     * Không đổi ngày đã chọn.
-     * Nếu khách đang đặt trước ngày tương lai,
-     * vẫn giữ ngày đó.
-     */
-
     setShippingCalculation(EMPTY_SHIPPING_RESULT);
 
     setDeliveryTimeSlot("");
   };
 
-  /*
-  ==========================================================
-  INPUT
-  ==========================================================
-  */
-
-  const handleChange = (event) => {
+  const handleSenderChange = (event) => {
     const { name, value } = event.target;
 
     setFormData((currentData) => ({
       ...currentData,
 
-      [name]: value,
+      sender: {
+        ...currentData.sender,
+
+        [name]: value,
+      },
     }));
   };
 
-  /*
-  ==========================================================
-  ADDRESS
-  ==========================================================
-  */
+  const handleSenderHiddenChange = (event) => {
+    setFormData((currentData) => ({
+      ...currentData,
+
+      sender: {
+        ...currentData.sender,
+
+        isHiddenFromRecipient: event.target.checked,
+      },
+    }));
+  };
+
+  const handleRecipientChange = (event) => {
+    const { name, value } = event.target;
+
+    setFormData((currentData) => ({
+      ...currentData,
+
+      recipient: {
+        ...currentData.recipient,
+
+        [name]: value,
+      },
+    }));
+  };
+
+  const handleNoteChange = (event) => {
+    setFormData((currentData) => ({
+      ...currentData,
+
+      note: event.target.value,
+    }));
+
+    setShippingCalculation(EMPTY_SHIPPING_RESULT);
+  };
 
   const handleAddressChange = (address) => {
     const nextAddress = {
@@ -269,12 +305,6 @@ const CheckoutPage = () => {
     setError("");
   };
 
-  /*
-  ==========================================================
-  PAYMENT
-  ==========================================================
-  */
-
   const handlePaymentChange = (event) => {
     const value = event.target.value;
 
@@ -284,16 +314,16 @@ const CheckoutPage = () => {
       paymentMethod: value,
     }));
 
-    setBankTransferConfirmed(false);
+    setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+    setPaymentVerified(false);
+
+    setPaymentStatus("idle");
+
+    setPaymentError("");
 
     setError("");
   };
-
-  /*
-  ==========================================================
-  DELIVERY DATE
-  ==========================================================
-  */
 
   const handleDeliveryDateChange = (event) => {
     const nextDate = event.target.value;
@@ -304,14 +334,16 @@ const CheckoutPage = () => {
 
     setShippingCalculation(EMPTY_SHIPPING_RESULT);
 
+    setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+    setPaymentVerified(false);
+
+    setPaymentStatus("idle");
+
+    setPaymentError("");
+
     setError("");
   };
-
-  /*
-  ==========================================================
-  CALCULATE SHIPPING
-  ==========================================================
-  */
 
   useEffect(() => {
     let cancelled = false;
@@ -361,11 +393,6 @@ const CheckoutPage = () => {
 
     setShippingLoading(true);
 
-    /*
-     * Không thay đổi text của nút Đặt hàng.
-     *
-     * Chỉ làm nút disabled trong lúc này.
-     */
     setShippingCalculation(EMPTY_SHIPPING_RESULT);
 
     calculateShippingAsync({
@@ -435,9 +462,177 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  SUBMIT
+  PAYMENT INTENT
   ==========================================================
   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+      return undefined;
+    }
+
+    if (paymentSettings?.bankTransfer?.enabled === false) {
+      setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
+
+      return undefined;
+    }
+
+    if (!shippingCalculation.success || grandTotal <= 0) {
+      return undefined;
+    }
+
+    setPaymentIntentLoading(true);
+
+    setPaymentError("");
+
+    setPaymentVerified(false);
+
+    setPaymentStatus("creating");
+
+    createBankTransferPaymentIntent({
+      amount: grandTotal,
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        const intent = result?.paymentIntent;
+
+        if (!intent?.id || !intent?.orderCode) {
+          throw new Error("Backend không trả về Payment Intent hợp lệ.");
+        }
+
+        setPaymentIntent(intent);
+
+        setPaymentStatus(intent.status || "pending");
+      })
+      .catch((intentError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+        setPaymentStatus("error");
+
+        setPaymentError(
+          intentError?.message ||
+            "Không thể tạo yêu cầu thanh toán chuyển khoản."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPaymentIntentLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.paymentMethod, shippingCalculation.success, grandTotal]);
+
+  /*
+  ==========================================================
+  PAYMENT POLLING
+  ==========================================================
+  */
+
+  useEffect(() => {
+    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+      return undefined;
+    }
+
+    if (!paymentIntent?.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    let timer = null;
+
+    const checkStatus = async () => {
+      try {
+        const result = await getBankTransferPaymentStatus(paymentIntent.id);
+
+        if (cancelled) {
+          return;
+        }
+
+        const status = result?.paymentIntent?.status || "pending";
+
+        setPaymentStatus(status);
+
+        if (status === "paid") {
+          setPaymentVerified(true);
+
+          setPaymentError("");
+
+          if (timer) {
+            clearInterval(timer);
+          }
+
+          return;
+        }
+
+        setPaymentVerified(false);
+
+        if (status === "expired" || status === "cancelled") {
+          setPaymentError(
+            "Yêu cầu thanh toán đã hết hạn. Vui lòng tạo lại thanh toán."
+          );
+
+          if (timer) {
+            clearInterval(timer);
+          }
+        }
+      } catch (statusError) {
+        if (cancelled) {
+          return;
+        }
+
+        setPaymentVerified(false);
+
+        setPaymentError(
+          statusError?.message || "Chưa thể kiểm tra trạng thái thanh toán."
+        );
+      }
+    };
+
+    checkStatus();
+
+    timer = setInterval(checkStatus, 3000);
+
+    return () => {
+      cancelled = true;
+
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [formData.paymentMethod, paymentIntent?.id]);
+
+  const transferContent = buildTransferContent(
+    paymentIntent?.orderCode,
+    paymentSettings?.bankTransfer
+  );
+
+  const dynamicQrUrl = buildVietQrUrl({
+    bankCode: paymentSettings?.bankTransfer?.bankCode,
+
+    accountNumber: paymentSettings?.bankTransfer?.accountNumber,
+
+    amount: grandTotal,
+
+    accountName: paymentSettings?.bankTransfer?.accountName,
+
+    transferContent,
+  });
+
+  const qrCodeUrl =
+    dynamicQrUrl || paymentSettings?.bankTransfer?.qrCodeUrl || "";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -454,14 +649,14 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (!formData.fullName.trim()) {
-      setError("Vui lòng nhập họ và tên.");
+    if (!formData.recipient.fullName.trim()) {
+      setError("Vui lòng nhập họ và tên người nhận.");
 
       return;
     }
 
-    if (!formData.phone.trim()) {
-      setError("Vui lòng nhập số điện thoại.");
+    if (!formData.recipient.phone.trim()) {
+      setError("Vui lòng nhập số điện thoại người nhận.");
 
       return;
     }
@@ -518,10 +713,10 @@ const CheckoutPage = () => {
 
     if (
       formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-      !bankTransferConfirmed
+      !paymentVerified
     ) {
       setError(
-        "Vui lòng hoàn tất thanh toán chuyển khoản và xác nhận đã thanh toán trước khi đặt hàng."
+        "Shop chưa xác nhận giao dịch chuyển khoản thành công. Vui lòng hoàn tất thanh toán và chờ hệ thống xác nhận."
       );
 
       return;
@@ -564,10 +759,6 @@ const CheckoutPage = () => {
         return;
       }
 
-      /*
-       * Nếu trong lúc khách đang checkout
-       * hỏa tốc vừa quá 18h thì không cho bypass.
-       */
       const now = new Date();
 
       if (
@@ -597,20 +788,42 @@ const CheckoutPage = () => {
 
       const finalGrandTotal = subtotal + finalShippingFee;
 
-      const paymentStatus =
-        formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD
-          ? "paid_by_customer_confirmation"
-          : "pending_cod";
+      if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
+        if (!paymentIntent?.id || !paymentIntent?.orderCode) {
+          setError(
+            "Chưa có mã thanh toán hợp lệ. Vui lòng chờ hệ thống tạo yêu cầu thanh toán."
+          );
+
+          return;
+        }
+
+        const latestPayment = await getBankTransferPaymentStatus(
+          paymentIntent.id
+        );
+
+        if (latestPayment?.paymentIntent?.status !== "paid") {
+          setPaymentVerified(false);
+
+          setError("Backend chưa xác nhận giao dịch chuyển khoản thành công.");
+
+          return;
+        }
+      }
+
+      const paymentIsBankTransfer =
+        formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD;
 
       const result = await createOrder({
+        orderId: paymentIsBankTransfer ? paymentIntent.orderCode : undefined,
+
         customer: {
-          name: formData.fullName.trim(),
+          name: formData.recipient.fullName.trim(),
 
-          fullName: formData.fullName.trim(),
+          fullName: formData.recipient.fullName.trim(),
 
-          phone: formData.phone.trim(),
+          phone: formData.recipient.phone.trim(),
 
-          email: formData.email.trim(),
+          email: formData.recipient.email.trim(),
 
           address: {
             provinceCode: formData.address.provinceCode,
@@ -629,14 +842,40 @@ const CheckoutPage = () => {
           note: formData.note.trim(),
         },
 
+        sender: {
+          name: formData.sender.name.trim(),
+
+          phone: formData.sender.phone.trim(),
+
+          email: formData.sender.email.trim(),
+
+          isHiddenFromRecipient:
+            formData.sender.isHiddenFromRecipient !== false,
+        },
+
+        recipient: {
+          name: formData.recipient.fullName.trim(),
+
+          fullName: formData.recipient.fullName.trim(),
+
+          phone: formData.recipient.phone.trim(),
+
+          email: formData.recipient.email.trim(),
+        },
+
         paymentMethod: formData.paymentMethod,
 
-        paymentStatus,
+        paymentStatus: paymentIsBankTransfer ? "paid" : "pending_cod",
 
-        paymentConfirmed:
-          formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD
-            ? true
-            : false,
+        paymentConfirmed: paymentIsBankTransfer,
+
+        paymentOrderCode: paymentIsBankTransfer ? paymentIntent.orderCode : "",
+
+        paymentTransferContent: paymentIsBankTransfer ? transferContent : "",
+
+        paymentTransaction: paymentIsBankTransfer
+          ? paymentIntent.transaction || null
+          : null,
 
         items: cartItems.map((item) => ({
           id: item.id,
@@ -710,12 +949,6 @@ const CheckoutPage = () => {
     }
   };
 
-  /*
-  ==========================================================
-  EMPTY CART
-  ==========================================================
-  */
-
   if (!cartItems || cartItems.length === 0) {
     return (
       <section className="py-16">
@@ -746,7 +979,7 @@ const CheckoutPage = () => {
             </h1>
 
             <p className="mt-2 text-gray-600">
-              Vui lòng nhập thông tin nhận hàng để hoàn tất đơn hàng.
+              Vui lòng nhập thông tin giao hàng để hoàn tất đơn hàng.
             </p>
           </div>
 
@@ -763,62 +996,149 @@ const CheckoutPage = () => {
             <div className="space-y-8 lg:col-span-2">
               <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
                 <h2 className="text-xl font-semibold text-gray-800">
-                  Thông tin nhận hàng
+                  Thông tin người gửi
                 </h2>
 
-                <div className="mt-6 space-y-5">
+                <p className="mt-2 text-sm leading-6 text-gray-500">
+                  Thông tin này có thể dùng để shop liên hệ khi giao hàng. Nếu
+                  bật ẩn thông tin, người nhận sẽ không được hiển thị thông tin
+                  người gửi.
+                </p>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
                   <div>
                     <label
-                      htmlFor="fullName"
+                      htmlFor="senderName"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Họ và tên *
+                      Họ và tên người gửi
                     </label>
 
                     <input
-                      id="fullName"
-                      name="fullName"
+                      id="senderName"
+                      name="name"
                       type="text"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      placeholder="Nhập họ và tên"
+                      value={formData.sender.name}
+                      onChange={handleSenderChange}
+                      placeholder="Nhập họ và tên người gửi"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                     />
                   </div>
 
                   <div>
                     <label
-                      htmlFor="phone"
+                      htmlFor="senderPhone"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Số điện thoại *
+                      Số điện thoại người gửi
                     </label>
 
                     <input
-                      id="phone"
+                      id="senderPhone"
                       name="phone"
                       type="tel"
-                      value={formData.phone}
-                      onChange={handleChange}
+                      value={formData.sender.phone}
+                      onChange={handleSenderChange}
                       placeholder="Nhập số điện thoại"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                     />
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label
-                      htmlFor="email"
+                      htmlFor="senderEmail"
                       className="mb-2 block text-sm font-medium text-gray-700"
                     >
-                      Email
+                      Email người gửi
                     </label>
 
                     <input
-                      id="email"
+                      id="senderEmail"
                       name="email"
                       type="email"
-                      value={formData.email}
-                      onChange={handleChange}
+                      value={formData.sender.email}
+                      onChange={handleSenderChange}
+                      placeholder="example@gmail.com"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-pink-100 bg-pink-50 p-4">
+                  <input
+                    type="checkbox"
+                    checked={formData.sender.isHiddenFromRecipient}
+                    onChange={handleSenderHiddenChange}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                  />
+
+                  <span className="text-sm leading-6 text-gray-700">
+                    <strong>Ẩn thông tin người gửi với người nhận</strong>
+                    <br />
+                    Shop vẫn lưu thông tin để phục vụ giao hàng và liên hệ khi
+                    cần, nhưng không hiển thị cho người nhận.
+                  </span>
+                </label>
+              </div>
+
+              <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Thông tin người nhận
+                </h2>
+
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <label
+                      htmlFor="recipientFullName"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
+                      Họ và tên người nhận *
+                    </label>
+
+                    <input
+                      id="recipientFullName"
+                      name="fullName"
+                      type="text"
+                      value={formData.recipient.fullName}
+                      onChange={handleRecipientChange}
+                      placeholder="Nhập họ và tên người nhận"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="recipientPhone"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
+                      Số điện thoại người nhận *
+                    </label>
+
+                    <input
+                      id="recipientPhone"
+                      name="phone"
+                      type="tel"
+                      value={formData.recipient.phone}
+                      onChange={handleRecipientChange}
+                      placeholder="Nhập số điện thoại người nhận"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="recipientEmail"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
+                      Email người nhận
+                    </label>
+
+                    <input
+                      id="recipientEmail"
+                      name="email"
+                      type="email"
+                      value={formData.recipient.email}
+                      onChange={handleRecipientChange}
                       placeholder="example@gmail.com"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                     />
@@ -892,7 +1212,7 @@ const CheckoutPage = () => {
                                 "Giao trong ngày, tốc độ trung bình, phù hợp đơn hàng thông thường."}
 
                               {mode === DELIVERY_MODE.EXPRESS &&
-                                "Giao trong ngày, ưu tiên nhanh nhất và luôn tính phí 50.000đ."}
+                                "Giao trong ngày, ưu tiên nhanh nhất."}
                             </p>
                           </div>
                         </label>
@@ -1004,20 +1324,12 @@ const CheckoutPage = () => {
                         shippingCalculation.deliveryMode !==
                           DELIVERY_MODE.EXPRESS && (
                           <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                            {shippingCalculation.freeShippingReason}
+                            Miễn phí phí giao hàng đơn hàng từ 500.000đ.
                           </div>
                         )}
-
-                      {deliveryMode === DELIVERY_MODE.EXPRESS && (
-                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
-                          Giao hỏa tốc luôn tính phí giao hàng 50.000đ.
-                        </div>
-                      )}
                     </div>
                   ) : shippingLoading ? (
-                    <p className="text-sm text-gray-500">
-                      Đang tính phí giao hàng...
-                    </p>
+                    <div className="h-5" />
                   ) : (
                     <p className="text-sm text-gray-500">
                       {shippingCalculation.message}
@@ -1041,10 +1353,9 @@ const CheckoutPage = () => {
 
                   <textarea
                     id="deliveryNote"
-                    name="note"
                     rows={4}
                     value={formData.note}
-                    onChange={handleChange}
+                    onChange={handleNoteChange}
                     placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi giao..."
                     className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
                   />
@@ -1063,65 +1374,131 @@ const CheckoutPage = () => {
                       Thông tin thanh toán chuyển khoản
                     </h3>
 
-                    <div className="mt-4 space-y-3 text-sm">
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">Ngân hàng</span>
-
-                        <span className="font-medium text-gray-800">
-                          {BANK_TRANSFER_INFO.bankName || "Chưa cấu hình"}
-                        </span>
+                    {paymentIntentLoading ? (
+                      <div className="mt-4 rounded-lg bg-white p-4 text-sm text-gray-600">
+                        Đang tạo thông tin thanh toán...
                       </div>
+                    ) : (
+                      <>
+                        <div className="mt-4 grid gap-5 md:grid-cols-[1fr_220px]">
+                          <div className="space-y-3 text-sm">
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">Ngân hàng</span>
 
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">Số tài khoản</span>
+                              <span className="text-right font-medium text-gray-800">
+                                {paymentSettings?.bankTransfer?.bankName}
+                              </span>
+                            </div>
 
-                        <span className="font-medium text-gray-800">
-                          {BANK_TRANSFER_INFO.accountNumber || "Chưa cấu hình"}
-                        </span>
-                      </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">
+                                Số tài khoản
+                              </span>
 
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">Chủ tài khoản</span>
+                              <span className="text-right font-medium text-gray-800">
+                                {paymentSettings?.bankTransfer?.accountNumber}
+                              </span>
+                            </div>
 
-                        <span className="font-medium text-gray-800">
-                          {BANK_TRANSFER_INFO.accountName || "Chưa cấu hình"}
-                        </span>
-                      </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">
+                                Chủ tài khoản
+                              </span>
 
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">Số tiền</span>
+                              <span className="text-right font-medium text-gray-800">
+                                {paymentSettings?.bankTransfer?.accountName}
+                              </span>
+                            </div>
 
-                        <span className="font-semibold text-pink-600">
-                          {formatShippingMoney(grandTotal)}
-                        </span>
-                      </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">Số tiền</span>
 
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">
-                          Nội dung chuyển khoản
-                        </span>
+                              <span className="text-right font-semibold text-pink-600">
+                                {formatShippingMoney(grandTotal)}
+                              </span>
+                            </div>
 
-                        <span className="font-medium text-gray-800">
-                          {BANK_TRANSFER_INFO.transferContentPrefix}
-                        </span>
-                      </div>
-                    </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">Mã đơn hàng</span>
 
-                    <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-lg border border-blue-200 bg-white p-4">
-                      <input
-                        type="checkbox"
-                        checked={bankTransferConfirmed}
-                        onChange={(event) =>
-                          setBankTransferConfirmed(event.target.checked)
-                        }
-                        className="mt-1"
-                      />
+                              <span className="text-right font-semibold text-gray-800">
+                                {paymentIntent.orderCode}
+                              </span>
+                            </div>
 
-                      <span className="text-sm leading-6 text-gray-700">
-                        Tôi xác nhận đã hoàn tất thanh toán chuyển khoản theo
-                        thông tin trên.
-                      </span>
-                    </label>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">
+                                Nội dung chuyển khoản
+                              </span>
+
+                              <span className="text-right font-semibold text-gray-800">
+                                {transferContent}
+                              </span>
+                            </div>
+
+                            <div className="rounded-lg border border-blue-200 bg-white p-3 text-sm leading-6 text-gray-700">
+                              {paymentSettings?.bankTransfer?.instructions}
+                            </div>
+                          </div>
+
+                          {qrCodeUrl ? (
+                            <div className="flex flex-col items-center justify-start rounded-xl bg-white p-3">
+                              <img
+                                src={qrCodeUrl}
+                                alt="Mã QR thanh toán"
+                                className="h-48 w-48 object-contain"
+                              />
+
+                              <p className="mt-2 text-center text-xs text-gray-500">
+                                Quét mã QR để thanh toán
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex min-h-48 items-center justify-center rounded-xl bg-white p-4 text-center text-xs text-gray-500">
+                              Admin chưa cấu hình QR hoặc mã ngân hàng.
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className={`mt-5 rounded-xl border p-4 ${
+                            paymentVerified
+                              ? "border-green-200 bg-green-50"
+                              : "border-orange-200 bg-orange-50"
+                          }`}
+                        >
+                          {paymentVerified ? (
+                            <>
+                              <p className="font-semibold text-green-700">
+                                Thanh toán đã được hệ thống xác nhận.
+                              </p>
+
+                              <p className="mt-1 text-sm text-green-700">
+                                Bạn có thể bấm Đặt hàng.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-orange-700">
+                                Đang chờ xác nhận thanh toán.
+                              </p>
+
+                              <p className="mt-1 text-sm leading-6 text-orange-700">
+                                Sau khi chuyển khoản thành công, hệ thống sẽ tự
+                                kiểm tra giao dịch. Không cần tick xác nhận thủ
+                                công.
+                              </p>
+                            </>
+                          )}
+                        </div>
+
+                        {paymentError && (
+                          <p className="mt-3 text-sm text-red-600">
+                            {paymentError}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1203,10 +1580,10 @@ const CheckoutPage = () => {
                 </div>
 
                 {formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-                  !bankTransferConfirmed && (
+                  !paymentVerified && (
                     <p className="mt-4 text-sm text-orange-600">
-                      Vui lòng hoàn tất thanh toán chuyển khoản và xác nhận đã
-                      thanh toán trước khi đặt hàng.
+                      Chỉ có thể đặt hàng sau khi backend xác nhận giao dịch
+                      chuyển khoản thành công.
                     </p>
                   )}
 
@@ -1217,7 +1594,7 @@ const CheckoutPage = () => {
                     shippingLoading ||
                     !shippingCalculation.success ||
                     (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-                      !bankTransferConfirmed)
+                      !paymentVerified)
                   }
                   className="mt-6 w-full rounded-lg bg-pink-600 px-6 py-3 font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
