@@ -112,8 +112,17 @@ const CheckoutPage = () => {
 
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
-  const getInitialDeliveryDate = () =>
-    addDaysToDateKey(getTodayDateKey(), 1) || getDefaultDeliveryDate();
+  const getInitialDeliveryDate = () => {
+    const now = new Date();
+
+    if (now.getHours() >= 21) {
+      return (
+        addDaysToDateKey(getTodayDateKey(now), 1) || getDefaultDeliveryDate()
+      );
+    }
+
+    return getTodayDateKey(now) || getDefaultDeliveryDate();
+  };
 
   const [deliveryDate, setDeliveryDate] = useState(getInitialDeliveryDate);
 
@@ -661,10 +670,7 @@ const CheckoutPage = () => {
 
   const qrCodeUrl = dynamicQrUrl
     ? addQrCacheBust(dynamicQrUrl, paymentQrVersion)
-    : addQrCacheBust(
-        paymentSettings?.bankTransfer?.qrCodeUrl,
-        paymentQrVersion
-      );
+    : "";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1522,12 +1528,6 @@ const CheckoutPage = () => {
                             <>
                               <p className="font-semibold text-orange-700">
                                 Đang chờ xác nhận thanh toán.
-                              </p>
-
-                              <p className="mt-1 text-sm leading-6 text-orange-700">
-                                Sau khi chuyển khoản thành công, hệ thống sẽ tự
-                                kiểm tra giao dịch. Không cần tick xác nhận thủ
-                                công.
                               </p>
                             </>
                           )}

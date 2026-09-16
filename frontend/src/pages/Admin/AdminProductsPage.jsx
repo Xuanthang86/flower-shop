@@ -624,21 +624,29 @@ const AdminProductsPage = () => {
         )}
 
         <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Tất cả sản phẩm
-              </h2>
+          <div className="mb-6">
+            {/* =====================================================
+      TIÊU ĐỀ
+  ====================================================== */}
+            <div className="flex flex-col gap-2 border-b border-gray-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="whitespace-nowrap text-xl font-bold text-gray-900">
+                  Tất cả sản phẩm
+                </h2>
 
-              <p className="mt-1 text-sm text-gray-500">
-                {totalProducts === 0
-                  ? "0/0 sản phẩm"
-                  : `${startIndex + 1}–${endIndex}/${totalProducts} sản phẩm`}
-              </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {totalProducts === 0
+                    ? "0/0 sản phẩm"
+                    : `${startIndex + 1}–${endIndex}/${totalProducts} sản phẩm`}
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <label className="relative">
+            {/* =====================================================
+      HÀNG BỘ LỌC
+  ====================================================== */}
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(240px,1.4fr)_minmax(190px,1fr)_minmax(190px,1fr)_auto]">
+              <label className="relative min-w-0">
                 <FiSearch
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                   size={17}
@@ -648,73 +656,77 @@ const AdminProductsPage = () => {
                   value={keyword}
                   onChange={(event) => {
                     setKeyword(event.target.value);
-
                     setCurrentPage(1);
                   }}
                   placeholder="Tìm sản phẩm..."
-                  className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pink-400 sm:w-64"
+                  className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
                 />
-                <select
-                  value={categoryFilter}
-                  onChange={(event) => {
-                    setCategoryFilter(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-pink-400 sm:w-52"
-                >
-                  <option value="all">Tất cả danh mục</option>
-
-                  {categoriesSorted.map((category) => (
-                    <option key={category.id} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={stockFilter}
-                  onChange={(event) => {
-                    setStockFilter(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-pink-400 sm:w-48"
-                >
-                  <option value="all">Tất cả trạng thái</option>
-
-                  <option value={STOCK_STATUS.IN_STOCK}>Còn hàng</option>
-
-                  <option value={STOCK_STATUS.LOW_STOCK}>Sắp hết</option>
-
-                  <option value={STOCK_STATUS.OUT_OF_STOCK}>Hết hàng</option>
-
-                  <option value={STOCK_STATUS.SOLD_OUT}>Đã bán hết</option>
-
-                  <option value={STOCK_STATUS.DISABLED}>Ngừng bán</option>
-                </select>
-
-                {(keyword ||
-                  categoryFilter !== "all" ||
-                  stockFilter !== "all") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setKeyword("");
-                      setCategoryFilter("all");
-                      setStockFilter("all");
-                      setCurrentPage(1);
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                  >
-                    <FiX />
-                    Xóa bộ lọc
-                  </button>
-                )}
               </label>
+
+              <select
+                value={categoryFilter}
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+              >
+                <option value="all">Tất cả danh mục</option>
+
+                {categoriesSorted.map((category) => (
+                  <option key={category.id} value={category.slug}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={stockFilter}
+                onChange={(event) => {
+                  setStockFilter(event.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+              >
+                <option value="all">Tất cả trạng thái</option>
+
+                <option value={STOCK_STATUS.IN_STOCK}>Còn hàng</option>
+
+                <option value={STOCK_STATUS.LOW_STOCK}>Sắp hết</option>
+
+                <option value={STOCK_STATUS.OUT_OF_STOCK}>Hết hàng</option>
+
+                <option value={STOCK_STATUS.SOLD_OUT}>Đã bán hết</option>
+
+                <option value={STOCK_STATUS.DISABLED}>Ngừng bán</option>
+              </select>
 
               <button
                 type="button"
+                onClick={() => {
+                  setKeyword("");
+                  setCategoryFilter("all");
+                  setStockFilter("all");
+                  setCurrentPage(1);
+                }}
+                disabled={
+                  !keyword && categoryFilter === "all" && stockFilter === "all"
+                }
+                className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FiX size={16} />
+                Xóa bộ lọc
+              </button>
+            </div>
+
+            {/* =====================================================
+      HÀNG THAO TÁC
+  ====================================================== */}
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
                 onClick={() => setShowExcelImportModal(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-pink-200 bg-pink-50 px-4 py-2.5 text-sm font-semibold text-pink-700 hover:bg-pink-100"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-pink-200 bg-pink-50 px-5 py-2.5 text-sm font-semibold text-pink-700 transition hover:bg-pink-100"
               >
                 <FiUpload />
                 Nhập Excel
@@ -723,7 +735,7 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={downloadProductExcelTemplate}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
               >
                 <FiDownload />
                 Tải Excel mẫu
@@ -732,7 +744,7 @@ const AdminProductsPage = () => {
               <button
                 type="button"
                 onClick={openCreateProduct}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pink-700"
               >
                 <FiPlus />
                 Thêm sản phẩm

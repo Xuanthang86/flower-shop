@@ -291,24 +291,30 @@ export const buildVietQrUrl = ({
 }) => {
   const bank = String(bankCode || "").trim();
 
-  const account = String(accountNumber || "").trim();
+  const account = String(accountNumber || "")
+    .trim()
+    .replace(/\s+/g, "");
 
-  const numericAmount = Number(amount) || 0;
+  const numericAmount = Math.round(Number(amount) || 0);
 
   if (!bank || !account || numericAmount <= 0) {
     return "";
   }
 
+  if (account.length < 6 || account.length > 19) {
+    return "";
+  }
+
   const params = new URLSearchParams();
 
-  params.set("amount", String(Math.round(numericAmount)));
+  params.set("amount", String(numericAmount));
 
   if (transferContent) {
-    params.set("addInfo", String(transferContent));
+    params.set("addInfo", String(transferContent).trim().slice(0, 50));
   }
 
   if (accountName) {
-    params.set("accountName", String(accountName));
+    params.set("accountName", String(accountName).trim().slice(0, 50));
   }
 
   return `https://img.vietqr.io/image/${encodeURIComponent(

@@ -87,6 +87,7 @@ export const SHIPPING_CONFIG = {
   deliveryProvinceKeywords: ["da nang"],
 
   sameDayDelivery: true,
+  deliveryDateNextDayCutoffHour: 21,
 
   /*
    * Hỏa tốc không nhận đơn mới từ 18:00
