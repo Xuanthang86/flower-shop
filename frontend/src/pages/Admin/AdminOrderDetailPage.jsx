@@ -1,8 +1,6 @@
 import { useMemo } from "react";
-
 import { Link, useNavigate, useParams } from "react-router-dom";
-
-import { FiArrowLeft, FiPackage } from "react-icons/fi";
+import { FiArrowLeft, FiPackage, FiMapPin, FiClock } from "react-icons/fi";
 
 import { useOrder } from "@/context/OrderContext";
 
@@ -31,6 +29,28 @@ const formatDate = (date) => {
 
 const formatCurrency = (value = 0) =>
   `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+
+const formatDistance = (value) => {
+  const distance = Number(value);
+
+  if (!Number.isFinite(distance)) {
+    return "—";
+  }
+
+  return `${distance.toFixed(2)} km`;
+};
+
+const getPaymentLabel = (paymentMethod) => {
+  if (paymentMethod === "cod") {
+    return "Thanh toán khi nhận hàng (COD)";
+  }
+
+  if (paymentMethod === "bank_transfer") {
+    return "Chuyển khoản ngân hàng";
+  }
+
+  return paymentMethod || "—";
+};
 
 const AdminOrderDetailPage = () => {
   const { orderId } = useParams();
@@ -84,6 +104,40 @@ const AdminOrderDetailPage = () => {
 
   const status = normalizeOrderStatus(order.status);
 
+  const shippingSnapshot = order.shippingSnapshot || {};
+
+  const deliveryModeLabel =
+    shippingSnapshot.deliveryModeLabel || order.deliveryModeLabel || "—";
+
+  const deliveryDate =
+    shippingSnapshot.deliveryDate || order.deliveryDate || "";
+
+  const deliveryTimeSlotLabel =
+    shippingSnapshot.deliveryTimeSlotLabel || order.deliveryTimeSlotLabel || "";
+
+  const estimatedDeliveryTime =
+    shippingSnapshot.estimatedDeliveryTime || order.estimatedDeliveryTime || "";
+
+  const distanceKm =
+    shippingSnapshot.distanceKm ?? order.deliveryDistanceKm ?? null;
+
+  const shippingFee = Number(
+    order.shippingFee ?? shippingSnapshot.shippingFee ?? 0
+  );
+
+  const subtotal = Number(order.subtotal ?? shippingSnapshot.subtotal ?? 0);
+
+  const deliveryNote =
+    shippingSnapshot.deliveryNote || order.deliveryNote || "";
+
+  const handleStatusChange = async (event) => {
+    const result = await updateOrderStatus(order.id, event.target.value);
+
+    if (result?.success === false) {
+      window.alert(result.message || "Không thể cập nhật trạng thái.");
+    }
+  };
+
   return (
     <section className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto max-w-7xl">
@@ -118,9 +172,7 @@ const AdminOrderDetailPage = () => {
 
           <select
             value={status}
-            onChange={(event) =>
-              updateOrderStatus(order.id, event.target.value)
-            }
+            onChange={handleStatusChange}
             className="rounded-xl bg-white px-4 py-3 text-sm shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-pink-200"
           >
             {STATUS_OPTIONS.map((item) => (
@@ -140,7 +192,6 @@ const AdminOrderDetailPage = () => {
             <div className="mt-5 space-y-4">
               <div>
                 <p className="text-sm text-gray-500">Họ và tên</p>
-
                 <p className="mt-1 font-medium">
                   {customer.fullName || customer.name || "—"}
                 </p>
@@ -148,13 +199,11 @@ const AdminOrderDetailPage = () => {
 
               <div>
                 <p className="text-sm text-gray-500">Số điện thoại</p>
-
                 <p className="mt-1 font-medium">{customer.phone || "—"}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-500">Email</p>
-
                 <p className="mt-1 break-all font-medium">
                   {customer.email || "—"}
                 </p>
@@ -163,7 +212,6 @@ const AdminOrderDetailPage = () => {
               {customer.note && (
                 <div>
                   <p className="text-sm text-gray-500">Ghi chú</p>
-
                   <p className="mt-1 font-medium">{customer.note}</p>
                 </div>
               )}
@@ -171,9 +219,13 @@ const AdminOrderDetailPage = () => {
           </div>
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-800">
-              Địa chỉ giao hàng
-            </h2>
+            <div className="flex items-center gap-3">
+              <FiMapPin className="text-pink-600" />
+
+              <h2 className="text-lg font-semibold text-gray-800">
+                Địa chỉ giao hàng
+              </h2>
+            </div>
 
             <div className="mt-5">
               <OrderAddress address={address} />
@@ -182,7 +234,73 @@ const AdminOrderDetailPage = () => {
         </div>
 
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-800">Sản phẩm</h2>
+          <div className="flex items-center gap-3">
+            <FiClock className="text-pink-600" />
+
+            <h2 className="text-lg font-semibold text-gray-800">
+              Thông tin giao hàng
+            </h2>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-sm text-gray-500">Hình thức giao</p>
+
+              <p className="mt-1 font-semibold text-gray-800">
+                {deliveryModeLabel}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">Ngày giao</p>
+
+              <p className="mt-1 font-semibold text-gray-800">
+                {deliveryDate || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">Khung giờ</p>
+
+              <p className="mt-1 font-semibold text-gray-800">
+                {deliveryTimeSlotLabel || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">Khoảng cách</p>
+
+              <p className="mt-1 font-semibold text-gray-800">
+                {formatDistance(distanceKm)}
+              </p>
+            </div>
+          </div>
+
+          {estimatedDeliveryTime && (
+            <div className="mt-5 rounded-xl bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Thời gian giao dự kiến</p>
+
+              <p className="mt-1 font-semibold text-gray-800">
+                {estimatedDeliveryTime}
+              </p>
+            </div>
+          )}
+
+          {deliveryNote && (
+            <div className="mt-4 rounded-xl border border-gray-200 p-4">
+              <p className="text-sm text-gray-500">Ghi chú giao hàng</p>
+
+              <p className="mt-1 text-gray-800">{deliveryNote}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <FiPackage className="text-pink-600" />
+
+            <h2 className="text-lg font-semibold text-gray-800">Sản phẩm</h2>
+          </div>
 
           <div className="mt-5 space-y-4">
             {items.length === 0 ? (
@@ -196,7 +314,7 @@ const AdminOrderDetailPage = () => {
                 return (
                   <div
                     key={item?.id || item?.productId || index}
-                    className="flex gap-4 pb-4 last:pb-0"
+                    className="flex gap-4 border-b border-gray-100 pb-4 last:border-b-0 last:pb-0"
                   >
                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-50">
                       {item?.image ? (
@@ -237,31 +355,37 @@ const AdminOrderDetailPage = () => {
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Phương thức thanh toán</p>
+          <h2 className="text-lg font-semibold text-gray-800">Thanh toán</h2>
 
-              <p className="mt-1 font-medium">
-                {order.paymentMethod === "cod"
-                  ? "Thanh toán khi nhận hàng (COD)"
-                  : order.paymentMethod || "—"}
-              </p>
+          <div className="mt-5 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Phương thức thanh toán</span>
+
+              <span className="font-medium text-gray-800">
+                {getPaymentLabel(order.paymentMethod)}
+              </span>
             </div>
 
-            <div className="sm:text-right">
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
-                  status
-                )}`}
-              >
-                {getStatusLabel(status)}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Tạm tính</span>
+
+              <span className="font-medium">{formatCurrency(subtotal)}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Phí giao hàng</span>
+
+              <span className="font-medium">
+                {shippingFee > 0 ? formatCurrency(shippingFee) : "Miễn phí"}
               </span>
+            </div>
 
-              <p className="mt-3 text-sm text-gray-500">Tổng cộng</p>
+            <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
+              <span className="font-semibold text-gray-800">Tổng cộng</span>
 
-              <p className="mt-1 text-2xl font-bold text-pink-600">
+              <span className="text-2xl font-bold text-pink-600">
                 {formatCurrency(total)}
-              </p>
+              </span>
             </div>
           </div>
         </div>
