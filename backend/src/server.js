@@ -260,7 +260,7 @@ const paymentIntentSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "paid", "expired", "cancelled"],
+      enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"],
       default: "pending",
       index: true,
     },
@@ -272,6 +272,11 @@ const paymentIntentSchema = new mongoose.Schema(
     },
 
     paidAt: {
+      type: Date,
+      default: null,
+    },
+
+    paymentAttemptedAt: {
       type: Date,
       default: null,
     },
@@ -1001,6 +1006,75 @@ app.post("/api/payments/intents", async (req, res, next) => {
 GET PAYMENT INTENT STATUS
 ==========================================================
 */
+app.post("/api/payments/intents/:intentId/started", async (req, res, next) => {
+  try {
+    if (!databaseReady) {
+      return res.status(503).json({
+        message: "MongoDB chưa kết nối.",
+      });
+    }
+
+    const intentId = String(req.params.intentId || "").trim();
+
+    if (!intentId) {
+      return res.status(400).json({
+        message: "Thiếu mã Payment Intent.",
+      });
+    }
+
+    const paymentIntent = await PaymentIntent.findOneAndUpdate(
+      {
+        intentId,
+        status: "pending",
+      },
+      {
+        $set: {
+          paymentAttemptedAt: new Date(),
+        },
+      },
+      {
+        new: true,
+      },
+    ).lean();
+
+    if (!paymentIntent) {
+      return res.status(404).json({
+        message:
+          "Payment Intent không tồn tại hoặc không còn ở trạng thái chờ thanh toán.",
+      });
+    }
+
+    return res.json({
+      success: true,
+
+      paymentIntent: {
+        id: paymentIntent.intentId,
+
+        orderCode: paymentIntent.orderCode,
+
+        reference: paymentIntent.reference || paymentIntent.orderCode || "",
+
+        amount: paymentIntent.amount,
+
+        currency: paymentIntent.currency,
+
+        status: paymentIntent.status,
+
+        expiresAt: paymentIntent.expiresAt,
+
+        paymentAttemptedAt: paymentIntent.paymentAttemptedAt || null,
+
+        paidAt: paymentIntent.paidAt || null,
+
+        transactionId: paymentIntent.transactionId || "",
+
+        transaction: paymentIntent.transaction || null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.get("/api/payments/intents/:intentId", async (req, res, next) => {
   try {
