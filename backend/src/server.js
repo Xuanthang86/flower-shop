@@ -236,6 +236,12 @@ const paymentIntentSchema = new mongoose.Schema(
       index: true,
     },
 
+    reference: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
     amount: {
       type: Number,
       required: true,
@@ -955,6 +961,8 @@ app.post("/api/payments/intents", async (req, res, next) => {
 
       orderCode,
 
+      reference: orderCode,
+
       amount: Math.round(amount),
 
       currency: "VND",
@@ -1058,6 +1066,10 @@ app.get("/api/payments/intents/:intentId", async (req, res, next) => {
         expiresAt: paymentIntent.expiresAt,
 
         paidAt: paymentIntent.paidAt,
+
+        transactionId: paymentIntent.transactionId || "",
+
+        reference: paymentIntent.reference || paymentIntent.orderCode || "",
 
         transaction: status === "paid" ? paymentIntent.transaction : null,
       },
