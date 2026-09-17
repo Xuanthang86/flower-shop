@@ -5,6 +5,8 @@ import { AuthContext } from "./AuthContext";
 
 import { ORDER_STATUS, normalizeOrderStatus } from "@/utils/orderStatus";
 
+import { PAYMENT_STATUS, normalizePaymentStatus } from "@/utils/paymentStatus";
+
 import { consumeStockForItems, restockOrderItems } from "@/services/inventory";
 
 const STORAGE_KEY = "flower-shop-orders";
@@ -85,6 +87,85 @@ const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
   };
 };
 
+const normalizePayment = (payment = {}, order = {}) => {
+  const paymentMethod = payment?.method || order?.paymentMethod || "cod";
+
+  const rawStatus =
+    payment?.status ||
+    order?.paymentStatus ||
+    (paymentMethod === "cod" ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.PENDING);
+
+  return {
+    id: String(payment?.id || payment?.paymentId || "").trim(),
+
+    reference: String(
+      payment?.reference ||
+        payment?.paymentReference ||
+        order?.paymentReference ||
+        order?.paymentOrderCode ||
+        ""
+    ).trim(),
+
+    method: String(paymentMethod).trim(),
+
+    provider: String(
+      payment?.provider ||
+        (paymentMethod === "bank_transfer" ? "bank_transfer" : "cod")
+    ).trim(),
+
+    status: normalizePaymentStatus(rawStatus),
+
+    amount: Math.max(
+      0,
+      Number(
+        payment?.amount ??
+          order?.grandTotal ??
+          order?.total ??
+          order?.subtotal ??
+          0
+      ) || 0
+    ),
+
+    currency: String(payment?.currency || "VND")
+      .trim()
+      .toUpperCase(),
+
+    transactionId: String(
+      payment?.transactionId ||
+        payment?.providerTransactionId ||
+        order?.paymentTransactionId ||
+        ""
+    ).trim(),
+
+    paidAt: payment?.paidAt || order?.paymentPaidAt || null,
+
+    failedAt: payment?.failedAt || order?.paymentFailedAt || null,
+
+    refundedAt: payment?.refundedAt || order?.paymentRefundedAt || null,
+
+    failureReason: String(
+      payment?.failureReason || order?.paymentFailureReason || ""
+    ).trim(),
+
+    refundAmount: Math.max(
+      0,
+      Number(payment?.refundAmount ?? order?.refundAmount ?? 0) || 0
+    ),
+
+    transferContent: String(
+      payment?.transferContent || order?.paymentTransferContent || ""
+    ).trim(),
+
+    transaction:
+      payment?.transaction && typeof payment.transaction === "object"
+        ? payment.transaction
+        : order?.paymentTransaction &&
+            typeof order.paymentTransaction === "object"
+          ? order.paymentTransaction
+          : null,
+  };
+};
+
 const normalizeOrder = (order) => {
   if (!order) {
     return order;
@@ -95,6 +176,8 @@ const normalizeOrder = (order) => {
   const address = normalizeAddress(getOrderAddressSource(order));
 
   const customer = normalizeCustomer(order.customer, address);
+
+  const payment = normalizePayment(order.payment, order);
 
   return {
     ...order,
@@ -185,6 +268,26 @@ const normalizeOrder = (order) => {
     inventoryRestockSnapshots: Array.isArray(order.inventoryRestockSnapshots)
       ? order.inventoryRestockSnapshots
       : [],
+
+    payment,
+
+    paymentMethod: payment.method,
+
+    paymentStatus: payment.status,
+
+    paymentReference: payment.reference,
+
+    paymentTransactionId: payment.transactionId,
+
+    paymentPaidAt: payment.paidAt,
+
+    paymentFailedAt: payment.failedAt,
+
+    paymentRefundedAt: payment.refundedAt,
+
+    paymentFailureReason: payment.failureReason,
+
+    refundAmount: payment.refundAmount,
   };
 };
 
