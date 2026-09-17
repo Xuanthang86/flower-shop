@@ -34,17 +34,21 @@ export const normalizePaymentStatus = (status) => {
 
     pending: PAYMENT_STATUS.PENDING,
     pending_payment: PAYMENT_STATUS.PENDING,
+    pending_cod: PAYMENT_STATUS.PENDING,
     "chờ thanh toán": PAYMENT_STATUS.PENDING,
 
     paid: PAYMENT_STATUS.PAID,
     success: PAYMENT_STATUS.PAID,
     successful: PAYMENT_STATUS.PAID,
     captured: PAYMENT_STATUS.PAID,
+    completed: PAYMENT_STATUS.PAID,
     "đã thanh toán": PAYMENT_STATUS.PAID,
 
     failed: PAYMENT_STATUS.FAILED,
     error: PAYMENT_STATUS.FAILED,
     declined: PAYMENT_STATUS.FAILED,
+    cancelled: PAYMENT_STATUS.FAILED,
+    expired: PAYMENT_STATUS.FAILED,
     "thanh toán thất bại": PAYMENT_STATUS.FAILED,
 
     refunded: PAYMENT_STATUS.REFUNDED,

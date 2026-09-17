@@ -88,53 +88,77 @@ const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
 };
 
 const normalizePayment = (payment = {}, order = {}) => {
-  const paymentMethod = payment?.method || order?.paymentMethod || "cod";
+  const paymentMethod = String(payment?.method || order?.paymentMethod || "cod")
+    .trim()
+    .toLowerCase();
 
   const rawStatus =
-    payment?.status ||
-    order?.paymentStatus ||
-    (paymentMethod === "cod" ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.PENDING);
+    payment?.status || order?.paymentStatus || PAYMENT_STATUS.PENDING;
+
+  const normalizedStatus = normalizePaymentStatus(rawStatus);
+
+  const amount = Math.max(
+    0,
+    Number(
+      payment?.amount ??
+        order?.grandTotal ??
+        order?.total ??
+        order?.subtotal ??
+        0
+    ) || 0
+  );
+
+  const reference = String(
+    payment?.reference ||
+      payment?.paymentReference ||
+      order?.paymentReference ||
+      order?.paymentOrderCode ||
+      ""
+  ).trim();
+
+  const transactionId = String(
+    payment?.transactionId ||
+      payment?.providerTransactionId ||
+      order?.paymentTransactionId ||
+      ""
+  ).trim();
+
+  const provider = String(
+    payment?.provider ||
+      (paymentMethod === "bank_transfer" ? "bank_transfer" : "cod")
+  ).trim();
+
+  const transaction =
+    payment?.transaction && typeof payment.transaction === "object"
+      ? payment.transaction
+      : order?.paymentTransaction &&
+          typeof order.paymentTransaction === "object"
+        ? order.paymentTransaction
+        : null;
 
   return {
     id: String(payment?.id || payment?.paymentId || "").trim(),
 
-    reference: String(
-      payment?.reference ||
-        payment?.paymentReference ||
-        order?.paymentReference ||
-        order?.paymentOrderCode ||
-        ""
-    ).trim(),
+    reference,
 
-    method: String(paymentMethod).trim(),
+    method: paymentMethod,
 
-    provider: String(
-      payment?.provider ||
-        (paymentMethod === "bank_transfer" ? "bank_transfer" : "cod")
-    ).trim(),
+    provider,
 
-    status: normalizePaymentStatus(rawStatus),
+    status: normalizedStatus,
 
-    amount: Math.max(
-      0,
-      Number(
-        payment?.amount ??
-          order?.grandTotal ??
-          order?.total ??
-          order?.subtotal ??
-          0
-      ) || 0
-    ),
+    amount,
 
     currency: String(payment?.currency || "VND")
       .trim()
       .toUpperCase(),
 
-    transactionId: String(
-      payment?.transactionId ||
-        payment?.providerTransactionId ||
-        order?.paymentTransactionId ||
-        ""
+    transactionId,
+
+    transaction,
+
+    transferContent: String(
+      payment?.transferContent || order?.paymentTransferContent || ""
     ).trim(),
 
     paidAt: payment?.paidAt || order?.paymentPaidAt || null,
@@ -151,18 +175,6 @@ const normalizePayment = (payment = {}, order = {}) => {
       0,
       Number(payment?.refundAmount ?? order?.refundAmount ?? 0) || 0
     ),
-
-    transferContent: String(
-      payment?.transferContent || order?.paymentTransferContent || ""
-    ).trim(),
-
-    transaction:
-      payment?.transaction && typeof payment.transaction === "object"
-        ? payment.transaction
-        : order?.paymentTransaction &&
-            typeof order.paymentTransaction === "object"
-          ? order.paymentTransaction
-          : null,
   };
 };
 
@@ -246,13 +258,20 @@ const normalizeOrder = (order) => {
         ? order.products
         : [],
 
-    total: Number(
-      order.total ??
-        order.totalAmount ??
-        order.cartTotal ??
-        order.grandTotal ??
-        order.subtotal ??
-        0
+    subtotal: Math.max(0, Number(order?.subtotal) || 0),
+
+    shippingFee: Math.max(0, Number(order?.shippingFee) || 0),
+
+    discountAmount: Math.max(0, Number(order?.discountAmount) || 0),
+
+    grandTotal: Math.max(
+      0,
+      Number(order?.grandTotal ?? order?.total ?? order?.totalAmount ?? 0) || 0
+    ),
+
+    total: Math.max(
+      0,
+      Number(order?.grandTotal ?? order?.total ?? order?.totalAmount ?? 0) || 0
     ),
 
     status: normalizeOrderStatus(order.status),
@@ -586,6 +605,90 @@ const OrderProvider = ({ children }) => {
       };
     },
     [user, readOrders]
+
+    payment: {
+  id: orderData?.payment?.id || "",
+
+  reference:
+    orderData?.payment?.reference ||
+    orderData?.paymentOrderCode ||
+    "",
+
+  method:
+    orderData?.payment?.method ||
+    orderData?.paymentMethod ||
+    "cod",
+
+  provider:
+    orderData?.payment?.provider ||
+    (orderData?.paymentMethod === "bank_transfer"
+      ? "bank_transfer"
+      : "cod"),
+
+  status: normalizePaymentStatus(
+    orderData?.payment?.status ||
+      orderData?.paymentStatus ||
+      PAYMENT_STATUS.PENDING
+  ),
+
+  amount: Math.max(
+    0,
+    Number(
+      orderData?.payment?.amount ??
+        orderData?.grandTotal ??
+        orderData?.total ??
+        0
+    ) || 0
+  ),
+
+  currency:
+    orderData?.payment?.currency ||
+    "VND",
+
+  transactionId:
+    orderData?.payment?.transactionId ||
+    orderData?.paymentTransactionId ||
+    "",
+
+  transaction:
+    orderData?.payment?.transaction ||
+    orderData?.paymentTransaction ||
+    null,
+
+  transferContent:
+    orderData?.payment?.transferContent ||
+    orderData?.paymentTransferContent ||
+    "",
+
+  paidAt:
+    orderData?.payment?.paidAt ||
+    orderData?.paymentPaidAt ||
+    null,
+
+  failedAt:
+    orderData?.payment?.failedAt ||
+    orderData?.paymentFailedAt ||
+    null,
+
+  refundedAt:
+    orderData?.payment?.refundedAt ||
+    orderData?.paymentRefundedAt ||
+    null,
+
+  failureReason:
+    orderData?.payment?.failureReason ||
+    orderData?.paymentFailureReason ||
+    "",
+
+  refundAmount: Math.max(
+    0,
+    Number(
+      orderData?.payment?.refundAmount ??
+        orderData?.refundAmount ??
+        0
+    ) || 0
+  ),
+},
   );
 
   const getOrderById = useCallback(
@@ -859,6 +962,217 @@ const OrderProvider = ({ children }) => {
     },
     [orders]
   );
+
+  const updateOrderPaymentStatus = useCallback(
+  async (
+    orderId,
+    nextPaymentStatus,
+    paymentData = {}
+  ) => {
+    if (!orderId) {
+      return {
+        success: false,
+        message: "Thiếu mã đơn hàng.",
+      };
+    }
+
+    const normalizedId = String(orderId)
+      .replace(/^#/, "")
+      .trim();
+
+    const status = normalizePaymentStatus(
+      nextPaymentStatus
+    );
+
+    const currentOrder = orders.find(
+      (order) =>
+        String(
+          order?.id ||
+            order?.orderId ||
+            ""
+        ).replace(/^#/, "") === normalizedId
+    );
+
+    if (!currentOrder) {
+      return {
+        success: false,
+        message: "Không tìm thấy đơn hàng.",
+      };
+    }
+
+    const currentPayment =
+      currentOrder.payment || {};
+
+    const now =
+      new Date().toISOString();
+
+    const nextPayment = {
+      ...currentPayment,
+
+      status,
+
+      method:
+        currentPayment.method ||
+        currentOrder.paymentMethod ||
+        "cod",
+
+      provider:
+        currentPayment.provider ||
+        (currentOrder.paymentMethod ===
+        "bank_transfer"
+          ? "bank_transfer"
+          : "cod"),
+
+      amount:
+        Number(
+          currentPayment.amount ??
+            currentOrder.grandTotal ??
+            currentOrder.total ??
+            0
+        ) || 0,
+
+      reference:
+        currentPayment.reference ||
+        currentOrder.paymentReference ||
+        "",
+
+      transactionId:
+        paymentData.transactionId ||
+        currentPayment.transactionId ||
+        currentOrder.paymentTransactionId ||
+        "",
+
+      transaction:
+        paymentData.transaction ||
+        currentPayment.transaction ||
+        null,
+
+      paidAt:
+        status === "paid"
+          ? paymentData.paidAt ||
+            currentPayment.paidAt ||
+            now
+          : currentPayment.paidAt ||
+            null,
+
+      failedAt:
+        status === "failed"
+          ? paymentData.failedAt ||
+            currentPayment.failedAt ||
+            now
+          : currentPayment.failedAt ||
+            null,
+
+      refundedAt:
+        status === "refunded"
+          ? paymentData.refundedAt ||
+            currentPayment.refundedAt ||
+            now
+          : currentPayment.refundedAt ||
+            null,
+
+      failureReason:
+        status === "failed"
+          ? String(
+              paymentData.failureReason ||
+                currentPayment.failureReason ||
+                ""
+            ).trim()
+          : currentPayment.failureReason ||
+            "",
+
+      refundAmount:
+        status === "refunded"
+          ? Math.max(
+              0,
+              Number(
+                paymentData.refundAmount ??
+                  currentPayment.refundAmount ??
+                  currentOrder.grandTotal ??
+                  currentOrder.total ??
+                  0
+              ) || 0
+            )
+          : Number(
+              currentPayment.refundAmount || 0
+            ),
+    };
+
+    const nextOrders = orders.map(
+      (order) => {
+        const currentId = String(
+          order?.id ||
+            order?.orderId ||
+            ""
+        ).replace(/^#/, "");
+
+        if (currentId !== normalizedId) {
+          return order;
+        }
+
+        return {
+          ...order,
+
+          payment: nextPayment,
+
+          paymentStatus: status,
+
+          paymentReference:
+            nextPayment.reference,
+
+          paymentTransactionId:
+            nextPayment.transactionId,
+
+          paymentTransaction:
+            nextPayment.transaction,
+
+          paymentPaidAt:
+            nextPayment.paidAt,
+
+          paymentFailedAt:
+            nextPayment.failedAt,
+
+          paymentRefundedAt:
+            nextPayment.refundedAt,
+
+          paymentFailureReason:
+            nextPayment.failureReason,
+
+          refundAmount:
+            nextPayment.refundAmount,
+
+          updatedAt: now,
+        };
+      }
+    );
+
+    try {
+      writeOrdersToStorage(nextOrders);
+
+      setOrders(nextOrders);
+
+      notifyOrdersUpdated();
+
+      return {
+        success: true,
+
+        status,
+
+        payment: nextPayment,
+      };
+    } catch (error) {
+      return {
+        success: false,
+
+        message:
+          "Không thể lưu trạng thái thanh toán.",
+
+        error,
+      };
+    }
+  },
+  [orders]
+);
 
   const removeOrder = useCallback(
     (orderId) => {

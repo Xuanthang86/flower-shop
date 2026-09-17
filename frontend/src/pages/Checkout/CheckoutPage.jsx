@@ -58,8 +58,13 @@ const BANK_TRANSFER_PAYMENT_METHOD = "bank_transfer";
 const EMPTY_PAYMENT_INTENT = {
   id: "",
   orderCode: "",
+  reference: "",
   amount: 0,
+  currency: "VND",
   status: "pending",
+  transactionId: "",
+  paidAt: null,
+  transaction: null,
 };
 
 const formatDeliveryDateDisplay = (dateKey) => {
@@ -1119,7 +1124,7 @@ const CheckoutPage = () => {
 
         paymentMethod: formData.paymentMethod,
 
-        paymentStatus: paymentIsBankTransfer ? "paid" : "pending_cod",
+        paymentStatus: paymentIsBankTransfer ? "paid" : "pending",
 
         paymentConfirmed: paymentIsBankTransfer,
 
@@ -1130,6 +1135,46 @@ const CheckoutPage = () => {
         paymentTransaction: paymentIsBankTransfer
           ? paymentIntent.transaction || null
           : null,
+
+        payment: {
+          id: paymentIsBankTransfer ? paymentIntent?.id || "" : "",
+
+          reference: paymentIsBankTransfer
+            ? paymentIntent?.orderCode || ""
+            : "",
+
+          method: formData.paymentMethod,
+
+          provider: paymentIsBankTransfer ? "bank_transfer" : "cod",
+
+          status: paymentIsBankTransfer ? "paid" : "pending",
+
+          amount: finalGrandTotal,
+
+          currency: "VND",
+
+          transactionId: paymentIsBankTransfer
+            ? paymentIntent?.transactionId || ""
+            : "",
+
+          transaction: paymentIsBankTransfer
+            ? paymentIntent?.transaction || null
+            : null,
+
+          transferContent: paymentIsBankTransfer ? transferContent : "",
+
+          paidAt: paymentIsBankTransfer
+            ? paymentIntent?.paidAt || new Date().toISOString()
+            : null,
+
+          failedAt: null,
+
+          refundedAt: null,
+
+          failureReason: "",
+
+          refundAmount: 0,
+        },
 
         items: cartItems.map((item) => ({
           id: item.id,
