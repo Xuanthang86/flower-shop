@@ -65,3 +65,18 @@ export const getBankTransferPaymentStatus = async (intentId) => {
     method: "GET",
   });
 };
+
+export const markBankTransferPaymentStarted = async (intentId) => {
+  const normalizedId = String(intentId || "").trim();
+
+  if (!normalizedId) {
+    throw new Error("Thiếu mã Payment Intent.");
+  }
+
+  return request(
+    `/payments/intents/${encodeURIComponent(normalizedId)}/started`,
+    {
+      method: "POST",
+    }
+  );
+};

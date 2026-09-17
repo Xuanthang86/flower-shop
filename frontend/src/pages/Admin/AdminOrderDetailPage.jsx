@@ -1,6 +1,14 @@
 import { useMemo } from "react";
+
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { FiArrowLeft, FiPackage, FiMapPin, FiClock } from "react-icons/fi";
+
+import {
+  FiArrowLeft,
+  FiPackage,
+  FiMapPin,
+  FiClock,
+  FiCreditCard,
+} from "react-icons/fi";
 
 import { useOrder } from "@/context/OrderContext";
 
@@ -11,6 +19,13 @@ import {
   normalizeOrderStatus,
   getStatusLabel,
 } from "@/utils/orderStatus";
+
+import {
+  PAYMENT_STATUS,
+  PAYMENT_STATUS_OPTIONS,
+  getPaymentStatusLabel,
+  getPaymentStatusClass,
+} from "@/utils/paymentStatus";
 
 const formatDate = (date) => {
   if (!date) {
@@ -56,9 +71,19 @@ const AdminOrderDetailPage = () => {
 
   const navigate = useNavigate();
 
-  const { getOrderById, updateOrderStatus } = useOrder();
+  const {
+    getOrderById,
+    getPaymentByOrderId,
+    updateOrderStatus,
+    updateOrderPaymentStatus,
+  } = useOrder();
 
   const order = useMemo(() => getOrderById(orderId), [getOrderById, orderId]);
+
+  const payment = useMemo(
+    () => getPaymentByOrderId(orderId),
+    [getPaymentByOrderId, orderId]
+  );
 
   if (!order) {
     return (
@@ -93,15 +118,23 @@ const AdminOrderDetailPage = () => {
   const items = Array.isArray(order.items) ? order.items : [];
 
   const total = Number(
-    order.total ??
+    order.grandTotal ??
+      order.total ??
       order.totalAmount ??
       order.cartTotal ??
-      order.grandTotal ??
       order.subtotal ??
       0
   );
 
+  const subtotal = Number(order.subtotal || 0);
+
+  const discountAmount = Number(order.discountAmount || 0);
+
+  const shippingFee = Number(order.shippingFee || 0);
+
   const status = normalizeOrderStatus(order.status);
+
+  const paymentStatus = payment?.status || PAYMENT_STATUS.PENDING;
 
   const shippingSnapshot = order.shippingSnapshot || {};
 
@@ -120,12 +153,6 @@ const AdminOrderDetailPage = () => {
   const distanceKm =
     shippingSnapshot.distanceKm ?? order.deliveryDistanceKm ?? null;
 
-  const shippingFee = Number(
-    order.shippingFee ?? shippingSnapshot.shippingFee ?? 0
-  );
-
-  const subtotal = Number(order.subtotal ?? shippingSnapshot.subtotal ?? 0);
-
   const deliveryNote =
     shippingSnapshot.deliveryNote || order.deliveryNote || "";
 
@@ -134,6 +161,34 @@ const AdminOrderDetailPage = () => {
 
     if (result?.success === false) {
       window.alert(result.message || "Không thể cập nhật trạng thái.");
+    }
+  };
+
+  const handlePaymentStatusChange = async (event) => {
+    const nextStatus = event.target.value;
+
+    const result = await updateOrderPaymentStatus(order.id, nextStatus, {
+      reference: payment?.reference || order.paymentReference || "",
+
+      transactionId: payment?.transactionId || order.paymentTransactionId || "",
+
+      transaction: payment?.transaction || order.paymentTransaction || null,
+
+      paidAt: payment?.paidAt || null,
+
+      failedAt: payment?.failedAt || null,
+
+      refundedAt: payment?.refundedAt || null,
+
+      failureReason: payment?.failureReason || "",
+
+      refundAmount: payment?.refundAmount || 0,
+    });
+
+    if (result?.success === false) {
+      window.alert(
+        result.message || "Không thể cập nhật trạng thái thanh toán."
+      );
     }
   };
 
@@ -160,27 +215,75 @@ const AdminOrderDetailPage = () => {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        {/* ORDER STATUS */}
+
+        <div className="mb-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-sm text-gray-500">Trạng thái đơn hàng</p>
 
-            <p className="mt-1 font-semibold text-gray-800">
-              {getStatusLabel(status)}
-            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <span className="font-semibold text-gray-800">
+                {getStatusLabel(status)}
+              </span>
+
+              <select
+                value={status}
+                onChange={handleStatusChange}
+                className="rounded-xl bg-white px-4 py-3 text-sm shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-pink-200"
+              >
+                {STATUS_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <select
-            value={status}
-            onChange={handleStatusChange}
-            className="rounded-xl bg-white px-4 py-3 text-sm shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-pink-200"
-          >
-            {STATUS_OPTIONS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          {/* PAYMENT STATUS */}
+
+          <div className="rounded-2xl bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <FiCreditCard className="text-pink-600" />
+
+              <div>
+                <p className="text-sm text-gray-500">Trạng thái thanh toán</p>
+
+                <span
+                  className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${getPaymentStatusClass(
+                    paymentStatus
+                  )}`}
+                >
+                  {getPaymentStatusLabel(paymentStatus)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label
+                htmlFor="paymentStatus"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Cập nhật Payment Status
+              </label>
+
+              <select
+                id="paymentStatus"
+                value={paymentStatus}
+                onChange={handlePaymentStatusChange}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+              >
+                {PAYMENT_STATUS_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
+
+        {/* CUSTOMER + ADDRESS */}
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -235,6 +338,8 @@ const AdminOrderDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* DELIVERY */}
 
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
@@ -298,6 +403,8 @@ const AdminOrderDetailPage = () => {
           )}
         </div>
 
+        {/* PRODUCTS */}
+
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <FiPackage className="text-pink-600" />
@@ -357,38 +464,136 @@ const AdminOrderDetailPage = () => {
           </div>
         </div>
 
+        {/* PAYMENT DETAIL */}
+
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-800">Thanh toán</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Chi tiết thanh toán
+          </h2>
 
           <div className="mt-5 space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-500">Phương thức thanh toán</span>
+              <span className="text-gray-500">Phương thức</span>
 
               <span className="font-medium text-gray-800">
-                {getPaymentLabel(order.paymentMethod)}
+                {getPaymentLabel(payment?.method || order.paymentMethod)}
               </span>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-500">Tạm tính</span>
+              <span className="text-gray-500">Nhà cung cấp</span>
 
-              <span className="font-medium">{formatCurrency(subtotal)}</span>
+              <span className="font-medium text-gray-800">
+                {payment?.provider || "—"}
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-500">Phí giao hàng</span>
+              <span className="text-gray-500">Số tiền thanh toán</span>
 
-              <span className="font-medium">
-                {shippingFee > 0 ? formatCurrency(shippingFee) : "Miễn phí"}
+              <span className="font-semibold text-gray-800">
+                {formatCurrency(payment?.amount || total)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
-              <span className="font-semibold text-gray-800">Tổng cộng</span>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Reference</span>
 
-              <span className="text-2xl font-bold text-pink-600">
-                {formatCurrency(total)}
+              <span className="break-all text-right font-semibold text-gray-800">
+                {payment?.reference || "—"}
               </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Transaction ID</span>
+
+              <span className="break-all text-right font-semibold text-gray-800">
+                {payment?.transactionId || "—"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Thời gian thanh toán</span>
+
+              <span className="text-right font-medium text-gray-800">
+                {formatDate(payment?.paidAt)}
+              </span>
+            </div>
+
+            {payment?.paymentAttemptedAt && (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-gray-500">Bắt đầu thanh toán</span>
+
+                <span className="text-right font-medium text-gray-800">
+                  {formatDate(payment.paymentAttemptedAt)}
+                </span>
+              </div>
+            )}
+
+            {payment?.transferContent && (
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-gray-500">Nội dung chuyển khoản</span>
+
+                <span className="max-w-[60%] break-words text-right font-medium text-gray-800">
+                  {payment.transferContent}
+                </span>
+              </div>
+            )}
+
+            {payment?.failureReason && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  Lý do thất bại
+                </p>
+
+                <p className="mt-1 text-sm text-red-700">
+                  {payment.failureReason}
+                </p>
+              </div>
+            )}
+
+            {paymentStatus === PAYMENT_STATUS.REFUNDED && (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-gray-500">Số tiền hoàn</span>
+
+                <span className="font-semibold text-purple-700">
+                  {formatCurrency(payment?.refundAmount || 0)}
+                </span>
+              </div>
+            )}
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-gray-500">Tạm tính</span>
+
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-4">
+                  <span className="text-gray-500">Giảm giá</span>
+
+                  <span className="font-semibold text-green-600">
+                    -{formatCurrency(discountAmount)}
+                  </span>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <span className="text-gray-500">Phí giao hàng</span>
+
+                <span className="font-medium">
+                  {shippingFee > 0 ? formatCurrency(shippingFee) : "Miễn phí"}
+                </span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
+                <span className="font-semibold text-gray-800">Tổng cộng</span>
+
+                <span className="text-2xl font-bold text-pink-600">
+                  {formatCurrency(total)}
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -644,7 +644,18 @@ const CheckoutPage = () => {
           return;
         }
 
-        const status = result?.paymentIntent?.status || "pending";
+        const nextIntent = result?.paymentIntent;
+
+        if (!nextIntent?.id) {
+          return;
+        }
+
+        setPaymentIntent((currentIntent) => ({
+          ...currentIntent,
+          ...nextIntent,
+        }));
+
+        const status = nextIntent.status || "pending";
 
         if (status === "paid") {
           setPaymentVerified(true);
@@ -653,12 +664,28 @@ const CheckoutPage = () => {
 
           if (timer) {
             clearInterval(timer);
+            timer = null;
           }
 
           return;
         }
 
         setPaymentVerified(false);
+
+        if (status === "failed" || status === "refunded") {
+          setPaymentError(
+            status === "failed"
+              ? "Giao dịch thanh toán thất bại. Vui lòng kiểm tra lại và thực hiện thanh toán lại."
+              : "Giao dịch đã được hoàn tiền."
+          );
+
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+
+          return;
+        }
 
         if (status === "expired" || status === "cancelled") {
           setPaymentError(
@@ -667,8 +694,13 @@ const CheckoutPage = () => {
 
           if (timer) {
             clearInterval(timer);
+            timer = null;
           }
+
+          return;
         }
+
+        setPaymentError("");
       } catch (statusError) {
         if (cancelled) {
           return;
@@ -1853,6 +1885,47 @@ const CheckoutPage = () => {
                             </div>
                           )}
                         </div>
+
+                        {paymentIntent?.status === "pending" &&
+                        !paymentIntent?.paymentAttemptedAt ? (
+                          <>
+                            <p className="font-semibold text-orange-700">
+                              Hệ thống đang chờ xác nhận giao dịch chuyển khoản,
+                              xin vui lòng đợi…
+                            </p>
+
+                            <p className="mt-1 text-sm text-orange-700">
+                              Sau khi chuyển khoản, hãy bấm “Tôi đã chuyển
+                              khoản”.
+                            </p>
+                          </>
+                        ) : paymentIntent?.status === "pending" ? (
+                          <>
+                            <p className="font-semibold text-blue-700">
+                              Hệ thống đang xác nhận giao dịch chuyển khoản, xin
+                              vui lòng đợi…
+                            </p>
+
+                            <p className="mt-1 text-sm text-blue-700">
+                              Hệ thống sẽ tự động cập nhật khi nhận được giao
+                              dịch.
+                            </p>
+                          </>
+                        ) : paymentIntent?.status === "paid" ? (
+                          <>
+                            <p className="font-semibold text-green-700">
+                              Thanh toán đã được hệ thống xác nhận.
+                            </p>
+
+                            <p className="mt-1 text-sm text-green-700">
+                              Bạn có thể bấm Đặt hàng.
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-semibold text-red-700">
+                            {paymentError || "Không thể hoàn tất thanh toán."}
+                          </p>
+                        )}
 
                         <div
                           className={`mt-5 rounded-xl border p-4 ${

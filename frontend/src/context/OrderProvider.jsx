@@ -175,6 +175,9 @@ const normalizePayment = (payment = {}, order = {}) => {
       0,
       Number(payment?.refundAmount ?? order?.refundAmount ?? 0) || 0
     ),
+
+    paymentAttemptedAt:
+      payment?.paymentAttemptedAt || order?.paymentAttemptedAt || null,
   };
 };
 
@@ -226,8 +229,6 @@ const normalizeOrder = (order) => {
               : [],
           }
         : null,
-
-    discountAmount: Math.max(0, Number(order?.discountAmount) || 0),
 
     couponCode: String(order?.couponCode || order?.couponSnapshot?.code || "")
       .trim()
@@ -298,6 +299,8 @@ const normalizeOrder = (order) => {
 
     paymentTransactionId: payment.transactionId,
 
+    paymentTransaction: payment.transaction,
+
     paymentPaidAt: payment.paidAt,
 
     paymentFailedAt: payment.failedAt,
@@ -305,6 +308,8 @@ const normalizeOrder = (order) => {
     paymentRefundedAt: payment.refundedAt,
 
     paymentFailureReason: payment.failureReason,
+
+    paymentAttemptedAt: payment.paymentAttemptedAt,
 
     refundAmount: payment.refundAmount,
   };
@@ -522,6 +527,68 @@ const OrderProvider = ({ children }) => {
 
       const orderId = suppliedOrderId || generateOrderCode(currentOrders);
 
+      const paymentInput = orderData.payment || {};
+
+      const payment = {
+        id: paymentInput.id || "",
+
+        reference: paymentInput.reference || orderData.paymentOrderCode || "",
+
+        method: paymentInput.method || orderData.paymentMethod || "cod",
+
+        provider:
+          paymentInput.provider ||
+          (orderData.paymentMethod === "bank_transfer"
+            ? "bank_transfer"
+            : "cod"),
+
+        status: normalizePaymentStatus(
+          paymentInput.status ||
+            orderData.paymentStatus ||
+            PAYMENT_STATUS.PENDING
+        ),
+
+        amount: Math.max(
+          0,
+          Number(
+            paymentInput.amount ?? orderData.grandTotal ?? orderData.total ?? 0
+          ) || 0
+        ),
+
+        currency: paymentInput.currency || "VND",
+
+        transactionId:
+          paymentInput.transactionId || orderData.paymentTransactionId || "",
+
+        transaction:
+          paymentInput.transaction || orderData.paymentTransaction || null,
+
+        transferContent:
+          paymentInput.transferContent ||
+          orderData.paymentTransferContent ||
+          "",
+
+        paidAt: paymentInput.paidAt || orderData.paymentPaidAt || null,
+
+        failedAt: paymentInput.failedAt || orderData.paymentFailedAt || null,
+
+        refundedAt:
+          paymentInput.refundedAt || orderData.paymentRefundedAt || null,
+
+        failureReason:
+          paymentInput.failureReason || orderData.paymentFailureReason || "",
+
+        refundAmount: Math.max(
+          0,
+          Number(paymentInput.refundAmount ?? orderData.refundAmount ?? 0) || 0
+        ),
+
+        paymentAttemptedAt:
+          paymentInput.paymentAttemptedAt ||
+          orderData.paymentAttemptedAt ||
+          null,
+      };
+
       const createdOrder = normalizeOrder({
         ...orderData,
 
@@ -551,13 +618,45 @@ const OrderProvider = ({ children }) => {
 
         items: snapshotItems,
 
-        total:
-          orderData.total ??
-          orderData.totalAmount ??
-          orderData.cartTotal ??
-          orderData.grandTotal ??
-          orderData.subtotal ??
+        subtotal: Number(orderData.subtotal) || 0,
+
+        shippingFee: Number(orderData.shippingFee) || 0,
+
+        discountAmount: Math.max(0, Number(orderData.discountAmount) || 0),
+
+        grandTotal: Math.max(
           0,
+          Number(orderData.grandTotal ?? orderData.total ?? 0) || 0
+        ),
+
+        total: Math.max(
+          0,
+          Number(orderData.grandTotal ?? orderData.total ?? 0) || 0
+        ),
+
+        payment,
+
+        paymentMethod: payment.method,
+
+        paymentStatus: payment.status,
+
+        paymentReference: payment.reference,
+
+        paymentTransactionId: payment.transactionId,
+
+        paymentTransaction: payment.transaction,
+
+        paymentPaidAt: payment.paidAt,
+
+        paymentFailedAt: payment.failedAt,
+
+        paymentRefundedAt: payment.refundedAt,
+
+        paymentFailureReason: payment.failureReason,
+
+        paymentAttemptedAt: payment.paymentAttemptedAt,
+
+        refundAmount: payment.refundAmount,
 
         inventoryConsumed: true,
 
@@ -605,90 +704,6 @@ const OrderProvider = ({ children }) => {
       };
     },
     [user, readOrders]
-
-    payment: {
-  id: orderData?.payment?.id || "",
-
-  reference:
-    orderData?.payment?.reference ||
-    orderData?.paymentOrderCode ||
-    "",
-
-  method:
-    orderData?.payment?.method ||
-    orderData?.paymentMethod ||
-    "cod",
-
-  provider:
-    orderData?.payment?.provider ||
-    (orderData?.paymentMethod === "bank_transfer"
-      ? "bank_transfer"
-      : "cod"),
-
-  status: normalizePaymentStatus(
-    orderData?.payment?.status ||
-      orderData?.paymentStatus ||
-      PAYMENT_STATUS.PENDING
-  ),
-
-  amount: Math.max(
-    0,
-    Number(
-      orderData?.payment?.amount ??
-        orderData?.grandTotal ??
-        orderData?.total ??
-        0
-    ) || 0
-  ),
-
-  currency:
-    orderData?.payment?.currency ||
-    "VND",
-
-  transactionId:
-    orderData?.payment?.transactionId ||
-    orderData?.paymentTransactionId ||
-    "",
-
-  transaction:
-    orderData?.payment?.transaction ||
-    orderData?.paymentTransaction ||
-    null,
-
-  transferContent:
-    orderData?.payment?.transferContent ||
-    orderData?.paymentTransferContent ||
-    "",
-
-  paidAt:
-    orderData?.payment?.paidAt ||
-    orderData?.paymentPaidAt ||
-    null,
-
-  failedAt:
-    orderData?.payment?.failedAt ||
-    orderData?.paymentFailedAt ||
-    null,
-
-  refundedAt:
-    orderData?.payment?.refundedAt ||
-    orderData?.paymentRefundedAt ||
-    null,
-
-  failureReason:
-    orderData?.payment?.failureReason ||
-    orderData?.paymentFailureReason ||
-    "",
-
-  refundAmount: Math.max(
-    0,
-    Number(
-      orderData?.payment?.refundAmount ??
-        orderData?.refundAmount ??
-        0
-    ) || 0
-  ),
-},
   );
 
   const getOrderById = useCallback(
@@ -706,6 +721,19 @@ const OrderProvider = ({ children }) => {
       );
     },
     [orders]
+  );
+
+  const getPaymentByOrderId = useCallback(
+    (orderId) => {
+      const order = getOrderById(orderId);
+
+      if (!order) {
+        return null;
+      }
+
+      return normalizePayment(order.payment, order);
+    },
+    [getOrderById]
   );
 
   const getMyOrders = useCallback(() => {
@@ -780,7 +808,9 @@ const OrderProvider = ({ children }) => {
         return {
           success: true,
           status,
+
           found: true,
+
           inventoryRestocked: Boolean(currentOrder.inventoryRestocked),
         };
       }
@@ -822,14 +852,19 @@ const OrderProvider = ({ children }) => {
 
             return {
               success: true,
+
               status,
+
               found: true,
+
               inventoryRestocked: true,
             };
           } catch (error) {
             return {
               success: false,
+
               message: "Không thể cập nhật trạng thái đơn hàng.",
+
               error,
             };
           }
@@ -964,147 +999,105 @@ const OrderProvider = ({ children }) => {
   );
 
   const updateOrderPaymentStatus = useCallback(
-  async (
-    orderId,
-    nextPaymentStatus,
-    paymentData = {}
-  ) => {
-    if (!orderId) {
-      return {
-        success: false,
-        message: "Thiếu mã đơn hàng.",
+    async (orderId, nextPaymentStatus, paymentData = {}) => {
+      if (!orderId) {
+        return {
+          success: false,
+          message: "Thiếu mã đơn hàng.",
+        };
+      }
+
+      const normalizedId = String(orderId).replace(/^#/, "").trim();
+
+      const status = normalizePaymentStatus(nextPaymentStatus);
+
+      const currentOrder = orders.find(
+        (order) =>
+          String(order?.id || order?.orderId || "").replace(/^#/, "") ===
+          normalizedId
+      );
+
+      if (!currentOrder) {
+        return {
+          success: false,
+          message: "Không tìm thấy đơn hàng.",
+        };
+      }
+
+      const currentPayment = normalizePayment(
+        currentOrder.payment,
+        currentOrder
+      );
+
+      const now = new Date().toISOString();
+
+      const nextPayment = {
+        ...currentPayment,
+
+        status,
+
+        reference:
+          paymentData.reference ||
+          currentPayment.reference ||
+          currentOrder.paymentReference ||
+          "",
+
+        transactionId:
+          paymentData.transactionId ||
+          currentPayment.transactionId ||
+          currentOrder.paymentTransactionId ||
+          "",
+
+        transaction:
+          paymentData.transaction || currentPayment.transaction || null,
+
+        paidAt:
+          status === PAYMENT_STATUS.PAID
+            ? paymentData.paidAt || currentPayment.paidAt || now
+            : currentPayment.paidAt || null,
+
+        failedAt:
+          status === PAYMENT_STATUS.FAILED
+            ? paymentData.failedAt || currentPayment.failedAt || now
+            : currentPayment.failedAt || null,
+
+        refundedAt:
+          status === PAYMENT_STATUS.REFUNDED
+            ? paymentData.refundedAt || currentPayment.refundedAt || now
+            : currentPayment.refundedAt || null,
+
+        failureReason:
+          status === PAYMENT_STATUS.FAILED
+            ? String(
+                paymentData.failureReason || currentPayment.failureReason || ""
+              ).trim()
+            : currentPayment.failureReason || "",
+
+        refundAmount:
+          status === PAYMENT_STATUS.REFUNDED
+            ? Math.max(
+                0,
+                Number(
+                  paymentData.refundAmount ??
+                    currentPayment.refundAmount ??
+                    currentOrder.grandTotal ??
+                    currentOrder.total ??
+                    0
+                ) || 0
+              )
+            : Number(currentPayment.refundAmount || 0),
+
+        paymentAttemptedAt:
+          paymentData.paymentAttemptedAt ||
+          currentPayment.paymentAttemptedAt ||
+          null,
       };
-    }
 
-    const normalizedId = String(orderId)
-      .replace(/^#/, "")
-      .trim();
-
-    const status = normalizePaymentStatus(
-      nextPaymentStatus
-    );
-
-    const currentOrder = orders.find(
-      (order) =>
-        String(
-          order?.id ||
-            order?.orderId ||
-            ""
-        ).replace(/^#/, "") === normalizedId
-    );
-
-    if (!currentOrder) {
-      return {
-        success: false,
-        message: "Không tìm thấy đơn hàng.",
-      };
-    }
-
-    const currentPayment =
-      currentOrder.payment || {};
-
-    const now =
-      new Date().toISOString();
-
-    const nextPayment = {
-      ...currentPayment,
-
-      status,
-
-      method:
-        currentPayment.method ||
-        currentOrder.paymentMethod ||
-        "cod",
-
-      provider:
-        currentPayment.provider ||
-        (currentOrder.paymentMethod ===
-        "bank_transfer"
-          ? "bank_transfer"
-          : "cod"),
-
-      amount:
-        Number(
-          currentPayment.amount ??
-            currentOrder.grandTotal ??
-            currentOrder.total ??
-            0
-        ) || 0,
-
-      reference:
-        currentPayment.reference ||
-        currentOrder.paymentReference ||
-        "",
-
-      transactionId:
-        paymentData.transactionId ||
-        currentPayment.transactionId ||
-        currentOrder.paymentTransactionId ||
-        "",
-
-      transaction:
-        paymentData.transaction ||
-        currentPayment.transaction ||
-        null,
-
-      paidAt:
-        status === "paid"
-          ? paymentData.paidAt ||
-            currentPayment.paidAt ||
-            now
-          : currentPayment.paidAt ||
-            null,
-
-      failedAt:
-        status === "failed"
-          ? paymentData.failedAt ||
-            currentPayment.failedAt ||
-            now
-          : currentPayment.failedAt ||
-            null,
-
-      refundedAt:
-        status === "refunded"
-          ? paymentData.refundedAt ||
-            currentPayment.refundedAt ||
-            now
-          : currentPayment.refundedAt ||
-            null,
-
-      failureReason:
-        status === "failed"
-          ? String(
-              paymentData.failureReason ||
-                currentPayment.failureReason ||
-                ""
-            ).trim()
-          : currentPayment.failureReason ||
-            "",
-
-      refundAmount:
-        status === "refunded"
-          ? Math.max(
-              0,
-              Number(
-                paymentData.refundAmount ??
-                  currentPayment.refundAmount ??
-                  currentOrder.grandTotal ??
-                  currentOrder.total ??
-                  0
-              ) || 0
-            )
-          : Number(
-              currentPayment.refundAmount || 0
-            ),
-    };
-
-    const nextOrders = orders.map(
-      (order) => {
-        const currentId = String(
-          order?.id ||
-            order?.orderId ||
-            ""
-        ).replace(/^#/, "");
+      const nextOrders = orders.map((order) => {
+        const currentId = String(order?.id || order?.orderId || "").replace(
+          /^#/,
+          ""
+        );
 
         if (currentId !== normalizedId) {
           return order;
@@ -1117,62 +1110,54 @@ const OrderProvider = ({ children }) => {
 
           paymentStatus: status,
 
-          paymentReference:
-            nextPayment.reference,
+          paymentReference: nextPayment.reference,
 
-          paymentTransactionId:
-            nextPayment.transactionId,
+          paymentTransactionId: nextPayment.transactionId,
 
-          paymentTransaction:
-            nextPayment.transaction,
+          paymentTransaction: nextPayment.transaction,
 
-          paymentPaidAt:
-            nextPayment.paidAt,
+          paymentPaidAt: nextPayment.paidAt,
 
-          paymentFailedAt:
-            nextPayment.failedAt,
+          paymentFailedAt: nextPayment.failedAt,
 
-          paymentRefundedAt:
-            nextPayment.refundedAt,
+          paymentRefundedAt: nextPayment.refundedAt,
 
-          paymentFailureReason:
-            nextPayment.failureReason,
+          paymentFailureReason: nextPayment.failureReason,
 
-          refundAmount:
-            nextPayment.refundAmount,
+          paymentAttemptedAt: nextPayment.paymentAttemptedAt,
+
+          refundAmount: nextPayment.refundAmount,
 
           updatedAt: now,
         };
+      });
+
+      try {
+        writeOrdersToStorage(nextOrders);
+
+        setOrders(nextOrders);
+
+        notifyOrdersUpdated();
+
+        return {
+          success: true,
+
+          status,
+
+          payment: nextPayment,
+        };
+      } catch (error) {
+        return {
+          success: false,
+
+          message: "Không thể lưu trạng thái thanh toán.",
+
+          error,
+        };
       }
-    );
-
-    try {
-      writeOrdersToStorage(nextOrders);
-
-      setOrders(nextOrders);
-
-      notifyOrdersUpdated();
-
-      return {
-        success: true,
-
-        status,
-
-        payment: nextPayment,
-      };
-    } catch (error) {
-      return {
-        success: false,
-
-        message:
-          "Không thể lưu trạng thái thanh toán.",
-
-        error,
-      };
-    }
-  },
-  [orders]
-);
+    },
+    [orders]
+  );
 
   const removeOrder = useCallback(
     (orderId) => {
@@ -1205,11 +1190,15 @@ const OrderProvider = ({ children }) => {
 
       getOrderById,
 
+      getPaymentByOrderId,
+
       getMyOrders,
 
       canViewOrder,
 
       updateOrderStatus,
+
+      updateOrderPaymentStatus,
 
       removeOrder,
     }),
@@ -1220,11 +1209,15 @@ const OrderProvider = ({ children }) => {
 
       getOrderById,
 
+      getPaymentByOrderId,
+
       getMyOrders,
 
       canViewOrder,
 
       updateOrderStatus,
+
+      updateOrderPaymentStatus,
 
       removeOrder,
     ]
