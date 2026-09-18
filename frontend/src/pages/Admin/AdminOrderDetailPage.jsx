@@ -128,7 +128,14 @@ const AdminOrderDetailPage = () => {
 
   const subtotal = Number(order.subtotal || 0);
 
-  const discountAmount = Number(order.discountAmount || 0);
+  const discountAmount = Math.max(
+    0,
+    Number(
+      order.discountAmount ??
+        order.couponSnapshot?.discountAmount ??
+        0
+    ) || 0
+  );
 
   const shippingFee = Number(order.shippingFee || 0);
 
