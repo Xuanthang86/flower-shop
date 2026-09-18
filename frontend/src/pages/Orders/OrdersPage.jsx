@@ -286,7 +286,7 @@ const OrdersPage = () => {
               </h1>
 
               <p className="text-sm text-gray-500 mt-1">
-                Theo dõi các đơn hàng bạn đã đặt tại Flower Shop.
+                Theo dõi các đơn hàng bạn đã đặt tại T Flower Shop.
               </p>
             </div>
           </div>
@@ -363,7 +363,7 @@ const OrdersPage = () => {
                       </h2>
 
                       <p className="text-sm text-gray-500 mt-2">
-                        {formatDate(order?.createdAt)}
+                        Thời gian đặt hàng: {formatDate(order?.createdAt)}
                       </p>
                     </div>
 

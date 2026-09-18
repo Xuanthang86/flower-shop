@@ -1,4 +1,6 @@
-const PaymentMethod = ({ value, onChange }) => {
+const PaymentMethod = ({ value, onChange, bankTransferEnabled = true }) => {
+  const bankTransferDisabled = bankTransferEnabled === false;
+
   return (
     <div>
       <h3 className="mb-3 text-lg font-semibold text-gray-800">
@@ -8,7 +10,7 @@ const PaymentMethod = ({ value, onChange }) => {
       <div className="space-y-3">
         {/* COD */}
         <label
-          className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+          className={`flex items-start gap-3 rounded-xl border p-4 transition ${
             value === "cod"
               ? "border-pink-500 bg-pink-50"
               : "border-gray-200 hover:border-pink-300"
@@ -36,10 +38,13 @@ const PaymentMethod = ({ value, onChange }) => {
 
         {/* BANK TRANSFER */}
         <label
-          className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-            value === "bank_transfer"
-              ? "border-pink-500 bg-pink-50"
-              : "border-gray-200 hover:border-pink-300"
+          aria-disabled={bankTransferDisabled}
+          className={`flex items-start gap-3 rounded-xl border p-4 transition ${
+            bankTransferDisabled
+              ? "cursor-not-allowed border-gray-200 bg-gray-100 opacity-50"
+              : value === "bank_transfer"
+                ? "cursor-pointer border-pink-500 bg-pink-50"
+                : "cursor-pointer border-gray-200 hover:border-pink-300"
           }`}
         >
           <input
@@ -48,15 +53,23 @@ const PaymentMethod = ({ value, onChange }) => {
             value="bank_transfer"
             checked={value === "bank_transfer"}
             onChange={onChange}
-            className="mt-1"
+            disabled={bankTransferDisabled}
+            className="mt-1 disabled:cursor-not-allowed"
           />
 
           <div>
-            <p className="font-medium text-gray-800">Chuyển khoản ngân hàng</p>
+            <p
+              className={`font-medium ${
+                bankTransferDisabled ? "text-gray-500" : "text-gray-800"
+              }`}
+            >
+              Chuyển khoản ngân hàng
+            </p>
 
             <p className="mt-1 text-sm text-gray-500">
-              Xem thông tin chuyển khoản, hoàn tất thanh toán rồi xác nhận trước
-              khi đặt hàng.
+              {bankTransferDisabled
+                ? "Shop hiện chưa bật thanh toán chuyển khoản."
+                : "Xem thông tin chuyển khoản, hoàn tất thanh toán rồi xác nhận trước khi đặt hàng."}
             </p>
           </div>
         </label>

@@ -162,7 +162,7 @@ const AdminOrderList = () => {
 
                 <th className="px-5 py-4">Trạng thái</th>
 
-                <th className="px-5 py-4">Ngày đặt</th>
+                <th className="px-5 py-4">Thời gian đặt hàng</th>
 
                 <th className="px-5 py-4 text-center">Chi tiết</th>
               </tr>

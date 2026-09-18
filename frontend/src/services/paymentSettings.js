@@ -273,7 +273,9 @@ export const buildVietQrUrl = ({
   accountName,
   transferContent,
 }) => {
-  const bank = String(bankCode || "").trim();
+  const bank = String(bankCode || "")
+    .trim()
+    .replace(/\s+/g, "");
 
   const account = String(accountNumber || "")
     .trim()
@@ -305,7 +307,6 @@ export const buildVietQrUrl = ({
     bank
   )}-${encodeURIComponent(account)}-compact2.png?${params.toString()}`;
 };
-
 export const getPaymentSettingsUpdatedEvent =
   "flower-shop-payment-settings-updated";
 

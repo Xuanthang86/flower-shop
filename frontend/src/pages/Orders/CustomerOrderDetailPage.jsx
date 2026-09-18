@@ -394,7 +394,7 @@ const CustomerOrderDetailPage = () => {
         <div className="mb-5">
           <Link
             to="/orders"
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-pink-600 transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
           >
             <FiArrowLeft size={17} />
             Quay lại đơn hàng của tôi
@@ -412,12 +412,12 @@ const CustomerOrderDetailPage = () => {
               </h1>
 
               <p className="text-sm text-gray-500 mt-2">
-                Ngày đặt: {formatDate(order?.createdAt)}
+                Thời gian đặt hàng: {formatDate(order?.createdAt)}
               </p>
 
               {order?.updatedAt && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Cập nhật: {formatDate(order.updatedAt)}
+                  Thời gian cập nhật: {formatDate(order.updatedAt)}
                 </p>
               )}
             </div>

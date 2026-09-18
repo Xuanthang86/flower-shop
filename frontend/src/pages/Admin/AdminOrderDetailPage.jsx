@@ -372,10 +372,6 @@ const AdminOrderDetailPage = () => {
             <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
               Chi tiết đơn hàng #{order.id}
             </h1>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Đặt ngày: {formatDate(order.createdAt)}
-            </p>
           </div>
         </div>
 
@@ -649,6 +645,14 @@ const AdminOrderDetailPage = () => {
 
               <span className="break-all text-right font-semibold text-gray-800">
                 {payment?.transactionId || "—"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Thời gian đặt hàng</span>
+
+              <span className="text-right font-medium text-gray-800">
+                {formatDate(order.createdAt)}
               </span>
             </div>
 

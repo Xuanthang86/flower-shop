@@ -413,9 +413,28 @@ const CheckoutPage = () => {
   const handlePaymentChange = (event) => {
     const value = event.target.value;
 
+    if (
+      value === BANK_TRANSFER_PAYMENT_METHOD &&
+      paymentSettings?.bankTransfer?.enabled === false
+    ) {
+      setFormData((currentData) => ({
+        ...currentData,
+        paymentMethod: CHECKOUT_PAYMENT_METHOD,
+      }));
+
+      setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+      setPaymentVerified(false);
+
+      setPaymentError("");
+
+      setError("");
+
+      return;
+    }
+
     setFormData((currentData) => ({
       ...currentData,
-
       paymentMethod: value,
     }));
 
@@ -1224,7 +1243,7 @@ const CheckoutPage = () => {
           id: paymentIsBankTransfer ? paymentIntent?.id || "" : "",
 
           reference: paymentIsBankTransfer
-            ? paymentIntent?.orderCode || ""
+            ? paymentIntent?.reference || paymentIntent?.orderCode || ""
             : "",
 
           method: formData.paymentMethod,
@@ -1251,9 +1270,7 @@ const CheckoutPage = () => {
 
           transferContent: paymentIsBankTransfer ? transferContent : "",
 
-          paidAt: paymentIsBankTransfer
-            ? paymentIntent?.paidAt || new Date().toISOString()
-            : null,
+          paidAt: paymentIsBankTransfer ? paymentIntent?.paidAt || null : null,
 
           failedAt: null,
 
@@ -1848,6 +1865,9 @@ const CheckoutPage = () => {
                 <PaymentMethod
                   value={formData.paymentMethod}
                   onChange={handlePaymentChange}
+                  bankTransferEnabled={
+                    paymentSettings?.bankTransfer?.enabled !== false
+                  }
                 />
 
                 {formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD && (

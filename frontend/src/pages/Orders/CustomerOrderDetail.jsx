@@ -254,7 +254,7 @@ const CustomerOrderDetail = ({ order }) => {
               </h1>
 
               <p className="text-sm text-gray-500 mt-2">
-                Ngày đặt: {formatDate(order.createdAt)}
+                Thời gian đặt hàng: {formatDate(order.createdAt)}
               </p>
             </div>
 
