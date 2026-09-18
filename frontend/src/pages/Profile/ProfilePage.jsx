@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiSave, FiUser, FiMapPin } from "react-icons/fi";
 
 import { useAuth } from "@/context/AuthContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 import AddressForm from "@/components/checkout/AddressForm";
 
@@ -25,6 +26,8 @@ const EMPTY_ADDRESS = {
 const ProfilePage = () => {
   const { user, roleLabels, updateProfile } = useAuth();
 
+  const { notifySuccess, notifyError } = useNotification();
+
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState({
@@ -33,8 +36,6 @@ const ProfilePage = () => {
     avatar: "",
     address: EMPTY_ADDRESS,
   });
-
-  const [profileMessage, setProfileMessage] = useState("");
 
   const [profileError, setProfileError] = useState("");
 
@@ -78,8 +79,6 @@ const ProfilePage = () => {
 
     setProfileError("");
 
-    setProfileMessage("");
-
     if (!file.type.startsWith("image/")) {
       setProfileError("Vui lòng chọn file hình ảnh.");
 
@@ -121,14 +120,10 @@ const ProfilePage = () => {
     }));
 
     setProfileError("");
-
-    setProfileMessage("");
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    setProfileMessage("");
 
     setProfileError("");
 
@@ -175,9 +170,7 @@ const ProfilePage = () => {
         return;
       }
 
-      setProfileMessage(
-        result.message || "Thông tin tài khoản đã được cập nhật."
-      );
+      notifySuccess(result.message || "Cập nhật thông tin thành công.");
     } catch (error) {
       console.error("Lỗi cập nhật hồ sơ:", error);
 
@@ -209,15 +202,6 @@ const ProfilePage = () => {
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="p-6 sm:p-8 md:p-10">
-            {profileMessage && (
-              <div
-                role="status"
-                className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700"
-              >
-                {profileMessage}
-              </div>
-            )}
-
             {profileError && (
               <div
                 role="alert"

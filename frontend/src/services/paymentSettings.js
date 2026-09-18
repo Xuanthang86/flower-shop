@@ -249,21 +249,19 @@ export const buildTransferContent = (
 ) => {
   const normalizedOrderCode = String(orderCode || "")
     .trim()
-    .toUpperCase();
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 
   if (!normalizedOrderCode) {
     return "";
   }
 
-  const prefix = String(
-    bankTransferSettings?.transferContentPrefix || ""
-  ).trim();
+  const prefix = String(bankTransferSettings?.transferContentPrefix || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 
-  if (!prefix) {
-    return normalizedOrderCode;
-  }
-
-  return `${prefix} ${normalizedOrderCode}`.trim();
+  return `${prefix}${normalizedOrderCode}`.slice(0, 50);
 };
 
 export const buildVietQrUrl = ({
@@ -295,18 +293,29 @@ export const buildVietQrUrl = ({
 
   params.set("amount", String(numericAmount));
 
-  if (transferContent) {
-    params.set("addInfo", String(transferContent).trim().slice(0, 50));
+  const normalizedTransferContent = String(transferContent || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 50);
+
+  if (normalizedTransferContent) {
+    params.set("addInfo", normalizedTransferContent);
   }
 
-  if (accountName) {
-    params.set("accountName", String(accountName).trim().slice(0, 50));
+  const normalizedAccountName = String(accountName || "")
+    .trim()
+    .slice(0, 50);
+
+  if (normalizedAccountName) {
+    params.set("accountName", normalizedAccountName);
   }
 
   return `https://img.vietqr.io/image/${encodeURIComponent(
     bank
   )}-${encodeURIComponent(account)}-compact2.png?${params.toString()}`;
 };
+
 export const getPaymentSettingsUpdatedEvent =
   "flower-shop-payment-settings-updated";
 
