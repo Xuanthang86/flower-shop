@@ -123,6 +123,46 @@ const CheckoutPage = () => {
     paymentMethod: CHECKOUT_PAYMENT_METHOD,
   });
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setFormData((currentData) => ({
+      ...currentData,
+
+      sender: {
+        ...currentData.sender,
+
+        name: currentData.sender.name || user.name || user.fullName || "",
+
+        phone: currentData.sender.phone || user.phone || "",
+
+        email: currentData.sender.email || user.email || "",
+      },
+
+      address:
+        currentData.address?.provinceCode ||
+        currentData.address?.wardCode ||
+        currentData.address?.houseNumber ||
+        currentData.address?.street
+          ? currentData.address
+          : {
+              provinceCode: user.address?.provinceCode || "",
+
+              provinceName: user.address?.provinceName || "",
+
+              wardCode: user.address?.wardCode || "",
+
+              wardName: user.address?.wardName || "",
+
+              houseNumber: user.address?.houseNumber || "",
+
+              street: user.address?.street || "",
+            },
+    }));
+  }, [user]);
+
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
   const getInitialDeliveryDate = () => {
@@ -1888,7 +1928,7 @@ const CheckoutPage = () => {
                               <img
                                 src={qrCodeUrl}
                                 alt="Mã QR thanh toán"
-                                className="h-48 w-48 object-contain"
+                                className="h-64 w-64 object-contain"
                               />
 
                               <p className="mt-2 text-center text-xs text-gray-500">

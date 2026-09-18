@@ -43,18 +43,39 @@ const normalizePhone = (phone) => String(phone || "").trim();
 const generateId = (prefix = "user") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const normalizeUserAddress = (address = {}) => ({
+  provinceCode: String(address?.provinceCode || ""),
+  provinceName: String(address?.provinceName || ""),
+  wardCode: String(address?.wardCode || ""),
+  wardName: String(address?.wardName || ""),
+  houseNumber: String(address?.houseNumber || ""),
+  street: String(address?.street || ""),
+});
+
 const normalizeUser = (user) => {
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return {
     ...user,
+
     id: String(user.id || generateId()),
+
     name: String(user.name || user.fullName || "").trim(),
+
     email: normalizeEmail(user.email),
+
     phone: normalizePhone(user.phone),
+
     role: Object.values(ROLES).includes(user.role) ? user.role : ROLES.CUSTOMER,
+
     avatar: user.avatar || "",
+
+    address: normalizeUserAddress(user.address),
+
     disabled: Boolean(user.disabled),
+
     createdAt: user.createdAt || new Date().toISOString(),
   };
 };
@@ -534,9 +555,17 @@ const AuthProvider = ({ children }) => {
 
       const updated = normalizeUser({
         ...current,
+
         name: updates.name ?? current.name,
+
         phone: updates.phone ?? current.phone,
+
         avatar: updates.avatar ?? current.avatar,
+
+        address:
+          updates.address !== undefined
+            ? normalizeUserAddress(updates.address)
+            : normalizeUserAddress(current.address),
       });
 
       if (!updated.name) {
