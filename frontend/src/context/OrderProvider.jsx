@@ -263,7 +263,14 @@ const normalizeOrder = (order) => {
 
     shippingFee: Math.max(0, Number(order?.shippingFee) || 0),
 
-    discountAmount: Math.max(0, Number(order?.discountAmount) || 0),
+    discountAmount: Math.max(
+      0,
+      Number(
+        order?.discountAmount ??
+          order?.couponSnapshot?.discountAmount ??
+          0
+      ) || 0
+    ),
 
     grandTotal: Math.max(
       0,
