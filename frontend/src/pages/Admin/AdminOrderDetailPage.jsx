@@ -130,11 +130,9 @@ const AdminOrderDetailPage = () => {
 
   const discountAmount = Math.max(
     0,
-    Number(
-      order.discountAmount ??
-        order.couponSnapshot?.discountAmount ??
-        0
-    ) || 0
+
+    Number(order.discountAmount ?? order.couponSnapshot?.discountAmount ?? 0) ||
+      0
   );
 
   const shippingFee = Number(order.shippingFee || 0);
