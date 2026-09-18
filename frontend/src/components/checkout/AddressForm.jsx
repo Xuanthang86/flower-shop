@@ -298,6 +298,26 @@ const AddressForm = ({ value = {}, onChange }) => {
         )}
       </div>
 
+      {/* TÊN ĐƯỜNG */}
+      <div>
+        <label
+          htmlFor="street"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Tên đường *
+        </label>
+
+        <input
+          id="street"
+          name="street"
+          type="text"
+          value={address.street || ""}
+          onChange={handleStreetChange}
+          placeholder="Ví dụ: Nguyễn Văn Linh"
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+        />
+      </div>
+
       {/* SỐ NHÀ */}
       <div>
         <label
@@ -315,26 +335,6 @@ const AddressForm = ({ value = {}, onChange }) => {
           onChange={handleHouseNumberChange}
           placeholder="Ví dụ: 123"
           autoComplete="street-address"
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
-        />
-      </div>
-
-      {/* TÊN ĐƯỜNG */}
-      <div>
-        <label
-          htmlFor="street"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
-          Tên đường *
-        </label>
-
-        <input
-          id="street"
-          name="street"
-          type="text"
-          value={address.street || ""}
-          onChange={handleStreetChange}
-          placeholder="Ví dụ: Nguyễn Văn Linh"
           className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
         />
       </div>

@@ -325,26 +325,26 @@ const getEligibleSubtotal = ({ items = [], coupon, productLookup }) => {
   }, 0);
 };
 
-const isDateOutsideRange = (now, startDate, endDate) => {
+const getCouponDateError = (now, startDate, endDate) => {
   const nowTime = now.getTime();
-
-  if (startDate) {
-    const start = new Date(startDate);
-
-    if (!Number.isNaN(start.getTime()) && nowTime < start.getTime()) {
-      return true;
-    }
-  }
 
   if (endDate) {
     const end = new Date(endDate);
 
     if (!Number.isNaN(end.getTime()) && nowTime > end.getTime()) {
-      return true;
+      return "Mã giảm giá đã hết hạn.";
     }
   }
 
-  return false;
+  if (startDate) {
+    const start = new Date(startDate);
+
+    if (!Number.isNaN(start.getTime()) && nowTime < start.getTime()) {
+      return "Mã giảm giá chưa đến thời gian áp dụng.";
+    }
+  }
+
+  return "";
 };
 
 export const calculateCouponDiscount = ({
@@ -438,7 +438,7 @@ export const validateCoupon = ({
   if (!coupon) {
     return {
       success: false,
-      message: "Mã giảm giá không tồn tại.",
+      message: "Mã giảm giá không hợp lệ.",
     };
   }
 
@@ -449,10 +449,16 @@ export const validateCoupon = ({
     };
   }
 
-  if (isDateOutsideRange(now, coupon.startDate, coupon.endDate)) {
+  const couponDateError = getCouponDateError(
+    now,
+    coupon.startDate,
+    coupon.endDate
+  );
+
+  if (couponDateError) {
     return {
       success: false,
-      message: "Mã giảm giá chưa đến thời gian áp dụng hoặc đã hết hạn.",
+      message: couponDateError,
     };
   }
 

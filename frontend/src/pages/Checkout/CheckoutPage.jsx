@@ -1172,7 +1172,11 @@ const CheckoutPage = () => {
 
           method: formData.paymentMethod,
 
-          provider: paymentIsBankTransfer ? "bank_transfer" : "cod",
+          provider: paymentIsBankTransfer
+            ? paymentSettings?.bankTransfer?.bankName ||
+              paymentSettings?.bankTransfer?.bankCode ||
+              "Chuyển khoản ngân hàng"
+            : "cod",
 
           status: paymentIsBankTransfer ? "paid" : "pending",
 

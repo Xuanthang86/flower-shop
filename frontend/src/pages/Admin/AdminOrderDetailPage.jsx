@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -22,10 +22,13 @@ import {
 
 import {
   PAYMENT_STATUS,
-  PAYMENT_STATUS_OPTIONS,
   getPaymentStatusLabel,
   getPaymentStatusClass,
 } from "@/utils/paymentStatus";
+
+import { getBankTransferPaymentStatus } from "@/services/payment";
+
+import { readPaymentSettings } from "@/services/paymentSettings";
 
 const formatDate = (date) => {
   if (!date) {
@@ -66,6 +69,40 @@ const getPaymentLabel = (paymentMethod) => {
   return paymentMethod || "—";
 };
 
+const normalizePaymentProviderLabel = (payment, paymentSettings) => {
+  const method = String(payment?.method || "")
+    .trim()
+    .toLowerCase();
+
+  if (method !== "bank_transfer") {
+    return "—";
+  }
+
+  const savedProvider = String(payment?.provider || "").trim();
+
+  if (
+    savedProvider &&
+    savedProvider !== "bank_transfer" &&
+    savedProvider !== "cod"
+  ) {
+    return savedProvider;
+  }
+
+  const bankName = String(paymentSettings?.bankTransfer?.bankName || "").trim();
+
+  if (bankName) {
+    return bankName;
+  }
+
+  const bankCode = String(paymentSettings?.bankTransfer?.bankCode || "").trim();
+
+  if (bankCode) {
+    return bankCode;
+  }
+
+  return "Chuyển khoản ngân hàng";
+};
+
 const AdminOrderDetailPage = () => {
   const { orderId } = useParams();
 
@@ -84,6 +121,152 @@ const AdminOrderDetailPage = () => {
     () => getPaymentByOrderId(orderId),
     [getPaymentByOrderId, orderId]
   );
+
+  const paymentSettings = useMemo(() => readPaymentSettings(), []);
+
+  /*
+   * TỰ ĐỘNG ĐỒNG BỘ TRẠNG THÁI THANH TOÁN
+   *
+   * Chỉ áp dụng cho chuyển khoản ngân hàng.
+   *
+   * Admin không còn cập nhật Payment Status thủ công.
+   * Hệ thống hỏi backend định kỳ và tự lưu kết quả vào OrderContext.
+   */
+  useEffect(() => {
+    if (!order || !payment) {
+      return undefined;
+    }
+
+    const method = String(payment.method || "")
+      .trim()
+      .toLowerCase();
+
+    if (method !== "bank_transfer") {
+      return undefined;
+    }
+
+    const paymentIntentId = String(payment.id || "").trim();
+
+    if (!paymentIntentId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timer = null;
+
+    const syncPaymentStatus = async () => {
+      try {
+        const result = await getBankTransferPaymentStatus(paymentIntentId);
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextPayment = result?.paymentIntent;
+
+        if (!nextPayment?.id) {
+          return;
+        }
+
+        const nextStatus = String(nextPayment.status || "pending")
+          .trim()
+          .toLowerCase();
+
+        const nextReference = String(
+          nextPayment.reference ||
+            nextPayment.orderCode ||
+            payment.reference ||
+            ""
+        ).trim();
+
+        const nextTransactionId = String(
+          nextPayment.transactionId ||
+            nextPayment.providerTransactionId ||
+            payment.transactionId ||
+            ""
+        ).trim();
+
+        const nextPaidAt = nextPayment.paidAt || payment.paidAt || null;
+
+        const nextTransaction =
+          nextPayment.transaction || payment.transaction || null;
+
+        const nextFailedAt = nextPayment.failedAt || payment.failedAt || null;
+
+        const nextRefundedAt =
+          nextPayment.refundedAt || payment.refundedAt || null;
+
+        const nextFailureReason =
+          nextPayment.failureReason || payment.failureReason || "";
+
+        const nextRefundAmount =
+          nextPayment.refundAmount ?? payment.refundAmount ?? 0;
+
+        const currentStatus = String(payment.status || "pending")
+          .trim()
+          .toLowerCase();
+
+        const hasChanged =
+          currentStatus !== nextStatus ||
+          String(payment.reference || "").trim() !== nextReference ||
+          String(payment.transactionId || "").trim() !== nextTransactionId ||
+          String(payment.paidAt || "") !== String(nextPaidAt || "") ||
+          JSON.stringify(payment.transaction || null) !==
+            JSON.stringify(nextTransaction || null) ||
+          String(payment.failedAt || "") !== String(nextFailedAt || "") ||
+          String(payment.refundedAt || "") !== String(nextRefundedAt || "") ||
+          String(payment.failureReason || "") !==
+            String(nextFailureReason || "") ||
+          Number(payment.refundAmount || 0) !== Number(nextRefundAmount || 0);
+
+        if (hasChanged) {
+          await updateOrderPaymentStatus(order.id, nextStatus, {
+            reference: nextReference,
+            transactionId: nextTransactionId,
+            transaction: nextTransaction,
+            paidAt: nextPaidAt,
+            failedAt: nextFailedAt,
+            refundedAt: nextRefundedAt,
+            failureReason: nextFailureReason,
+            refundAmount: nextRefundAmount,
+          });
+        }
+
+        /*
+         * Khi giao dịch đã vào trạng thái kết thúc,
+         * không cần polling tiếp.
+         */
+        if (
+          nextStatus === PAYMENT_STATUS.PAID ||
+          nextStatus === PAYMENT_STATUS.FAILED ||
+          nextStatus === PAYMENT_STATUS.REFUNDED
+        ) {
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        }
+      } catch (error) {
+        /*
+         * Không làm ảnh hưởng giao diện Admin nếu backend
+         * tạm thời không phản hồi.
+         */
+        console.warn("Không thể đồng bộ trạng thái thanh toán:", error);
+      }
+    };
+
+    syncPaymentStatus();
+
+    timer = setInterval(syncPaymentStatus, 3000);
+
+    return () => {
+      cancelled = true;
+
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [order?.id, payment?.id, payment?.method, payment?.status]);
 
   if (!order) {
     return (
@@ -130,7 +313,6 @@ const AdminOrderDetailPage = () => {
 
   const discountAmount = Math.max(
     0,
-
     Number(order.discountAmount ?? order.couponSnapshot?.discountAmount ?? 0) ||
       0
   );
@@ -161,39 +343,16 @@ const AdminOrderDetailPage = () => {
   const deliveryNote =
     shippingSnapshot.deliveryNote || order.deliveryNote || "";
 
+  const paymentProvider = normalizePaymentProviderLabel(
+    payment,
+    paymentSettings
+  );
+
   const handleStatusChange = async (event) => {
     const result = await updateOrderStatus(order.id, event.target.value);
 
     if (result?.success === false) {
       window.alert(result.message || "Không thể cập nhật trạng thái.");
-    }
-  };
-
-  const handlePaymentStatusChange = async (event) => {
-    const nextStatus = event.target.value;
-
-    const result = await updateOrderPaymentStatus(order.id, nextStatus, {
-      reference: payment?.reference || order.paymentReference || "",
-
-      transactionId: payment?.transactionId || order.paymentTransactionId || "",
-
-      transaction: payment?.transaction || order.paymentTransaction || null,
-
-      paidAt: payment?.paidAt || null,
-
-      failedAt: payment?.failedAt || null,
-
-      refundedAt: payment?.refundedAt || null,
-
-      failureReason: payment?.failureReason || "",
-
-      refundAmount: payment?.refundAmount || 0,
-    });
-
-    if (result?.success === false) {
-      window.alert(
-        result.message || "Không thể cập nhật trạng thái thanh toán."
-      );
     }
   };
 
@@ -264,27 +423,9 @@ const AdminOrderDetailPage = () => {
               </div>
             </div>
 
-            <div className="mt-4">
-              <label
-                htmlFor="paymentStatus"
-                className="mb-2 block text-sm font-medium text-gray-700"
-              >
-                Cập nhật Payment Status
-              </label>
-
-              <select
-                id="paymentStatus"
-                value={paymentStatus}
-                onChange={handlePaymentStatusChange}
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
-              >
-                {PAYMENT_STATUS_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <p className="mt-4 text-xs leading-5 text-gray-500">
+              Trạng thái thanh toán được hệ thống tự động đồng bộ từ giao dịch.
+            </p>
           </div>
         </div>
 
@@ -485,21 +626,15 @@ const AdminOrderDetailPage = () => {
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-500">Nhà cung cấp</span>
+            {payment?.method === "bank_transfer" && (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-gray-500">Nhà cung cấp</span>
 
-              <span className="font-medium text-gray-800">
-                {payment?.provider || "—"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-500">Số tiền thanh toán</span>
-
-              <span className="font-semibold text-gray-800">
-                {formatCurrency(payment?.amount || total)}
-              </span>
-            </div>
+                <span className="font-medium text-gray-800">
+                  {paymentProvider}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-4">
               <span className="text-gray-500">Reference</span>

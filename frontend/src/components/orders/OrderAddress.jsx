@@ -1,8 +1,10 @@
 const OrderAddress = ({ address }) => {
   const safe = address || {};
 
-  const provinceName = safe.provinceName || safe.province || safe.province_name || "";
-  const wardName = safe.wardName || safe.ward || safe.ward_name || safe.communeName || "";
+  const provinceName =
+    safe.provinceName || safe.province || safe.province_name || "";
+  const wardName =
+    safe.wardName || safe.ward || safe.ward_name || safe.communeName || "";
   const houseNumber = safe.houseNumber || safe.house_number || safe.house || "";
   const street = safe.street || safe.streetName || safe.street_name || "";
 
@@ -31,8 +33,7 @@ const OrderAddress = ({ address }) => {
         {provinceName || "—"}
       </div>
       <div className="pt-2 text-sm text-gray-500">
-        <span className="font-medium">Địa chỉ đầy đủ:</span>{" "}
-        {parts.join(", ")}
+        <span className="font-medium">Địa chỉ đầy đủ:</span> {parts.join(", ")}
       </div>
     </div>
   );
