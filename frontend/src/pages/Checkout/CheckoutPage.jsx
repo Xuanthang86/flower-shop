@@ -792,13 +792,9 @@ const CheckoutPage = () => {
 
   const dynamicQrUrl = buildVietQrUrl({
     bankCode: paymentSettings?.bankTransfer?.bankCode,
-
     accountNumber: paymentSettings?.bankTransfer?.accountNumber,
-
     amount: grandTotal,
-
     accountName: paymentSettings?.bankTransfer?.accountName,
-
     transferContent,
   });
 
@@ -814,23 +810,12 @@ const CheckoutPage = () => {
     return `${normalizedUrl}${separator}v=${version}`;
   };
 
-  const dynamicQrCodeUrl = dynamicQrUrl
-    ? addQrCacheBust(dynamicQrUrl, paymentQrVersion)
-    : "";
+  const dynamicQrCodeUrl = dynamicQrUrl || "";
 
   const staticQrCodeUrl = paymentSettings?.bankTransfer?.qrCodeUrl
     ? addQrCacheBust(paymentSettings.bankTransfer.qrCodeUrl, paymentQrVersion)
     : "";
 
-  /*
-   * Ưu tiên QR động vì QR động chứa:
-   * - số tiền chính xác;
-   * - nội dung chuyển khoản;
-   * - mã Payment Intent / mã đơn hàng.
-   *
-   * QR thực tế upload lên Cloudinary được dùng
-   * làm fallback nếu QR động không tạo được.
-   */
   const qrCodeUrl = dynamicQrCodeUrl || staticQrCodeUrl;
 
   const handleApplyCoupon = () => {

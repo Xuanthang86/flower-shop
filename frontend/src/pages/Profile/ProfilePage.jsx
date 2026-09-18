@@ -26,7 +26,7 @@ const EMPTY_ADDRESS = {
 const ProfilePage = () => {
   const { user, roleLabels, updateProfile } = useAuth();
 
-  const { notifySuccess, notifyError } = useNotification();
+  const { notifySuccess } = useNotification();
 
   const navigate = useNavigate();
 
