@@ -15,6 +15,7 @@ import { useNotification } from "@/context/NotificationProvider";
 import {
   COUPON_TYPES,
   deleteCoupon,
+  getCouponStatus,
   getCouponUsage,
   normalizeCoupon,
   readCoupons,
@@ -78,6 +79,28 @@ const toDateTimeLocal = (value) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const STATUS_CONFIG = {
+  active: {
+    label: "Đang hoạt động",
+    className: "bg-green-50 text-green-700",
+  },
+
+  scheduled: {
+    label: "Chưa bắt đầu",
+    className: "bg-blue-50 text-blue-700",
+  },
+
+  expired: {
+    label: "Đã hết hạn",
+    className: "bg-orange-50 text-orange-700",
+  },
+
+  disabled: {
+    label: "Đã tắt",
+    className: "bg-gray-100 text-gray-500",
+  },
+};
+
 const AdminCouponsPage = () => {
   const [coupons, setCoupons] = useState(() => readCoupons());
 
@@ -87,10 +110,27 @@ const AdminCouponsPage = () => {
 
   const [saving, setSaving] = useState(false);
 
+  /*
+   * currentTime giúp giao diện tự cập nhật trạng thái
+   * khi mã giảm giá chuyển từ đang hoạt động -> hết hạn
+   * mà người quản trị không cần tải lại trang.
+   */
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
   const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
     document.title = "Quản lý khuyến mãi | Flower Shop";
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -176,9 +216,11 @@ const AdminCouponsPage = () => {
 
       resetForm();
 
-      notifySuccess(editing ? "Đã cập nhật coupon." : "Đã tạo coupon.");
+      notifySuccess(
+        editing ? "Đã cập nhật mã giảm giá." : "Đã tạo mã giảm giá."
+      );
     } catch (error) {
-      notifyError(error?.message || "Không thể lưu coupon.");
+      notifyError(error?.message || "Không thể lưu mã giảm giá.");
     } finally {
       setSaving(false);
     }
@@ -217,7 +259,7 @@ const AdminCouponsPage = () => {
 
   const handleDelete = (coupon) => {
     const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa coupon "${coupon.code}" không?`
+      `Bạn có chắc muốn xóa mã giảm giá "${coupon.code}" không?`
     );
 
     if (!confirmed) {
@@ -233,9 +275,9 @@ const AdminCouponsPage = () => {
         resetForm();
       }
 
-      notifySuccess("Đã xóa coupon.");
+      notifySuccess("Đã xóa mã giảm giá.");
     } catch (error) {
-      notifyError(error?.message || "Không thể xóa coupon.");
+      notifyError(error?.message || "Không thể xóa mã giảm giá.");
     }
   };
 
@@ -245,9 +287,13 @@ const AdminCouponsPage = () => {
 
       setCoupons(readCoupons());
 
-      notifySuccess(coupon.active ? "Đã tắt coupon." : "Đã bật coupon.");
+      notifySuccess(
+        coupon.active ? "Đã tắt mã giảm giá." : "Đã bật mã giảm giá."
+      );
     } catch (error) {
-      notifyError(error?.message || "Không thể thay đổi trạng thái coupon.");
+      notifyError(
+        error?.message || "Không thể thay đổi trạng thái mã giảm giá."
+      );
     }
   };
 
@@ -277,7 +323,7 @@ const AdminCouponsPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {editing ? "Chỉnh sửa coupon" : "Tạo coupon mới"}
+                  {editing ? "Chỉnh sửa mã giảm giá" : "Tạo mã giảm giá mới"}
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500">
@@ -300,7 +346,7 @@ const AdminCouponsPage = () => {
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Mã coupon *
+                  Mã giảm giá *
                 </label>
 
                 <input
@@ -536,7 +582,7 @@ const AdminCouponsPage = () => {
                 />
 
                 <span className="text-sm font-semibold text-gray-700">
-                  Coupon đang hoạt động
+                  Mã giảm giá đang được bật
                 </span>
               </label>
 
@@ -551,7 +597,7 @@ const AdminCouponsPage = () => {
                   ? "Đang lưu..."
                   : editing
                     ? "Lưu thay đổi"
-                    : "Tạo coupon"}
+                    : "Tạo mã giảm giá"}
               </button>
             </form>
           </section>
@@ -560,11 +606,11 @@ const AdminCouponsPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  Danh sách coupon
+                  Danh sách mã giảm giá
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  {coupons.length} coupon
+                  {coupons.length} mã giảm giá
                 </p>
               </div>
             </div>
@@ -572,11 +618,21 @@ const AdminCouponsPage = () => {
             <div className="mt-5 space-y-4">
               {coupons.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
-                  Chưa có coupon.
+                  Chưa có mã giảm giá.
                 </div>
               ) : (
                 coupons.map((coupon) => {
                   const usage = getCouponUsage(coupon.code);
+
+                  /*
+                   * Đây là điểm quan trọng:
+                   * trạng thái được tính theo currentTime,
+                   * không lấy trực tiếp coupon.active.
+                   */
+                  const status = getCouponStatus(coupon, currentTime);
+
+                  const statusConfig =
+                    STATUS_CONFIG[status] || STATUS_CONFIG.disabled;
 
                   return (
                     <div
@@ -584,7 +640,6 @@ const AdminCouponsPage = () => {
                       className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-pink-100 hover:shadow-md"
                     >
                       <div className="flex flex-col gap-5">
-                        {/* HEADER */}
                         <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -593,13 +648,9 @@ const AdminCouponsPage = () => {
                               </span>
 
                               <span
-                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                  coupon.active
-                                    ? "bg-green-50 text-green-700"
-                                    : "bg-gray-100 text-gray-500"
-                                }`}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${statusConfig.className}`}
                               >
-                                {coupon.active ? "Đang hoạt động" : "Tắt"}
+                                {statusConfig.label}
                               </span>
                             </div>
 
@@ -617,7 +668,6 @@ const AdminCouponsPage = () => {
                             </p>
                           </div>
 
-                          {/* 3 NÚT LUÔN TRÊN 1 DÒNG */}
                           <div className="flex shrink-0 items-center gap-2">
                             <button
                               type="button"
@@ -625,6 +675,7 @@ const AdminCouponsPage = () => {
                               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                             >
                               <FiCheckCircle />
+
                               {coupon.active ? "Tắt" : "Bật"}
                             </button>
 
@@ -648,7 +699,6 @@ const AdminCouponsPage = () => {
                           </div>
                         </div>
 
-                        {/* THÔNG TIN COUPON */}
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <div className="rounded-xl bg-gray-50 px-4 py-3">
                             <p className="text-xs font-medium text-gray-500">
@@ -681,6 +731,7 @@ const AdminCouponsPage = () => {
 
                             <p className="mt-1 font-semibold text-gray-800">
                               {usage.total}
+
                               {coupon.usageLimit
                                 ? ` / ${coupon.usageLimit}`
                                 : " / Không giới hạn"}
@@ -704,7 +755,6 @@ const AdminCouponsPage = () => {
                           </div>
                         </div>
 
-                        {/* GIỚI HẠN */}
                         {(coupon.categoryRestriction?.length > 0 ||
                           coupon.productRestriction?.length > 0) && (
                           <div className="border-t border-gray-100 pt-4">

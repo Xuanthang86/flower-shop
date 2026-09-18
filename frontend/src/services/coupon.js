@@ -120,7 +120,7 @@ const readRawCoupons = () => {
 
     return parsed;
   } catch (error) {
-    console.error("Lỗi đọc coupon:", error);
+    console.error("Lỗi đọc mã giảm giá:", error);
 
     return [];
   }
@@ -140,11 +140,57 @@ const writeCoupons = (coupons) => {
   window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
 };
 
+/**
+ * Xác định trạng thái thực tế của mã giảm giá theo:
+ * - active
+ * - thời gian bắt đầu
+ * - thời gian kết thúc
+ *
+ * Không sử dụng coupon.active đơn độc để quyết định
+ * mã còn hoạt động hay không.
+ *
+ * Các trạng thái:
+ * - disabled: Đã tắt
+ * - scheduled: Chưa bắt đầu
+ * - active: Đang hoạt động
+ * - expired: Đã hết hạn
+ */
+export const getCouponStatus = (coupon, now = new Date()) => {
+  if (!coupon?.active) {
+    return "disabled";
+  }
+
+  const currentDate = now instanceof Date ? now : new Date(now);
+  const nowTime = currentDate.getTime();
+
+  if (Number.isNaN(nowTime)) {
+    return "disabled";
+  }
+
+  if (coupon.startDate) {
+    const start = new Date(coupon.startDate);
+
+    if (!Number.isNaN(start.getTime()) && nowTime < start.getTime()) {
+      return "scheduled";
+    }
+  }
+
+  if (coupon.endDate) {
+    const end = new Date(coupon.endDate);
+
+    if (!Number.isNaN(end.getTime()) && nowTime >= end.getTime()) {
+      return "expired";
+    }
+  }
+
+  return "active";
+};
+
 export const saveCoupon = (coupon) => {
   const normalized = normalizeCoupon(coupon);
 
   if (!normalized.code) {
-    throw new Error("Vui lòng nhập mã coupon.");
+    throw new Error("Vui lòng nhập mã giảm giá.");
   }
 
   if (!normalized.name) {
@@ -166,7 +212,7 @@ export const saveCoupon = (coupon) => {
   );
 
   if (duplicate) {
-    throw new Error("Mã coupon đã tồn tại.");
+    throw new Error("Mã giảm giá đã tồn tại.");
   }
 
   const now = new Date().toISOString();
@@ -243,7 +289,7 @@ const readOrdersForUsage = () => {
 
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error("Lỗi đọc đơn hàng để kiểm tra coupon:", error);
+    console.error("Lỗi đọc đơn hàng để kiểm tra mã giảm giá:", error);
 
     return [];
   }
@@ -326,12 +372,20 @@ const getEligibleSubtotal = ({ items = [], coupon, productLookup }) => {
 };
 
 const getCouponDateError = (now, startDate, endDate) => {
-  const nowTime = now.getTime();
+  const currentDate = now instanceof Date ? now : new Date(now);
+  const nowTime = currentDate.getTime();
+
+  if (Number.isNaN(nowTime)) {
+    return "";
+  }
 
   if (endDate) {
     const end = new Date(endDate);
 
-    if (!Number.isNaN(end.getTime()) && nowTime > end.getTime()) {
+    /*
+     * Dùng >= để đúng thời điểm kết thúc thì mã đã hết hạn.
+     */
+    if (!Number.isNaN(end.getTime()) && nowTime >= end.getTime()) {
       return "Mã giảm giá đã hết hạn.";
     }
   }
