@@ -74,6 +74,7 @@ const AdminPaymentSettingsPage = () => {
 
       bankTransfer: {
         ...(current.bankTransfer || {}),
+
         [field]: value,
       },
     }));
@@ -91,16 +92,24 @@ const AdminPaymentSettingsPage = () => {
     setUploadingQr(true);
 
     try {
+      /*
+       * QR thanh toán phải giữ nguyên file gốc.
+       *
+       * Không resize.
+       * Không convert WebP.
+       * Không nén lossy.
+       */
       const url = await uploadImageFile(file, {
         folder: "flower-shop/payment",
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.9,
+
+        preserveOriginal: true,
       });
 
       updateBankTransfer("qrCodeUrl", url);
 
-      notifySuccess("Đã tải mã QR lên Cloudinary.");
+      notifySuccess(
+        "Đã tải QR ngân hàng lên Cloudinary và giữ nguyên dữ liệu gốc."
+      );
     } catch (error) {
       notifyError(error?.message || "Không thể tải mã QR lên Cloudinary.");
     } finally {
@@ -121,26 +130,31 @@ const AdminPaymentSettingsPage = () => {
 
     if (!bankName) {
       notifyError("Vui lòng nhập tên ngân hàng.");
+
       return;
     }
 
     if (!bankCode) {
       notifyError("Vui lòng nhập mã ngân hàng/BIN để hệ thống tạo QR động.");
+
       return;
     }
 
     if (!accountNumber) {
       notifyError("Vui lòng nhập số tài khoản nhận tiền.");
+
       return;
     }
 
     if (!accountName) {
       notifyError("Vui lòng nhập tên chủ tài khoản.");
+
       return;
     }
 
     if (!prefix) {
       notifyError("Vui lòng nhập tiền tố nội dung chuyển khoản.");
+
       return;
     }
 
@@ -256,12 +270,13 @@ const AdminPaymentSettingsPage = () => {
                   onChange={(event) =>
                     updateBankTransfer("bankCode", event.target.value)
                   }
-                  placeholder="Ví dụ: VCB hoặc 970436"
+                  placeholder="Ví dụ: 970436"
                   className={inputClass}
                 />
 
                 <p className="mt-2 text-xs text-gray-500">
-                  Dùng mã được VietQR hỗ trợ để tạo QR động.
+                  Khuyến nghị nhập BIN 6 chữ số của ngân hàng để tạo VietQR ổn
+                  định.
                 </p>
               </div>
 
@@ -316,13 +331,13 @@ const AdminPaymentSettingsPage = () => {
                 />
 
                 <p className="mt-2 text-xs text-gray-500">
-                  Hệ thống luôn nối thêm mã đơn hàng phía sau.
+                  Hệ thống sẽ nối mã đơn hàng vào sau tiền tố này.
                 </p>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-semibold">
-                  QR tĩnh dự phòng
+                  QR ngân hàng thực tế
                 </label>
 
                 <input
@@ -338,16 +353,39 @@ const AdminPaymentSettingsPage = () => {
                 <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-pink-50">
                   <FiImage />
 
-                  {uploadingQr ? "Đang tải QR..." : "Tải ảnh QR lên Cloudinary"}
+                  {uploadingQr
+                    ? "Đang tải QR..."
+                    : "Tải QR ngân hàng lên Cloudinary"}
 
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp"
                     onChange={handleQrUpload}
                     disabled={uploadingQr}
                     className="hidden"
                   />
                 </label>
+
+                {bankTransfer.qrCodeUrl && (
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="mb-3 text-sm font-semibold text-gray-700">
+                      QR đã cấu hình
+                    </p>
+
+                    <div className="flex justify-center">
+                      <img
+                        src={bankTransfer.qrCodeUrl}
+                        alt="QR ngân hàng"
+                        className="max-h-72 w-auto rounded-lg bg-white object-contain shadow-sm"
+                      />
+                    </div>
+
+                    <p className="mt-3 text-xs leading-5 text-gray-500">
+                      QR này được giữ nguyên file gốc khi upload, không chuyển
+                      sang WebP.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -369,16 +407,13 @@ const AdminPaymentSettingsPage = () => {
           </section>
 
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-6">
-            <h2 className="font-bold text-blue-900">
-              Cơ chế xác nhận thanh toán
-            </h2>
+            <h2 className="font-bold text-blue-900">Cơ chế thanh toán</h2>
 
             <p className="mt-2 text-sm leading-6 text-blue-800">
-              Mỗi lần khách hàng chọn thanh toán chuyển khoản, hệ thống tạo một
-              mã giao dịch riêng. Nội dung chuyển khoản luôn chứa mã đơn hàng.
-              Sau khi ngân hàng gửi giao dịch thành công về hệ thống, backend
-              kiểm tra tài khoản nhận, số tiền và mã đơn hàng trước khi xác nhận
-              thanh toán.
+              QR động được tạo theo số tiền và mã đơn hàng của từng lần thanh
+              toán. QR ngân hàng thực tế đã tải lên được giữ nguyên để làm QR dự
+              phòng. Hệ thống vẫn sử dụng mã đơn hàng và số tiền để đối soát
+              giao dịch ngân hàng.
             </p>
           </section>
 

@@ -20,6 +20,7 @@ const EMPTY_ADDRESS = {
   wardName: "",
   houseNumber: "",
   street: "",
+  note: "",
 };
 
 const normalizeAddress = (address = {}) => {
@@ -58,10 +59,11 @@ const normalizeAddress = (address = {}) => {
 };
 
 const getOrderAddressSource = (order = {}) =>
-  order?.customer?.address ||
+  order?.addressSnapshot ||
   order?.shippingAddress ||
   order?.customerAddress ||
   order?.address ||
+  order?.customer?.address ||
   {};
 
 const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
@@ -72,6 +74,8 @@ const normalizeCustomer = (customer = {}, fallbackAddress = {}) => {
 
   return {
     ...customer,
+
+    id: String(customer.id || customer.userId || "").trim(),
 
     name: customer.name || customer.fullName || "",
 
@@ -181,6 +185,86 @@ const normalizePayment = (payment = {}, order = {}) => {
   };
 };
 
+const normalizeOrderItem = (item = {}) => {
+  const productId = String(item?.productId ?? item?.id ?? "").trim();
+
+  const productName = item?.productName || item?.name || "Sản phẩm";
+
+  const productImage = item?.productImage || item?.image || "";
+
+  const unitPrice = Math.max(
+    0,
+    Number(item?.unitPrice ?? item?.price ?? 0) || 0
+  );
+
+  const quantity = Math.max(0, Number(item?.quantity) || 0);
+
+  const subtotal = Math.max(
+    0,
+    Number(item?.subtotal ?? unitPrice * quantity) || 0
+  );
+
+  return {
+    ...item,
+
+    id: productId,
+
+    productId,
+
+    productName,
+
+    productImage,
+
+    name: productName,
+
+    image: productImage,
+
+    unitPrice,
+
+    price: unitPrice,
+
+    quantity,
+
+    subtotal,
+
+    stockSnapshot:
+      item?.stockSnapshot && typeof item.stockSnapshot === "object"
+        ? item.stockSnapshot
+        : null,
+  };
+};
+
+const normalizeCustomerSnapshot = (order = {}, customer = {}) => {
+  const snapshot =
+    order?.customerSnapshot && typeof order.customerSnapshot === "object"
+      ? order.customerSnapshot
+      : {};
+
+  return {
+    id: String(snapshot.id ?? order?.customerId ?? customer?.id ?? "").trim(),
+
+    name:
+      snapshot.name ||
+      snapshot.fullName ||
+      order?.customerName ||
+      customer?.name ||
+      customer?.fullName ||
+      "",
+
+    fullName:
+      snapshot.fullName ||
+      snapshot.name ||
+      order?.customerName ||
+      customer?.fullName ||
+      customer?.name ||
+      "",
+
+    phone: snapshot.phone || order?.customerPhone || customer?.phone || "",
+
+    email: snapshot.email || order?.customerEmail || customer?.email || "",
+  };
+};
+
 const normalizeOrder = (order) => {
   if (!order) {
     return order;
@@ -190,12 +274,105 @@ const normalizeOrder = (order) => {
 
   const address = normalizeAddress(getOrderAddressSource(order));
 
-  const customer = normalizeCustomer(order.customer, address);
+  const customer = normalizeCustomer(order.customer || {}, address);
+
+  const customerSnapshot = normalizeCustomerSnapshot(order, customer);
 
   const payment = normalizePayment(order.payment, order);
 
+  const rawItems = Array.isArray(order.items)
+    ? order.items
+    : Array.isArray(order.products)
+      ? order.products
+      : [];
+
+  const items = rawItems.map(normalizeOrderItem);
+
+  const calculatedItemsSubtotal = items.reduce(
+    (total, item) => total + item.subtotal,
+    0
+  );
+
+  const subtotal = Math.max(
+    0,
+    Number(order?.subtotal ?? calculatedItemsSubtotal) || 0
+  );
+
+  const discountAmount = Math.max(
+    0,
+    Number(
+      order?.discountAmount ??
+        order?.discount ??
+        order?.couponSnapshot?.discountAmount ??
+        0
+    ) || 0
+  );
+
+  const shippingFee = Math.max(
+    0,
+    Number(order?.shippingFee ?? order?.shipping ?? 0) || 0
+  );
+
+  const grandTotal = Math.max(
+    0,
+    Number(
+      order?.grandTotal ??
+        order?.total ??
+        order?.totalAmount ??
+        Math.max(0, subtotal + shippingFee - discountAmount)
+    ) || 0
+  );
+
+  const status = normalizeOrderStatus(order.status || order.orderStatus);
+
   return {
     ...order,
+
+    id,
+
+    orderId: id,
+
+    customer,
+
+    customerSnapshot,
+
+    customerId: order.customerId || customerSnapshot.id || "",
+
+    customerEmail: order.customerEmail || customerSnapshot.email || "",
+
+    customerName:
+      order.customerName ||
+      customerSnapshot.name ||
+      customerSnapshot.fullName ||
+      "",
+
+    shippingAddress: address,
+
+    customerAddress: address,
+
+    address,
+
+    addressSnapshot: address,
+
+    items,
+
+    subtotal,
+
+    discountAmount,
+
+    discount: discountAmount,
+
+    shippingFee,
+
+    shipping: shippingFee,
+
+    grandTotal,
+
+    total: grandTotal,
+
+    status,
+
+    orderStatus: status,
 
     couponSnapshot:
       order?.couponSnapshot && typeof order.couponSnapshot === "object"
@@ -234,68 +411,6 @@ const normalizeOrder = (order) => {
       .trim()
       .toUpperCase(),
 
-    id,
-
-    orderId: id,
-
-    customer,
-
-    customerId: order.customerId || customer.id || "",
-
-    customerEmail: order.customerEmail || customer.email || "",
-
-    customerName:
-      order.customerName || customer.name || customer.fullName || "",
-
-    shippingAddress: address,
-
-    customerAddress: address,
-
-    address,
-
-    items: Array.isArray(order.items)
-      ? order.items
-      : Array.isArray(order.products)
-        ? order.products
-        : [],
-
-    subtotal: Math.max(0, Number(order?.subtotal) || 0),
-
-    shippingFee: Math.max(0, Number(order?.shippingFee) || 0),
-
-    discountAmount: Math.max(
-      0,
-      Number(
-        order?.discountAmount ??
-          order?.couponSnapshot?.discountAmount ??
-          0
-      ) || 0
-    ),
-
-    grandTotal: Math.max(
-      0,
-      Number(order?.grandTotal ?? order?.total ?? order?.totalAmount ?? 0) || 0
-    ),
-
-    total: Math.max(
-      0,
-      Number(order?.grandTotal ?? order?.total ?? order?.totalAmount ?? 0) || 0
-    ),
-
-    status: normalizeOrderStatus(order.status),
-
-    inventoryConsumed: Boolean(order.inventoryConsumed),
-
-    inventoryRestocked: Boolean(order.inventoryRestocked),
-
-    inventorySnapshots: Array.isArray(order.inventorySnapshots)
-      ? order.inventorySnapshots
-      : [],
-
-    inventoryRestockSnapshots: Array.isArray(order.inventoryRestockSnapshots)
-      ? order.inventoryRestockSnapshots
-      : [],
-
     payment,
 
     paymentMethod: payment.method,
@@ -319,6 +434,26 @@ const normalizeOrder = (order) => {
     paymentAttemptedAt: payment.paymentAttemptedAt,
 
     refundAmount: payment.refundAmount,
+
+    deliveredAt: order.deliveredAt || null,
+
+    cancelledAt: order.cancelledAt || null,
+
+    createdAt: order.createdAt || new Date().toISOString(),
+
+    updatedAt: order.updatedAt || order.createdAt || new Date().toISOString(),
+
+    inventoryConsumed: Boolean(order.inventoryConsumed),
+
+    inventoryRestocked: Boolean(order.inventoryRestocked),
+
+    inventorySnapshots: Array.isArray(order.inventorySnapshots)
+      ? order.inventorySnapshots
+      : [],
+
+    inventoryRestockSnapshots: Array.isArray(order.inventoryRestockSnapshots)
+      ? order.inventoryRestockSnapshots
+      : [],
   };
 };
 
@@ -474,53 +609,102 @@ const OrderProvider = ({ children }) => {
             orderData.customer?.name ||
             orderData.customer?.fullName ||
             orderData.customerName ||
-            user.name ||
             "",
 
           fullName:
             orderData.customer?.fullName ||
             orderData.customer?.name ||
             orderData.customerName ||
-            user.name ||
             "",
 
-          phone:
-            orderData.customer?.phone || orderData.phone || user.phone || "",
+          phone: orderData.customer?.phone || orderData.phone || "",
 
-          email:
-            orderData.customer?.email ||
-            orderData.customerEmail ||
-            user.email ||
-            "",
+          email: orderData.customer?.email || orderData.customerEmail || "",
         },
         address
       );
 
+      /*
+       * CUSTOMER SNAPSHOT
+       *
+       * Đây là thông tin người mua tại thời điểm
+       * tạo đơn. Sau này user đổi tên/email/số điện thoại
+       * thì Order cũ không bị thay đổi.
+       */
+      const customerSnapshot = {
+        id: String(user.id || "").trim(),
+
+        name: user.name || user.fullName || customer.name || "",
+
+        fullName: user.fullName || user.name || customer.fullName || "",
+
+        phone: user.phone || customer.phone || "",
+
+        email: user.email || customer.email || "",
+      };
+
+      /*
+       * PRODUCT SNAPSHOT
+       *
+       * Giá ở đây được chốt ngay tại thời điểm
+       * khách đặt hàng.
+       *
+       * Không bao giờ đọc lại giá từ Catalog
+       * để thay đổi Order cũ.
+       */
       const snapshotItems = items.map((item) => {
-        const snapshot = inventoryResult.snapshots.find(
+        const inventorySnapshot = inventoryResult.snapshots.find(
           (entry) => String(entry.productId) === String(item.id)
         );
 
+        const productId = String(item?.productId ?? item?.id ?? "").trim();
+
+        const productName = item?.productName || item?.name || "Sản phẩm";
+
+        const productImage = item?.productImage || item?.image || "";
+
+        const unitPrice = Math.max(
+          0,
+          Number(item?.unitPrice ?? item?.price ?? 0) || 0
+        );
+
+        const quantity = Math.max(0, Number(item?.quantity) || 0);
+
         return {
-          id: item.id,
+          /*
+           * Các field chuẩn.
+           */
+          productId,
 
-          productId: item.id,
+          productName,
 
-          name: item.name || "Sản phẩm",
+          productImage,
 
-          price: Number(item.price) || 0,
+          unitPrice,
 
-          quantity: Number(item.quantity) || 0,
+          quantity,
 
-          image: item.image || "",
+          subtotal: unitPrice * quantity,
 
-          stockSnapshot: snapshot
+          /*
+           * Giữ alias cũ để toàn bộ UI
+           * hiện tại không bị hỏng.
+           */
+          id: productId,
+
+          name: productName,
+
+          image: productImage,
+
+          price: unitPrice,
+
+          stockSnapshot: inventorySnapshot
             ? {
-                stockBefore: snapshot.stockBefore,
+                stockBefore: inventorySnapshot.stockBefore,
 
-                stockAfter: snapshot.stockAfter,
+                stockAfter: inventorySnapshot.stockAfter,
 
-                stockStatusBefore: snapshot.stockStatusBefore,
+                stockStatusBefore: inventorySnapshot.stockStatusBefore,
               }
             : null,
         };
@@ -533,6 +717,36 @@ const OrderProvider = ({ children }) => {
         .trim();
 
       const orderId = suppliedOrderId || generateOrderCode(currentOrders);
+
+      const subtotal = Math.max(
+        0,
+        Number(
+          orderData.subtotal ??
+            snapshotItems.reduce((total, item) => total + item.subtotal, 0)
+        ) || 0
+      );
+
+      const discountAmount = Math.max(
+        0,
+        Number(orderData.discountAmount ?? orderData.discount ?? 0) || 0
+      );
+
+      const shippingFee = Math.max(
+        0,
+        Number(orderData.shippingFee ?? orderData.shipping ?? 0) || 0
+      );
+
+      const calculatedGrandTotal = Math.max(
+        0,
+        subtotal + shippingFee - discountAmount
+      );
+
+      const grandTotal = Math.max(
+        0,
+        Number(
+          orderData.grandTotal ?? orderData.total ?? calculatedGrandTotal
+        ) || calculatedGrandTotal
+      );
 
       const paymentInput = orderData.payment || {};
 
@@ -555,12 +769,7 @@ const OrderProvider = ({ children }) => {
             PAYMENT_STATUS.PENDING
         ),
 
-        amount: Math.max(
-          0,
-          Number(
-            paymentInput.amount ?? orderData.grandTotal ?? orderData.total ?? 0
-          ) || 0
-        ),
+        amount: Math.max(0, Number(paymentInput.amount ?? grandTotal) || 0),
 
         currency: paymentInput.currency || "VND",
 
@@ -609,37 +818,53 @@ const OrderProvider = ({ children }) => {
 
         status: ORDER_STATUS.PENDING,
 
+        orderStatus: ORDER_STATUS.PENDING,
+
+        /*
+         * CUSTOMER SNAPSHOT
+         */
         customer,
 
-        customerId: user.id,
+        customerSnapshot,
 
-        customerEmail: user.email,
+        customerId: customerSnapshot.id,
 
-        customerName: user.name || customer.name || customer.fullName || "",
+        customerEmail: customerSnapshot.email,
 
+        customerName: customerSnapshot.name || customerSnapshot.fullName || "",
+
+        /*
+         * ADDRESS SNAPSHOT
+         */
         shippingAddress: address,
 
         customerAddress: address,
 
         address,
 
+        addressSnapshot: address,
+
+        /*
+         * PRODUCT SNAPSHOT
+         */
         items: snapshotItems,
 
-        subtotal: Number(orderData.subtotal) || 0,
+        /*
+         * TOTAL SNAPSHOT
+         */
+        subtotal,
 
-        shippingFee: Number(orderData.shippingFee) || 0,
+        discountAmount,
 
-        discountAmount: Math.max(0, Number(orderData.discountAmount) || 0),
+        discount: discountAmount,
 
-        grandTotal: Math.max(
-          0,
-          Number(orderData.grandTotal ?? orderData.total ?? 0) || 0
-        ),
+        shippingFee,
 
-        total: Math.max(
-          0,
-          Number(orderData.grandTotal ?? orderData.total ?? 0) || 0
-        ),
+        shipping: shippingFee,
+
+        grandTotal,
+
+        total: grandTotal,
 
         payment,
 
@@ -664,6 +889,10 @@ const OrderProvider = ({ children }) => {
         paymentAttemptedAt: payment.paymentAttemptedAt,
 
         refundAmount: payment.refundAmount,
+
+        deliveredAt: null,
+
+        cancelledAt: null,
 
         inventoryConsumed: true,
 
@@ -814,6 +1043,7 @@ const OrderProvider = ({ children }) => {
       if (currentStatus === status) {
         return {
           success: true,
+
           status,
 
           found: true,
@@ -822,11 +1052,16 @@ const OrderProvider = ({ children }) => {
         };
       }
 
+      /*
+       * HỦY ĐƠN
+       */
       if (
         status === ORDER_STATUS.CANCELLED &&
         currentStatus !== ORDER_STATUS.CANCELLED
       ) {
         if (currentOrder.inventoryRestocked) {
+          const now = new Date().toISOString();
+
           const nextOrders = orders.map((order) => {
             const currentId = String(order?.id || order?.orderId || "").replace(
               /^#/,
@@ -846,7 +1081,11 @@ const OrderProvider = ({ children }) => {
 
               status,
 
-              updatedAt: new Date().toISOString(),
+              orderStatus: status,
+
+              cancelledAt: order.cancelledAt || now,
+
+              updatedAt: now,
             };
           });
 
@@ -887,6 +1126,8 @@ const OrderProvider = ({ children }) => {
           };
         }
 
+        const now = new Date().toISOString();
+
         const nextOrders = orders.map((order) => {
           const currentId = String(order?.id || order?.orderId || "").replace(
             /^#/,
@@ -906,11 +1147,15 @@ const OrderProvider = ({ children }) => {
 
             status,
 
+            orderStatus: status,
+
+            cancelledAt: now,
+
+            updatedAt: now,
+
             inventoryRestocked: true,
 
             inventoryRestockSnapshots: restockResult.snapshots,
-
-            updatedAt: new Date().toISOString(),
           };
         });
 
@@ -942,6 +1187,14 @@ const OrderProvider = ({ children }) => {
         }
       }
 
+      /*
+       * CẬP NHẬT TRẠNG THÁI THÔNG THƯỜNG
+       *
+       * Đặc biệt:
+       * delivered -> deliveredAt
+       */
+      const now = new Date().toISOString();
+
       const nextOrders = orders.map((order) => {
         const currentId = String(order?.id || order?.orderId || "").replace(
           /^#/,
@@ -961,7 +1214,19 @@ const OrderProvider = ({ children }) => {
 
           status,
 
-          updatedAt: new Date().toISOString(),
+          orderStatus: status,
+
+          deliveredAt:
+            status === ORDER_STATUS.DELIVERED
+              ? order.deliveredAt || now
+              : order.deliveredAt || null,
+
+          cancelledAt:
+            status === ORDER_STATUS.CANCELLED
+              ? order.cancelledAt || now
+              : order.cancelledAt || null,
+
+          updatedAt: now,
         };
       });
 
@@ -1088,7 +1353,6 @@ const OrderProvider = ({ children }) => {
                   paymentData.refundAmount ??
                     currentPayment.refundAmount ??
                     currentOrder.grandTotal ??
-                    currentOrder.total ??
                     0
                 ) || 0
               )
@@ -1114,6 +1378,8 @@ const OrderProvider = ({ children }) => {
           ...order,
 
           payment: nextPayment,
+
+          paymentMethod: nextPayment.method,
 
           paymentStatus: status,
 

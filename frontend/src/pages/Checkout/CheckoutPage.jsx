@@ -755,9 +755,24 @@ const CheckoutPage = () => {
     return `${normalizedUrl}${separator}v=${version}`;
   };
 
-  const qrCodeUrl = dynamicQrUrl
+  const dynamicQrCodeUrl = dynamicQrUrl
     ? addQrCacheBust(dynamicQrUrl, paymentQrVersion)
     : "";
+
+  const staticQrCodeUrl = paymentSettings?.bankTransfer?.qrCodeUrl
+    ? addQrCacheBust(paymentSettings.bankTransfer.qrCodeUrl, paymentQrVersion)
+    : "";
+
+  /*
+   * Ưu tiên QR động vì QR động chứa:
+   * - số tiền chính xác;
+   * - nội dung chuyển khoản;
+   * - mã Payment Intent / mã đơn hàng.
+   *
+   * QR thực tế upload lên Cloudinary được dùng
+   * làm fallback nếu QR động không tạo được.
+   */
+  const qrCodeUrl = dynamicQrCodeUrl || staticQrCodeUrl;
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
@@ -837,6 +852,8 @@ const CheckoutPage = () => {
 
       userId: user?.id,
 
+      now: currentTime,
+
       productLookup: (productId) => getProductById(productId, products),
     });
 
@@ -853,7 +870,7 @@ const CheckoutPage = () => {
     setAppliedCoupon(result);
 
     setCouponMessage(result.message || `Đã áp dụng mã ${result.coupon.code}.`);
-  }, [cartItems, subtotal, user?.id]);
+  }, [cartItems, subtotal, user?.id, currentTime]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();

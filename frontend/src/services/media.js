@@ -12,6 +12,7 @@ export const readImageDimensions = (file) =>
   new Promise((resolve, reject) => {
     if (!file?.type?.startsWith("image/")) {
       reject(new Error("Vui lòng chọn đúng file hình ảnh."));
+
       return;
     }
 
@@ -23,7 +24,9 @@ export const readImageDimensions = (file) =>
       image.onload = () => {
         resolve({
           width: image.naturalWidth,
+
           height: image.naturalHeight,
+
           ratio:
             image.naturalHeight > 0
               ? image.naturalWidth / image.naturalHeight
@@ -44,13 +47,11 @@ export const readImageDimensions = (file) =>
 
 export const getImageDimensions = readImageDimensions;
 
-const fileToCompressedDataUri = (
-  file,
-  { maxWidth = 2000, maxHeight = 1400, quality = 0.82 } = {}
-) =>
+const fileToDataUri = (file) =>
   new Promise((resolve, reject) => {
     if (!file?.type?.startsWith("image/")) {
       reject(new Error("Vui lòng chọn đúng file hình ảnh."));
+
       return;
     }
 
@@ -58,6 +59,37 @@ const fileToCompressedDataUri = (
       reject(
         new Error("File hình ảnh quá lớn. Vui lòng chọn file không quá 15MB.")
       );
+
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resolve(String(reader.result || ""));
+    };
+
+    reader.onerror = () => reject(new Error("Không thể đọc file hình ảnh."));
+
+    reader.readAsDataURL(file);
+  });
+
+const fileToCompressedDataUri = (
+  file,
+  { maxWidth = 2000, maxHeight = 1400, quality = 0.82 } = {}
+) =>
+  new Promise((resolve, reject) => {
+    if (!file?.type?.startsWith("image/")) {
+      reject(new Error("Vui lòng chọn đúng file hình ảnh."));
+
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      reject(
+        new Error("File hình ảnh quá lớn. Vui lòng chọn file không quá 15MB.")
+      );
+
       return;
     }
 
@@ -83,6 +115,7 @@ const fileToCompressedDataUri = (
 
         if (!context) {
           reject(new Error("Không thể xử lý hình ảnh."));
+
           return;
         }
 
@@ -108,24 +141,37 @@ export const uploadImageFile = async (
     maxWidth = 2000,
     maxHeight = 1400,
     quality = 0.82,
+
+    /*
+     * true = giữ nguyên file gốc.
+     *
+     * Dùng bắt buộc cho QR thanh toán
+     * để không làm biến dạng mã QR.
+     */
+    preserveOriginal = false,
   } = {}
 ) => {
-  const dataUri = await fileToCompressedDataUri(file, {
-    maxWidth,
-    maxHeight,
-    quality,
-  });
+  const dataUri = preserveOriginal
+    ? await fileToDataUri(file)
+    : await fileToCompressedDataUri(file, {
+        maxWidth,
+        maxHeight,
+        quality,
+      });
 
   let response;
 
   try {
     response = await fetch(`${API_BASE_URL}/media/upload`, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
         dataUri,
+
         folder,
       }),
     });

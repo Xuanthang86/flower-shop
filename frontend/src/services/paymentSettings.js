@@ -93,6 +93,7 @@ const syncPaymentSettingsToBackend = async (paymentSettings) => {
   try {
     snapshotResponse = await fetch(`${API_BASE_URL}/data/snapshot`, {
       method: "GET",
+
       headers: {
         "Content-Type": "application/json",
       },
@@ -175,11 +176,6 @@ export const readPaymentSettings = () => {
     return stored;
   }
 
-  /*
-   * Migration một lần:
-   * Nếu phiên bản cũ đã lưu payment trong site settings,
-   * lấy lại dữ liệu cũ rồi chuyển sang storage riêng.
-   */
   try {
     const rawSiteSettings = localStorage.getItem("flower-shop-site-settings");
 
@@ -226,24 +222,12 @@ export const savePaymentSettings = async (paymentSettings = {}) => {
     },
   });
 
-  /*
-   * Lưu local trước.
-   * Đây là nguồn cấu hình tức thời của frontend.
-   */
   const saved = writeStoredPaymentSettings(next);
 
-  /*
-   * Thông báo ngay cho các component đang mở.
-   * Checkout sẽ cập nhật QR/thông tin ngân hàng ngay cả khi
-   * backend đang tạm thời không kết nối được.
-   */
   window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
 
   window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
 
-  /*
-   * Đồng bộ backend.
-   */
   try {
     await syncPaymentSettingsToBackend(saved);
   } catch (error) {
