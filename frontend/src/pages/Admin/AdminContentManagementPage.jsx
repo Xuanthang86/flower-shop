@@ -689,9 +689,6 @@ const AdminContentManagementPage = () => {
                   ))}
                 </select>
 
-                <p className="mt-2 text-xs leading-5 text-gray-500">
-                  Có thể thay đổi bất kỳ lúc nào. Không cần sửa code.
-                </p>
               </div>
             </div>
 
