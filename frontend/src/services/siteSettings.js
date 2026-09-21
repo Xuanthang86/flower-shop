@@ -469,6 +469,8 @@ export const DEFAULT_SITE_SETTINGS = {
 
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 
+  blogCategories: [],
+
   blogPosts: [],
 
   blog: {
