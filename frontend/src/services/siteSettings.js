@@ -1,6 +1,17 @@
 export const getSiteName = (settings) =>
   String(settings?.branding?.siteName || "HTH Flower Shop").trim();
 
+export const getPageTitle = (settings, title) => {
+  const siteName = getSiteName(settings);
+  const pageTitle = String(title || "").trim();
+
+  if (!pageTitle) {
+    return siteName;
+  }
+
+  return `${pageTitle} | ${siteName}`;
+};
+
 export const getSiteTagline = (settings) =>
   String(settings?.branding?.tagline || "Fresh Flower Everyday").trim();
 
@@ -502,8 +513,19 @@ export const DEFAULT_SITE_SETTINGS = {
 
   blog: {
     columns: 3,
+
+    introTitle: "Bài viết",
+
+    introDescription:
+      "Những câu chuyện, kiến thức và cảm hứng từ {{siteName}}.",
+
+    shopSummary:
+      "{{siteName}} chia sẻ những câu chuyện, kiến thức về hoa và cảm hứng để bạn lựa chọn những sản phẩm phù hợp cho từng khoảnh khắc đặc biệt.",
+
     borderRadius: 16,
+
     defaultShopInfoHtml: DEFAULT_BLOG_SHOP_INFO_HTML,
+
     defaultShopInfoStyle: DEFAULT_BLOG_SHOP_INFO_STYLE,
   },
 

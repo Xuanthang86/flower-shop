@@ -25,6 +25,8 @@ import {
 
 import { PRODUCT_CATEGORIES } from "@/data/products";
 
+import { readSiteSettings, getPageTitle } from "@/services/siteSettings";
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -120,7 +122,26 @@ const AdminCouponsPage = () => {
   const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
-    document.title = "Quản lý khuyến mãi | Flower Shop";
+    const updateTitle = () => {
+      const settings = readSiteSettings();
+
+      document.title = getPageTitle(settings, "Quản lý khuyến mãi");
+    };
+
+    updateTitle();
+
+    window.addEventListener("flower-shop-site-settings-updated", updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        updateTitle
+      );
+
+      window.removeEventListener("storage", updateTitle);
+    };
   }, []);
 
   useEffect(() => {

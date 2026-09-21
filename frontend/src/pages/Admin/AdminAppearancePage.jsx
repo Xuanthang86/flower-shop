@@ -14,6 +14,8 @@ import {
 
 import { useNotification } from "@/context/NotificationProvider";
 
+import { getPageTitle } from "@/services/siteSettings";
+
 const FONT_OPTIONS = [
   {
     value:
@@ -68,20 +70,25 @@ const AdminAppearancePage = () => {
   const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
-    document.title = "Tùy chỉnh giao diện | Flower Shop";
+    const updateTitle = () => {
+      const settings = readSiteSettings();
 
-    let robots = document.querySelector('meta[name="robots"]');
+      document.title = getPageTitle(settings, "Tùy chỉnh giao diện");
+    };
 
-    if (!robots) {
-      robots = document.createElement("meta");
-      robots.name = "robots";
-      document.head.appendChild(robots);
-    }
+    updateTitle();
 
-    robots.content = "noindex,nofollow";
+    window.addEventListener("flower-shop-site-settings-updated", updateTitle);
+
+    window.addEventListener("storage", updateTitle);
 
     return () => {
-      robots.content = "index,follow";
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        updateTitle
+      );
+
+      window.removeEventListener("storage", updateTitle);
     };
   }, []);
 

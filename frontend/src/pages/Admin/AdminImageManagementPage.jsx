@@ -20,6 +20,8 @@ import { readProducts, PRODUCT_UPDATED_EVENT } from "@/services/catalog";
 
 import { getImageDimensions, uploadImageFile } from "@/services/media";
 
+import { getPageTitle } from "@/services/siteSettings";
+
 const STANDARD_WIDTH = 1600;
 const STANDARD_HEIGHT = 700;
 
@@ -141,22 +143,25 @@ const AdminImageManagementPage = () => {
   const [deleteBanner, setDeleteBanner] = useState(null);
 
   useEffect(() => {
-    document.title = "Quản lý hình ảnh | Flower Shop";
+    const updateTitle = () => {
+      const settings = readSiteSettings();
 
-    let robots = document.querySelector('meta[name="robots"]');
+      document.title = getPageTitle(settings, "Quản lý hình ảnh");
+    };
 
-    if (!robots) {
-      robots = document.createElement("meta");
+    updateTitle();
 
-      robots.name = "robots";
+    window.addEventListener("flower-shop-site-settings-updated", updateTitle);
 
-      document.head.appendChild(robots);
-    }
-
-    robots.content = "noindex,nofollow";
+    window.addEventListener("storage", updateTitle);
 
     return () => {
-      robots.content = "index,follow";
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        updateTitle
+      );
+
+      window.removeEventListener("storage", updateTitle);
     };
   }, []);
 

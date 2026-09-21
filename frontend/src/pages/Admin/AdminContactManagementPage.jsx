@@ -20,6 +20,8 @@ import {
 
 import { useNotification } from "@/context/NotificationProvider";
 
+import { getPageTitle } from "@/services/siteSettings";
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100";
 
@@ -51,20 +53,25 @@ const AdminContactManagementPage = () => {
   const { notifySuccess, notifyError } = useNotification();
 
   useEffect(() => {
-    document.title = "Quản lý thông tin liên hệ | Flower Shop";
+    const updateTitle = () => {
+      const settings = readSiteSettings();
 
-    let robots = document.querySelector('meta[name="robots"]');
+      document.title = getPageTitle(settings, "Quản lý thông tin liên hệ");
+    };
 
-    if (!robots) {
-      robots = document.createElement("meta");
-      robots.name = "robots";
-      document.head.appendChild(robots);
-    }
+    updateTitle();
 
-    robots.content = "noindex,nofollow";
+    window.addEventListener("flower-shop-site-settings-updated", updateTitle);
+
+    window.addEventListener("storage", updateTitle);
 
     return () => {
-      robots.content = "index,follow";
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        updateTitle
+      );
+
+      window.removeEventListener("storage", updateTitle);
     };
   }, []);
 

@@ -139,8 +139,8 @@ const ContactPage = () => {
     <main className="min-h-screen bg-gray-50 py-10 md:py-14">
       <div className="mx-auto max-w-6xl px-4">
         <header className="mb-8 text-center">
-          <span className="inline-flex rounded-full bg-pink-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-pink-600">
-            Flower Shop
+          <span className="inline-flex rounded-full ...">
+            {getSiteName(settings)}
           </span>
 
           <h1 className="mt-3 text-3xl font-bold text-gray-900 md:text-4xl">
@@ -149,7 +149,7 @@ const ContactPage = () => {
 
           <p className="mx-auto mt-3 max-w-2xl leading-7 text-gray-500">
             {contact.description ||
-              "Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp."}
+              `${getSiteName(settings)} luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp.`}
           </p>
 
           {isAdmin && (
@@ -173,7 +173,7 @@ const ContactPage = () => {
           }}
         >
           <h2 id="contact-information" className="sr-only">
-            Thông tin liên hệ Flower Shop
+            Thông tin liên hệ {getSiteName(settings)}
           </h2>
 
           {items.length > 0 ? (

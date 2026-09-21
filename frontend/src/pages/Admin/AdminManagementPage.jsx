@@ -73,6 +73,14 @@ const AdminManagementPage = () => {
       icon: FiPenTool,
     },
 
+    canManageBlog && {
+      to: "/admin/blog/categories",
+      title: "Danh mục bài viết",
+      description:
+        "Tạo, chỉnh sửa, sắp xếp và quản lý các danh mục của bài viết.",
+      icon: FiFolder,
+    },
+
     canManageImages && {
       to: "/admin/images",
       title: "Quản lý hình ảnh",

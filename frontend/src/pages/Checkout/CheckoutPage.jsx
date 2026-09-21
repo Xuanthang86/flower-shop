@@ -126,44 +126,97 @@ const CheckoutPage = () => {
   });
 
   useEffect(() => {
-    if (!user) {
-      return;
+    let cancelled = false;
+
+    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+      return undefined;
     }
 
-    setFormData((currentData) => ({
-      ...currentData,
+    if (paymentSettings?.bankTransfer?.enabled === false) {
+      setPaymentIntent(EMPTY_PAYMENT_INTENT);
+      setPaymentVerified(false);
+      setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
 
-      sender: {
-        ...currentData.sender,
+      return undefined;
+    }
 
-        name: currentData.sender.name || user.name || user.fullName || "",
+    if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
+      return undefined;
+    }
 
-        phone: currentData.sender.phone || user.phone || "",
+    const normalizedAmount = checkoutPaymentAmount;
 
-        email: currentData.sender.email || user.email || "",
-      },
+    /*
+     * Mỗi khi tổng tiền Checkout thay đổi,
+     * phải tạo Payment Intent mới.
+     *
+     * Không được kiểm tra/reuse Payment Intent cũ ở đây.
+     */
+    paymentIntentAmountRef.current = normalizedAmount;
 
-      address:
-        currentData.address?.provinceCode ||
-        currentData.address?.wardCode ||
-        currentData.address?.houseNumber ||
-        currentData.address?.street
-          ? currentData.address
-          : {
-              provinceCode: user.address?.provinceCode || "",
+    setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
-              provinceName: user.address?.provinceName || "",
+    setPaymentVerified(false);
 
-              wardCode: user.address?.wardCode || "",
+    setPaymentError("");
 
-              wardName: user.address?.wardName || "",
+    setPaymentIntentLoading(true);
 
-              houseNumber: user.address?.houseNumber || "",
+    createBankTransferPaymentIntent({
+      amount: normalizedAmount,
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
 
-              street: user.address?.street || "",
-            },
-    }));
-  }, [user]);
+        const intent = result?.paymentIntent;
+
+        if (!intent?.id || !intent?.orderCode) {
+          throw new Error("Backend không trả về Payment Intent hợp lệ.");
+        }
+
+        const receivedAmount = Math.round(Number(intent.amount) || 0);
+
+        if (receivedAmount !== normalizedAmount) {
+          throw new Error(
+            "Số tiền Payment Intent không khớp với tổng tiền Checkout."
+          );
+        }
+
+        setPaymentIntent(intent);
+      })
+      .catch((intentError) => {
+        if (cancelled) {
+          return;
+        }
+
+        paymentIntentAmountRef.current = null;
+
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+        setPaymentVerified(false);
+
+        setPaymentError(
+          intentError?.message ||
+            "Không thể tạo yêu cầu thanh toán chuyển khoản."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPaymentIntentLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    formData.paymentMethod,
+    paymentSettings?.bankTransfer?.enabled,
+    shippingCalculation.success,
+    checkoutPaymentAmount,
+  ]);
 
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 

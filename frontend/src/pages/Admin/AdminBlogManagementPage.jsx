@@ -559,10 +559,6 @@ const AdminBlogManagementPage = () => {
     }
   };
 
-  const categories = Array.isArray(settings.blogCategories)
-    ? settings.blogCategories
-    : [];
-
   const savePost = () => {
     const title = String(form.title || "").trim();
 
@@ -959,27 +955,6 @@ const AdminBlogManagementPage = () => {
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="blog-excerpt"
-                    className="mb-2 block text-sm font-semibold"
-                  >
-                    Mô tả ngắn
-                  </label>
-
-                  <textarea
-                    id="blog-excerpt"
-                    value={form.excerpt || ""}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        excerpt: event.target.value,
-                      }))
-                    }
-                    rows={3}
-                    placeholder="Mô tả ngắn hiển thị ở danh sách bài viết..."
-                    className={inputClass}
-                  />
-
                   <p className="mt-1 text-xs text-gray-500">
                     Nếu bỏ trống, hệ thống sẽ tự lấy nội dung đầu bài viết.
                   </p>

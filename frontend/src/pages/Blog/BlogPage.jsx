@@ -90,9 +90,11 @@ const normalizePostForDisplay = (post) => ({
 });
 
 const BlogPage = () => {
-  const { postId } = useParams();
+  const { slug, categorySlug } = useParams();
 
   const [settings, setSettings] = useState(() => readSiteSettings());
+
+  const siteName = settings?.branding?.siteName || "HTH Flower Shop";
 
   useEffect(() => {
     const refresh = () => {
@@ -110,7 +112,9 @@ const BlogPage = () => {
     };
   }, []);
 
-  const rawPosts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+  const categories = Array.isArray(settings.blogCategories)
+    ? settings.blogCategories.filter((category) => category.active !== false)
+    : [];
 
   /*
    * Chuẩn hóa ngày của toàn bộ bài viết trước khi
@@ -120,14 +124,14 @@ const BlogPage = () => {
    * ", 14/09/2026"
    * sẽ không thể đi thẳng ra giao diện.
    */
-  const posts = useMemo(
-    () => rawPosts.map(normalizePostForDisplay),
-    [rawPosts]
-  );
-
   const currentPost = useMemo(
-    () => posts.find((post) => String(post.id) === String(postId)),
-    [posts, postId]
+    () =>
+      posts.find(
+        (post) =>
+          String(post.id) === String(slug) ||
+          String(post.slug || "") === String(slug)
+      ),
+    [posts, slug]
   );
 
   const renderedDefaultTemplate = useMemo(
@@ -149,7 +153,7 @@ const BlogPage = () => {
     }
 
     if (currentPost) {
-      const siteName = settings.branding?.siteName || "HTH Flower Shop";
+      const siteName = getSiteName(settings);
 
       document.title = `${currentPost.title} | ${siteName}`;
 
@@ -252,7 +256,7 @@ const BlogPage = () => {
 
       document.head.appendChild(schemaScript);
     } else if (!postId) {
-      document.title = "Bài viết | HTH Flower Shop";
+      document.title = `Bài viết | ${siteName}`;
     }
 
     return () => {
@@ -602,13 +606,23 @@ const BlogPage = () => {
   return (
     <section className="min-h-screen bg-gray-50 py-8 md:py-12">
       <div className="mx-auto max-w-7xl px-4">
-        <header className="mb-8 text-center">
+        <header className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-gray-900 md:text-4xl">
-            Bài viết
+            {settings.blog?.introTitle || "Bài viết"}
           </h1>
 
           <p className="mx-auto mt-2 max-w-2xl text-gray-500">
-            Những câu chuyện, kiến thức và cảm hứng từ HTH Flower Shop.
+            {String(
+              settings.blog?.introDescription ||
+                "Những câu chuyện, kiến thức và cảm hứng từ {{siteName}}."
+            ).replace(/\{\{siteName\}\}/g, siteName)}
+          </p>
+
+          <p className="mx-auto mt-3 max-w-3xl text-sm leading-6 text-gray-500">
+            {String(
+              settings.blog?.shopSummary ||
+                "{{siteName}} chia sẻ những câu chuyện, kiến thức về hoa và cảm hứng cho những dịp đặc biệt."
+            ).replace(/\{\{siteName\}\}/g, siteName)}
           </p>
         </header>
 

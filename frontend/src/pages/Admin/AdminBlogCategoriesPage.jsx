@@ -204,7 +204,9 @@ const AdminBlogCategoriesPage = () => {
       <div className="mx-auto max-w-7xl px-4">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Danh mục Blog</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Danh mục Bài viết
+            </h1>
 
             <p className="mt-2 text-sm text-gray-500">
               Quản lý danh mục bài viết.
@@ -317,7 +319,7 @@ const AdminBlogCategoriesPage = () => {
                       colSpan={6}
                       className="px-5 py-12 text-center text-sm text-gray-500"
                     >
-                      Chưa có danh mục Blog.
+                      Chưa có danh mục bài viết.
                     </td>
                   </tr>
                 )}

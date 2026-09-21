@@ -34,6 +34,8 @@ import { downloadProductExcelTemplate } from "@/services/productExcel";
 
 import AdminProductExcelImportModal from "./AdminProductExcelImportModal";
 
+import { readSiteSettings, getPageTitle } from "@/services/siteSettings";
+
 const PRODUCTS_PER_PAGE = 20;
 
 const EMPTY_PRODUCT = {
@@ -166,19 +168,26 @@ const AdminProductsPage = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
-    document.title = "Quản lý sản phẩm | Flower Shop";
+    const updateTitle = () => {
+      const settings = readSiteSettings();
 
-    let robots = document.querySelector('meta[name="robots"]');
+      document.title = getPageTitle(settings, "Quản lý sản phẩm");
+    };
 
-    if (!robots) {
-      robots = document.createElement("meta");
+    updateTitle();
 
-      robots.name = "robots";
+    window.addEventListener("flower-shop-site-settings-updated", updateTitle);
 
-      document.head.appendChild(robots);
-    }
+    window.addEventListener("storage", updateTitle);
 
-    robots.content = "noindex,nofollow";
+    return () => {
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        updateTitle
+      );
+
+      window.removeEventListener("storage", updateTitle);
+    };
   }, []);
 
   useEffect(() => {
