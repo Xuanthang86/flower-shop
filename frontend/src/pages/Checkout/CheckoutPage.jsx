@@ -32,6 +32,7 @@ import {
   readPaymentSettings,
   buildTransferContent,
   buildVietQrUrl,
+  resolvePaymentBank,
 } from "@/services/paymentSettings";
 
 import {
@@ -94,6 +95,8 @@ const CheckoutPage = () => {
     readPaymentSettings()
   );
   const [paymentQrVersion, setPaymentQrVersion] = useState(() => Date.now());
+
+  const [resolvedBankCode, setResolvedBankCode] = useState("");
 
   const [formData, setFormData] = useState({
     sender: {
@@ -259,6 +262,59 @@ const CheckoutPage = () => {
       window.removeEventListener("storage", refreshPaymentSettings);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bankTransfer = paymentSettings?.bankTransfer || {};
+
+    const bankCode = String(bankTransfer.bankCode || "").trim();
+
+    const bankName = String(bankTransfer.bankName || "").trim();
+
+    if (!bankCode && !bankName) {
+      setResolvedBankCode("");
+
+      return undefined;
+    }
+
+    resolvePaymentBank({
+      bankCode,
+      bankName,
+    })
+      .then((bank) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!bank?.bin) {
+          setResolvedBankCode("");
+
+          return;
+        }
+
+        setResolvedBankCode(bank.bin);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        console.warn(
+          "Không thể xác định ngân hàng VietQR cho Checkout:",
+          error
+        );
+
+        setResolvedBankCode("");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    paymentSettings?.bankTransfer?.bankCode,
+    paymentSettings?.bankTransfer?.bankName,
+  ]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -791,10 +847,22 @@ const CheckoutPage = () => {
   );
 
   const dynamicQrUrl = buildVietQrUrl({
-    bankCode: paymentSettings?.bankTransfer?.bankCode,
+    /*
+     * QUAN TRỌNG:
+     *
+     * Không dùng trực tiếp bankCode từ Admin.
+     *
+     * Checkout chỉ dùng BIN đã được VietQR xác thực
+     * thông qua Bank Database.
+     */
+    bankCode: resolvedBankCode,
+
     accountNumber: paymentSettings?.bankTransfer?.accountNumber,
+
     amount: grandTotal,
+
     accountName: paymentSettings?.bankTransfer?.accountName,
+
     transferContent,
   });
 
@@ -816,6 +884,12 @@ const CheckoutPage = () => {
     ? addQrCacheBust(paymentSettings.bankTransfer.qrCodeUrl, paymentQrVersion)
     : "";
 
+  /*
+   * Ưu tiên QR động khi ngân hàng đã được VietQR xác định.
+   *
+   * Nếu không xác định được ngân hàng:
+   * dùng QR Admin upload làm fallback.
+   */
   const qrCodeUrl = dynamicQrCodeUrl || staticQrCodeUrl;
 
   const handleApplyCoupon = () => {

@@ -1,5 +1,7 @@
 const PAYMENT_SETTINGS_STORAGE_KEY = "flower-shop-payment-settings";
 
+const VIETQR_BANKS_API_URL = "https://api.vietqr.io/v2/banks";
+
 const DEFAULT_PAYMENT_SETTINGS = {
   bankTransfer: {
     enabled: true,
@@ -264,6 +266,184 @@ export const buildTransferContent = (
   return `${prefix}${normalizedOrderCode}`.slice(0, 50);
 };
 
+/* ==========================================================
+   VIETQR BANK DATABASE
+   ========================================================== */
+
+let vietQrBanksCache = null;
+
+let vietQrBanksPromise = null;
+
+const normalizeLookupText = (value) =>
+  String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+const normalizeBankCodeValue = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+
+export const loadVietQrBanks = async () => {
+  if (Array.isArray(vietQrBanksCache) && vietQrBanksCache.length > 0) {
+    return vietQrBanksCache;
+  }
+
+  if (vietQrBanksPromise) {
+    return vietQrBanksPromise;
+  }
+
+  vietQrBanksPromise = fetch(VIETQR_BANKS_API_URL, {
+    method: "GET",
+
+    headers: {
+      Accept: "application/json",
+    },
+  })
+    .then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.desc || "Không thể tải danh sách ngân hàng VietQR."
+        );
+      }
+
+      if (String(payload?.code) !== "00" || !Array.isArray(payload?.data)) {
+        throw new Error(
+          payload?.desc || "Danh sách ngân hàng VietQR không hợp lệ."
+        );
+      }
+
+      const banks = payload.data
+        .map((bank) => ({
+          id: bank?.id,
+          name: String(bank?.name || "").trim(),
+          code: normalizeBankCodeValue(bank?.code),
+          bin: String(bank?.bin || "").replace(/\D/g, ""),
+          shortName: normalizeBankCodeValue(bank?.shortName),
+          logo: String(bank?.logo || "").trim(),
+          transferSupported: Number(bank?.transferSupported) === 1,
+          lookupSupported: Number(bank?.lookupSupported) === 1,
+        }))
+        .filter(
+          (bank) => bank.bin.length === 6 && bank.name && bank.transferSupported
+        );
+
+      vietQrBanksCache = banks;
+
+      return banks;
+    })
+    .catch((error) => {
+      vietQrBanksPromise = null;
+
+      throw error;
+    })
+    .finally(() => {
+      vietQrBanksPromise = null;
+    });
+
+  return vietQrBanksPromise;
+};
+
+/**
+ * Tìm ngân hàng VietQR chuẩn từ:
+ *
+ * - BIN
+ * - code
+ * - shortName
+ * - tên ngân hàng
+ *
+ * Kết quả trả về BIN chuẩn để dùng cho Quick Link.
+ */
+export const resolveVietQrBank = async (value) => {
+  const banks = await loadVietQrBanks();
+
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = normalizeLookupText(raw);
+
+  const exactBin = banks.find((bank) => bank.bin === raw);
+
+  if (exactBin) {
+    return exactBin;
+  }
+
+  const exactCode = banks.find(
+    (bank) => normalizeLookupText(bank.code) === normalized
+  );
+
+  if (exactCode) {
+    return exactCode;
+  }
+
+  const exactShortName = banks.find(
+    (bank) => normalizeLookupText(bank.shortName) === normalized
+  );
+
+  if (exactShortName) {
+    return exactShortName;
+  }
+
+  const exactName = banks.find(
+    (bank) => normalizeLookupText(bank.name) === normalized
+  );
+
+  if (exactName) {
+    return exactName;
+  }
+
+  const partialMatch = banks.find((bank) => {
+    const bankName = normalizeLookupText(bank.name);
+    const bankCode = normalizeLookupText(bank.code);
+    const bankShortName = normalizeLookupText(bank.shortName);
+
+    return (
+      (bankName && bankName.includes(normalized)) ||
+      (normalized && bankName.includes(normalized)) ||
+      (bankCode && bankCode === normalized) ||
+      (bankShortName && bankShortName === normalized)
+    );
+  });
+
+  return partialMatch || null;
+};
+
+/**
+ * Chuẩn hóa bankCode hiện tại thành BIN VietQR.
+ *
+ * Ưu tiên bankCode.
+ * Nếu bankCode không hợp lệ thì thử bankName.
+ */
+export const resolvePaymentBank = async ({ bankCode, bankName } = {}) => {
+  const candidates = [bankCode, bankName]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    const bank = await resolveVietQrBank(candidate);
+
+    if (bank) {
+      return bank;
+    }
+  }
+
+  return null;
+};
+
+/* ==========================================================
+   VIETQR QUICK LINK
+   ========================================================== */
+
 export const buildVietQrUrl = ({
   bankCode,
   accountNumber,
@@ -286,28 +466,28 @@ export const buildVietQrUrl = ({
   }
 
   /*
-   * VietQR Quick Link:
+   * Sau khi v19.2:
    *
-   * https://img.vietqr.io/image/
-   * <BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png
+   * Checkout/Admin phải truyền BIN 6 số đã được
+   * resolve từ VietQR Bank Database.
    *
-   * ACCOUNT_NO tối đa 19 ký tự.
-   *
-   * Quick Link của VietQR hỗ trợ số tài khoản,
-   * alias hoặc virtual account.
+   * Không cho phép mã ngân hàng tùy ý đi vào QR động.
    */
-  if (normalizedAccountNumber.length > 19) {
+  if (!/^\d{6}$/.test(normalizedBankCode)) {
     return "";
   }
 
   /*
-   * Chỉ cho phép BANK_ID dạng:
-   *
-   * - BIN 6 chữ số
-   * - hoặc short code / bank ID hợp lệ của VietQR
-   *
-   * Không tự biến đổi giá trị người quản trị đã nhập.
+   * VietQR Quick Link hỗ trợ account number / alias /
+   * virtual account và giới hạn tối đa 19 ký tự.
    */
+  if (
+    normalizedAccountNumber.length < 6 ||
+    normalizedAccountNumber.length > 19
+  ) {
+    return "";
+  }
+
   const bankId = encodeURIComponent(normalizedBankCode);
 
   const accountNo = encodeURIComponent(normalizedAccountNumber);
@@ -316,13 +496,6 @@ export const buildVietQrUrl = ({
 
   params.set("amount", String(numericAmount));
 
-  /*
-   * Nội dung chuyển khoản:
-   *
-   * - không dấu
-   * - không ký tự đặc biệt
-   * - tối đa 50 ký tự theo Quick Link
-   */
   const normalizedTransferContent = String(transferContent || "")
     .trim()
     .toUpperCase()
@@ -337,11 +510,6 @@ export const buildVietQrUrl = ({
     params.set("addInfo", normalizedTransferContent);
   }
 
-  /*
-   * accountName chỉ dùng để hiển thị trên ảnh QR.
-   *
-   * Không để accountName quyết định tài khoản nhận tiền.
-   */
   const normalizedAccountName = String(accountName || "")
     .trim()
     .normalize("NFD")

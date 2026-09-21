@@ -7,6 +7,7 @@ import { useNotification } from "@/context/NotificationProvider";
 import {
   readPaymentSettings,
   savePaymentSettings,
+  resolvePaymentBank,
 } from "@/services/paymentSettings";
 
 import { uploadImageFile } from "@/services/media";
@@ -118,7 +119,9 @@ const AdminPaymentSettingsPage = () => {
   };
 
   const handleSave = async () => {
-    const accountNumber = String(bankTransfer.accountNumber || "").trim();
+    const accountNumber = String(bankTransfer.accountNumber || "")
+      .trim()
+      .replace(/\s+/g, "");
 
     const accountName = String(bankTransfer.accountName || "").trim();
 
@@ -134,14 +137,14 @@ const AdminPaymentSettingsPage = () => {
       return;
     }
 
-    if (!bankCode) {
-      notifyError("Vui lòng nhập mã ngân hàng/BIN để hệ thống tạo QR động.");
+    if (!accountNumber) {
+      notifyError("Vui lòng nhập số tài khoản nhận tiền.");
 
       return;
     }
 
-    if (!accountNumber) {
-      notifyError("Vui lòng nhập số tài khoản nhận tiền.");
+    if (accountNumber.length < 6 || accountNumber.length > 19) {
+      notifyError("Số tài khoản phải có từ 6 đến 19 ký tự để tạo VietQR.");
 
       return;
     }
@@ -161,6 +164,36 @@ const AdminPaymentSettingsPage = () => {
     setSaving(true);
 
     try {
+      /*
+       * Không sử dụng bankCode nhập tay trực tiếp nữa.
+       *
+       * resolvePaymentBank sẽ kiểm tra:
+       * - BIN
+       * - code
+       * - shortName
+       * - tên ngân hàng
+       *
+       * và trả về BIN chuẩn của VietQR.
+       */
+      const resolvedBank = await resolvePaymentBank({
+        bankCode,
+        bankName,
+      });
+
+      if (!resolvedBank) {
+        notifyError(
+          "Không xác định được ngân hàng từ VietQR. Vui lòng nhập đúng BIN 6 số hoặc tên/mã ngân hàng được VietQR hỗ trợ."
+        );
+
+        return;
+      }
+
+      if (!resolvedBank.transferSupported) {
+        notifyError("Ngân hàng này hiện không hỗ trợ chuyển khoản VietQR.");
+
+        return;
+      }
+
       const saved = await savePaymentSettings({
         ...settings,
 
@@ -171,7 +204,11 @@ const AdminPaymentSettingsPage = () => {
 
           bankName,
 
-          bankCode,
+          /*
+           * QUAN TRỌNG:
+           * lưu BIN 6 số chuẩn VietQR thay cho giá trị nhập tự do.
+           */
+          bankCode: resolvedBank.bin,
 
           accountNumber,
 
@@ -187,7 +224,9 @@ const AdminPaymentSettingsPage = () => {
 
       setSettings(saved);
 
-      notifySuccess("Đã lưu và đồng bộ cấu hình thanh toán.");
+      notifySuccess(
+        `Đã lưu cấu hình thanh toán. BIN VietQR: ${resolvedBank.bin}.`
+      );
     } catch (error) {
       notifyError(error?.message || "Không thể đồng bộ cấu hình thanh toán.");
     } finally {
@@ -274,9 +313,10 @@ const AdminPaymentSettingsPage = () => {
                   className={inputClass}
                 />
 
-                <p className="mt-2 text-xs text-gray-500">
-                  Khuyến nghị nhập BIN 6 chữ số của ngân hàng để tạo VietQR ổn
-                  định.
+                <p className="mt-2 text-xs leading-5 text-gray-500">
+                  Có thể nhập BIN 6 số, mã ngân hàng hoặc tên ngân hàng. Hệ
+                  thống sẽ tự đối chiếu với danh sách VietQR và lưu BIN chuẩn
+                  trước khi tạo QR Checkout.
                 </p>
               </div>
 
