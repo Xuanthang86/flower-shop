@@ -20,6 +20,8 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
 } from "@/services/siteSettings";
 
+import { verifyGoogleCredential } from "@/services/googleAuth";
+
 const ADMIN_EMAIL = "admin@flowershop.vn";
 const ADMIN_BOOTSTRAP_PASSWORD = "Admin@12345";
 
@@ -344,6 +346,84 @@ const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  const loginWithGoogle = useCallback(
+    async (credential) => {
+      setLoading(true);
+
+      try {
+        const result = await verifyGoogleCredential(credential);
+
+        if (!result?.success || !result?.user) {
+          return {
+            success: false,
+            message: "Không thể đăng nhập bằng Google.",
+          };
+        }
+
+        const googleUser = normalizeUser(result.user);
+
+        if (googleUser.disabled) {
+          return {
+            success: false,
+            message: "Tài khoản Google này đã bị khóa.",
+          };
+        }
+
+        const currentUsers = readUsers();
+
+        const existingIndex = currentUsers.findIndex(
+          (item) => item.email === googleUser.email
+        );
+
+        let finalUser = googleUser;
+
+        if (existingIndex >= 0) {
+          const existing = currentUsers[existingIndex];
+
+          finalUser = normalizeUser({
+            ...existing,
+
+            name: existing.name || googleUser.name,
+
+            avatar: googleUser.avatar || existing.avatar,
+
+            provider: "google",
+
+            providerId: googleUser.providerId,
+
+            disabled: false,
+          });
+
+          const nextUsers = [...currentUsers];
+
+          nextUsers[existingIndex] = finalUser;
+
+          persistUsers(nextUsers);
+        } else {
+          finalUser = normalizeUser({
+            ...googleUser,
+            role: ROLES.CUSTOMER,
+          });
+
+          persistUsers([...currentUsers, finalUser]);
+        }
+
+        const safeUser = sanitizeUser(finalUser);
+
+        setUser(safeUser);
+        saveSession(safeUser);
+
+        return {
+          success: true,
+          user: safeUser,
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [persistUsers]
+  );
 
   const logout = useCallback(() => {
     setUser(null);
@@ -943,6 +1023,7 @@ const AuthProvider = ({ children }) => {
 
       hasPermission,
       hasRole,
+      loginWithGoogle,
 
       isAdmin: user?.role === ROLES.ADMIN,
 
@@ -978,6 +1059,7 @@ const AuthProvider = ({ children }) => {
       getRolePermissions,
       hasPermission,
       hasRole,
+      loginWithGoogle,
       permissions,
     ]
   );
