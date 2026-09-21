@@ -671,11 +671,22 @@ app.post(
       /*
        * Bắt buộc nội dung có mã Payment Intent.
        */
-      const normalizedContent = content.toUpperCase();
+      const normalizePaymentReference = (value) =>
+        String(value || "")
+          .trim()
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
 
-      const normalizedOrderCode = String(paymentIntent.orderCode).toUpperCase();
+      const normalizedContent = normalizePaymentReference(content);
 
-      if (!normalizedContent.includes(normalizedOrderCode)) {
+      const normalizedOrderCode = normalizePaymentReference(
+        paymentIntent.orderCode,
+      );
+
+      if (
+        !normalizedOrderCode ||
+        !normalizedContent.includes(normalizedOrderCode)
+      ) {
         return res.json({
           success: true,
         });
@@ -1262,5 +1273,99 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+app.post("/api/auth/google", async (req, res, next) => {
+  try {
+    const credential = String(req.body?.credential || "").trim();
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu Google credential.",
+      });
+    }
+
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+
+    if (!clientId) {
+      return res.status(503).json({
+        success: false,
+        message: "GOOGLE_CLIENT_ID chưa được cấu hình.",
+      });
+    }
+
+    const googleResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(
+        credential,
+      )}`,
+    );
+
+    if (!googleResponse.ok) {
+      return res.status(401).json({
+        success: false,
+        message: "Thông tin đăng nhập Google không hợp lệ.",
+      });
+    }
+
+    const googleUser = await googleResponse.json();
+
+    if (String(googleUser.aud || "") !== clientId) {
+      return res.status(401).json({
+        success: false,
+        message: "Google Client ID không khớp.",
+      });
+    }
+
+    if (String(googleUser.email_verified || "").toLowerCase() !== "true") {
+      return res.status(401).json({
+        success: false,
+        message: "Tài khoản Google chưa được xác minh email.",
+      });
+    }
+
+    const email = String(googleUser.email || "")
+      .trim()
+      .toLowerCase();
+
+    const name = String(googleUser.name || googleUser.given_name || "").trim();
+
+    const avatar = String(googleUser.picture || "").trim();
+
+    if (!email) {
+      return res.status(401).json({
+        success: false,
+        message: "Google không cung cấp email tài khoản.",
+      });
+    }
+
+    return res.json({
+      success: true,
+
+      user: {
+        id: `google-${String(googleUser.sub || email)}`,
+
+        name: name || email,
+
+        email,
+
+        phone: "",
+
+        avatar,
+
+        role: "customer",
+
+        disabled: false,
+
+        provider: "google",
+
+        providerId: String(googleUser.sub || ""),
+
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 startServer();
