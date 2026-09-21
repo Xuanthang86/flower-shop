@@ -271,49 +271,92 @@ export const buildVietQrUrl = ({
   accountName,
   transferContent,
 }) => {
-  const bank = String(bankCode || "")
+  const normalizedBankCode = String(bankCode || "")
     .trim()
     .replace(/\s+/g, "");
 
-  const account = String(accountNumber || "")
+  const normalizedAccountNumber = String(accountNumber || "")
     .trim()
     .replace(/\s+/g, "");
 
   const numericAmount = Math.round(Number(amount) || 0);
 
-  if (!bank || !account || numericAmount <= 0) {
+  if (!normalizedBankCode || !normalizedAccountNumber || numericAmount <= 0) {
     return "";
   }
 
-  if (account.length > 19) {
+  /*
+   * VietQR Quick Link:
+   *
+   * https://img.vietqr.io/image/
+   * <BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png
+   *
+   * ACCOUNT_NO tối đa 19 ký tự.
+   *
+   * Quick Link của VietQR hỗ trợ số tài khoản,
+   * alias hoặc virtual account.
+   */
+  if (normalizedAccountNumber.length > 19) {
     return "";
   }
+
+  /*
+   * Chỉ cho phép BANK_ID dạng:
+   *
+   * - BIN 6 chữ số
+   * - hoặc short code / bank ID hợp lệ của VietQR
+   *
+   * Không tự biến đổi giá trị người quản trị đã nhập.
+   */
+  const bankId = encodeURIComponent(normalizedBankCode);
+
+  const accountNo = encodeURIComponent(normalizedAccountNumber);
 
   const params = new URLSearchParams();
 
   params.set("amount", String(numericAmount));
 
+  /*
+   * Nội dung chuyển khoản:
+   *
+   * - không dấu
+   * - không ký tự đặc biệt
+   * - tối đa 50 ký tự theo Quick Link
+   */
   const normalizedTransferContent = String(transferContent || "")
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "D")
+    .replace(/[^A-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
     .slice(0, 50);
 
   if (normalizedTransferContent) {
     params.set("addInfo", normalizedTransferContent);
   }
 
+  /*
+   * accountName chỉ dùng để hiển thị trên ảnh QR.
+   *
+   * Không để accountName quyết định tài khoản nhận tiền.
+   */
   const normalizedAccountName = String(accountName || "")
     .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "D")
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase()
     .slice(0, 50);
 
   if (normalizedAccountName) {
     params.set("accountName", normalizedAccountName);
   }
 
-  return `https://img.vietqr.io/image/${encodeURIComponent(
-    bank
-  )}-${encodeURIComponent(account)}-compact2.png?${params.toString()}`;
+  return `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?${params.toString()}`;
 };
 
 export const getPaymentSettingsUpdatedEvent =
