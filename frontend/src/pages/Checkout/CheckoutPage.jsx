@@ -230,6 +230,8 @@ const CheckoutPage = () => {
 
   const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount);
 
+  const checkoutPaymentAmount = Math.round(Number(grandTotal) || 0);
+
   const resetPaymentIntentForAmountChange = () => {
     paymentIntentAmountRef.current = null;
 
@@ -664,12 +666,16 @@ const CheckoutPage = () => {
       return undefined;
     }
 
-    if (!shippingCalculation.success || grandTotal <= 0) {
+    if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
       return undefined;
     }
 
-    const normalizedAmount = Math.round(Number(grandTotal) || 0);
+    const normalizedAmount = checkoutPaymentAmount;
 
+    /*
+     * Nếu Payment Intent hiện tại khác tổng tiền Checkout,
+     * tuyệt đối không được sử dụng lại.
+     */
     if (
       paymentIntent?.id &&
       Number(paymentIntent.amount) !== normalizedAmount
@@ -681,14 +687,12 @@ const CheckoutPage = () => {
       setPaymentVerified(false);
 
       setPaymentError("");
+
+      return undefined;
     }
 
     /*
-     * Nếu Payment Intent hiện tại đã được tạo cho đúng số tiền
-     * thì KHÔNG tạo lại.
-     *
-     * Điều này giúp mã đơn hàng / mã thanh toán giữ nguyên
-     * trong suốt thời gian khách đang thanh toán.
+     * Payment Intent hiện tại đã đúng số tiền.
      */
     if (
       paymentIntent?.id &&
@@ -702,7 +706,9 @@ const CheckoutPage = () => {
     paymentIntentAmountRef.current = normalizedAmount;
 
     setPaymentIntentLoading(true);
+
     setPaymentError("");
+
     setPaymentVerified(false);
 
     createBankTransferPaymentIntent({
@@ -719,13 +725,14 @@ const CheckoutPage = () => {
           throw new Error("Backend không trả về Payment Intent hợp lệ.");
         }
 
-        const expectedAmount = Math.round(Number(grandTotal) || 0);
-
         const receivedAmount = Math.round(Number(intent.amount) || 0);
 
-        if (receivedAmount !== expectedAmount) {
+        /*
+         * Tuyệt đối không nhận Payment Intent sai số tiền.
+         */
+        if (receivedAmount !== normalizedAmount) {
           throw new Error(
-            "Số tiền Payment Intent không khớp với tổng tiền Checkout hiện tại."
+            "Số tiền Payment Intent không khớp với tổng tiền Checkout."
           );
         }
 
@@ -739,6 +746,8 @@ const CheckoutPage = () => {
         paymentIntentAmountRef.current = null;
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+        setPaymentVerified(false);
 
         setPaymentError(
           intentError?.message ||
@@ -758,10 +767,7 @@ const CheckoutPage = () => {
     formData.paymentMethod,
     paymentSettings?.bankTransfer?.enabled,
     shippingCalculation.success,
-    grandTotal,
-    paymentIntent?.id,
-    paymentIntent?.orderCode,
-    paymentIntent?.amount,
+    checkoutPaymentAmount,
   ]);
 
   /*
@@ -882,9 +888,9 @@ const CheckoutPage = () => {
   const paymentIntentAmount = Math.round(Number(paymentIntent?.amount) || 0);
 
   const checkoutAmountIsSynchronized =
-    paymentIntent?.id &&
-    paymentIntent?.orderCode &&
-    paymentIntentAmount === Math.round(Number(grandTotal) || 0);
+    Boolean(paymentIntent?.id) &&
+    Boolean(paymentIntent?.orderCode) &&
+    paymentIntentAmount === checkoutPaymentAmount;
 
   const dynamicQrUrl = checkoutAmountIsSynchronized
     ? buildVietQrUrl({
@@ -900,50 +906,26 @@ const CheckoutPage = () => {
       })
     : "";
 
-  const addQrCacheBust = (url, version) => {
-    const normalizedUrl = String(url || "").trim();
-
-    if (!normalizedUrl) {
-      return "";
-    }
-
-    const separator = normalizedUrl.includes("?") ? "&" : "?";
-
-    return `${normalizedUrl}${separator}v=${version}`;
-  };
-
-  const dynamicQrCodeUrl = dynamicQrUrl || "";
-
-  const staticQrCodeUrl = paymentSettings?.bankTransfer?.qrCodeUrl
-    ? addQrCacheBust(paymentSettings.bankTransfer.qrCodeUrl, paymentQrVersion)
-    : "";
-
-  /*
-   * Ưu tiên QR động khi ngân hàng đã được VietQR xác định.
-   *
-   * Nếu không xác định được ngân hàng:
-   * dùng QR Admin upload làm fallback.
-   */
-  const qrCodeUrl = dynamicQrCodeUrl;
+  const qrCodeUrl = dynamicQrUrl;
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
 
+    if (!code) {
+      setAppliedCoupon(null);
+
+      setCouponMessage("Vui lòng nhập mã giảm giá.");
+
+      resetPaymentIntentForAmountChange();
+
+      setError("");
+
+      return;
+    }
+
     setCouponLoading(true);
 
     try {
-      if (!code) {
-        setAppliedCoupon(null);
-
-        setCouponMessage("Vui lòng nhập mã giảm giá.");
-
-        resetPaymentIntentForAmountChange();
-
-        setError("");
-
-        return;
-      }
-
       const products = getProductsSnapshot();
 
       const result = validateCoupon({
@@ -971,10 +953,7 @@ const CheckoutPage = () => {
       }
 
       /*
-       * Coupon là một phần trực tiếp của tổng thanh toán.
-       *
-       * Vì vậy ngay khi Coupon thay đổi,
-       * Payment Intent cũ không còn hợp lệ.
+       * Chỉ reset Payment Intent khi Coupon thực sự hợp lệ.
        */
       resetPaymentIntentForAmountChange();
 
