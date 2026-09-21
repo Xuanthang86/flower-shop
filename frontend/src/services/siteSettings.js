@@ -1,3 +1,34 @@
+export const getSiteName = (settings) =>
+  String(settings?.branding?.siteName || "HTH Flower Shop").trim();
+
+export const getSiteTagline = (settings) =>
+  String(settings?.branding?.tagline || "Fresh Flower Everyday").trim();
+
+export const getEmailDomain = (settings) =>
+  String(settings?.branding?.emailDomain || "hth.flowershop.vn")
+    .trim()
+    .replace(/^@+/, "");
+
+export const buildBrandEmail = (localPart, settings) => {
+  const local = String(localPart || "")
+    .trim()
+    .replace(/@.*$/, "");
+
+  const domain = getEmailDomain(settings);
+
+  if (!local || !domain) {
+    return "";
+  }
+
+  return `${local}@${domain}`;
+};
+
+export const getSeoTitle = (settings, key, fallback = "") => {
+  const title = String(settings?.seo?.[key] || "").trim();
+
+  return title || fallback;
+};
+
 export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
@@ -87,11 +118,11 @@ export const DEFAULT_BLOG_SHOP_INFO_HTML = `
     <h3>Khám phá thêm</h3>
 
     <p>
-      Khám phá thêm các sản phẩm hoa tại
-      <a href="/products">danh mục sản phẩm</a>
-      hoặc tìm hiểu thêm thông tin và kết nối với
-      <a href="/contact">Flower Shop</a>.
-    </p>
+  Khám phá thêm các sản phẩm hoa tại
+  <a href="/products">danh mục sản phẩm</a>
+  hoặc tìm hiểu thêm thông tin và kết nối với
+  <a href="/contact">{{siteName}}</a>.
+</p>
   </section>
 </section>
 `;
@@ -405,10 +436,30 @@ export const DEFAULT_SITE_SETTINGS = {
   ],
 
   branding: {
-    siteName: "Flower Shop",
+    siteName: "HTH Flower Shop",
     tagline: "Fresh Flower Everyday",
     logoImage: "",
-    logoAlt: "Flower Shop",
+    logoAlt: "HTH Flower Shop",
+
+    /*
+     * Domain thương hiệu dùng chung.
+     * Khi đổi domain/email thương hiệu,
+     * chỉ thay tại đây.
+     */
+    emailDomain: "hth.flowershop.vn",
+  },
+
+  seo: {
+    homeTitle: "HTH Flower Shop | Hoa tươi cho những khoảnh khắc đáng nhớ",
+
+    contactTitle: "Quản lý thông tin liên hệ | HTH Flower Shop",
+
+    blogTitle: "Bài viết | HTH Flower Shop",
+
+    productsTitle: "Hoa tươi | HTH Flower Shop",
+
+    defaultDescription:
+      "HTH Flower Shop cung cấp hoa tươi cho sinh nhật, khai trương, cưới hỏi, chúc mừng và những dịp đặc biệt.",
   },
 
   hero: {
@@ -618,6 +669,131 @@ const normalizeBlogStyle = (style) => {
   };
 };
 
+const normalizeBlogCategory = (category, index = 0) => {
+  const source = category && typeof category === "object" ? category : {};
+
+  return {
+    id:
+      String(source.id || "").trim() || `blog-category-${Date.now()}-${index}`,
+
+    name: String(source.name || "").trim(),
+
+    slug: String(source.slug || "").trim(),
+
+    description: String(source.description || "").trim(),
+
+    image: String(source.image || "").trim(),
+
+    active: source.active !== false,
+
+    sortOrder: Number.isFinite(Number(source.sortOrder))
+      ? Number(source.sortOrder)
+      : index + 1,
+
+    seoTitle: String(source.seoTitle || "").trim(),
+
+    seoDescription: String(source.seoDescription || "").trim(),
+
+    createdAt: source.createdAt || new Date().toISOString(),
+
+    updatedAt: source.updatedAt || new Date().toISOString(),
+  };
+};
+
+const normalizeBlogCategories = (categories) => {
+  if (!Array.isArray(categories)) {
+    return [];
+  }
+
+  return categories
+    .map((category, index) => normalizeBlogCategory(category, index))
+    .filter((category) => category.name)
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+};
+
+const createBlogSlug = (value = "") =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
+const stripHtml = (value = "") =>
+  String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const createBlogExcerpt = (content, maxLength = 180) => {
+  const text = stripHtml(content);
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength).trim()}…`;
+};
+
+const normalizeBlogPost = (post, index = 0) => {
+  const source = post && typeof post === "object" ? post : {};
+
+  const title = String(source.title || "").trim();
+
+  const content = normalizeBlogPostContent(source.content || "");
+
+  const slug = String(source.slug || "").trim() || createBlogSlug(title);
+
+  return {
+    id: String(source.id || "").trim() || `blog-post-${Date.now()}-${index}`,
+
+    categoryId: String(source.categoryId || "").trim(),
+
+    categorySlug: String(source.categorySlug || "").trim(),
+
+    categoryName: String(source.categoryName || "").trim(),
+
+    title,
+
+    slug,
+
+    excerpt: String(source.excerpt || "").trim() || createBlogExcerpt(content),
+
+    content,
+
+    image: String(source.image || "").trim(),
+
+    author: String(source.author || "").trim() || "HTH Flower Shop",
+
+    status: source.status === "draft" ? "draft" : "published",
+
+    publishedAt: source.publishedAt || source.date || new Date().toISOString(),
+
+    updatedAt: source.updatedAt || new Date().toISOString(),
+
+    seoTitle: String(source.seoTitle || "").trim(),
+
+    seoDescription: String(source.seoDescription || "").trim(),
+
+    /*
+     * Giữ lại dữ liệu cũ để tương thích.
+     */
+    date: source.date || "",
+
+    time: source.time || "",
+  };
+};
+
+const normalizeBlogPosts = (posts) => {
+  if (!Array.isArray(posts)) {
+    return [];
+  }
+
+  return posts.map((post, index) => normalizeBlogPost(post, index));
+};
+
 const mergeSettings = (input = {}) => {
   const source = input && typeof input === "object" ? input : {};
 
@@ -648,6 +824,11 @@ const mergeSettings = (input = {}) => {
     ...(source.branding || {}),
   };
 
+  const seo = {
+    ...defaults.seo,
+    ...(source.seo || {}),
+  };
+
   const contact = {
     ...defaults.contact,
     ...(source.contact || {}),
@@ -662,7 +843,11 @@ const mergeSettings = (input = {}) => {
       : [],
   };
 
-  const normalizedBlogPosts = normalizeStoredBlogPosts(
+  const normalizedBlogCategories = normalizeBlogCategories(
+    Array.isArray(source.blogCategories) ? source.blogCategories : []
+  );
+
+  const normalizedBlogPosts = normalizeBlogPosts(
     Array.isArray(source.blogPosts) ? source.blogPosts : []
   );
 
@@ -747,6 +932,8 @@ const mergeSettings = (input = {}) => {
     customerLogos: Array.isArray(source.customerLogos)
       ? source.customerLogos
       : [],
+
+    blogCategories: normalizedBlogCategories,
 
     blogPosts: normalizedBlogPosts,
 

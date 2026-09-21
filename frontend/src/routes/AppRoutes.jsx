@@ -44,7 +44,7 @@ import AdminContactManagementPage from "@/pages/Admin/AdminContactManagementPage
 import AdminContentManagementPage from "@/pages/Admin/AdminContentManagementPage";
 import AdminPaymentSettingsPage from "@/pages/Admin/AdminPaymentSettingsPage";
 import AdminCouponsPage from "@/pages/Admin/AdminCouponsPage";
-// import AdminBlogCategoriesPage from "@/pages/Admin/AdminBlogCategoriesPage";
+import AdminBlogCategoriesPage from "@/pages/Admin/AdminBlogCategoriesPage";
 
 import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
@@ -384,7 +384,7 @@ const AppRoutes = () => {
             }
           />
 
-          {/* <Route
+          <Route
             path="/admin/blog/categories"
             element={
               <PermissionRoute permission={PERMISSIONS.MANAGE_BLOG}>
@@ -393,7 +393,7 @@ const AppRoutes = () => {
                 </AdminSubPage>
               </PermissionRoute>
             }
-          /> */}
+          />
 
           <Route path="*" element={<NotFoundPage />} />
         </Route>

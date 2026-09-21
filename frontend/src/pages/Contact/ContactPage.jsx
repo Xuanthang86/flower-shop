@@ -18,13 +18,26 @@ import {
 
 import { ROLES, useAuth } from "@/context/AuthContext";
 
+import {
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+  getSeoTitle,
+  getSiteName,
+} from "@/services/siteSettings";
+
 const ContactPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const { user } = useAuth();
 
   useEffect(() => {
-    document.title = "Liên hệ | Flower Shop";
+    const currentSettings = readSiteSettings();
+
+    document.title = getSeoTitle(
+      currentSettings,
+      "contactTitle",
+      `Liên hệ | ${getSiteName(currentSettings)}`
+    );
 
     let description = document.querySelector('meta[name="description"]');
 
@@ -34,8 +47,7 @@ const ContactPage = () => {
       document.head.appendChild(description);
     }
 
-    description.content =
-      "Liên hệ Flower Shop để được tư vấn hoa tươi, đặt hoa và hỗ trợ giao hoa.";
+    description.content = `Liên hệ ${getSiteName(currentSettings)} để được tư vấn hoa tươi, đặt hoa và hỗ trợ giao hoa.`;
 
     let canonical = document.querySelector('link[rel="canonical"]');
 

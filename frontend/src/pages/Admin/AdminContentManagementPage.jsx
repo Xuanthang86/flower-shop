@@ -688,7 +688,6 @@ const AdminContentManagementPage = () => {
                     </option>
                   ))}
                 </select>
-
               </div>
             </div>
 

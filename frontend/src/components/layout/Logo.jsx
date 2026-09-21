@@ -4,8 +4,10 @@ const Logo = ({ settings, onClick }) => {
   const branding = settings?.branding || {};
 
   const image = branding.logoImage || branding.logo || "";
-  const siteName = branding.siteName || "Flower Shop";
+  const siteName = branding.siteName || "HTH Flower Shop";
+
   const tagline = branding.tagline || "Fresh Flower Everyday";
+
   const alt = branding.logoAlt || siteName;
 
   return (
@@ -39,17 +41,28 @@ const Logo = ({ settings, onClick }) => {
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-lg sm:h-12 sm:w-12">
+          {/* <div className="flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-lg sm:h-12 sm:w-12">
+            🌸
+          </div> */}
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 via-rose-50 to-fuchsia-100 text-xl shadow-sm ring-1 ring-pink-100">
             🌸
           </div>
 
-          <div className="hidden sm:block">
-            <div className="text-lg font-bold leading-tight text-gray-900">
-              {siteName}
+          <div className="hidden min-w-0 sm:block">
+            <div className="flex items-center gap-1.5">
+              <span className="bg-gradient-to-r from-pink-600 via-rose-500 to-fuchsia-500 bg-clip-text text-lg font-extrabold leading-tight tracking-tight text-transparent">
+                {siteName}
+              </span>
             </div>
 
             {tagline && (
-              <div className="mt-0.5 text-[10px] text-gray-500">{tagline}</div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="h-px w-5 bg-pink-300" />
+
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-500">
+                  {tagline}
+                </span>
+              </div>
             )}
           </div>
         </div>
