@@ -149,7 +149,7 @@ const BlogPage = () => {
     }
 
     if (currentPost) {
-      const siteName = settings.branding?.siteName || "Flower Shop";
+      const siteName = settings.branding?.siteName || "HTH Flower Shop";
 
       document.title = `${currentPost.title} | ${siteName}`;
 
@@ -252,7 +252,7 @@ const BlogPage = () => {
 
       document.head.appendChild(schemaScript);
     } else if (!postId) {
-      document.title = "Bài viết | Flower Shop";
+      document.title = "Bài viết | HTH Flower Shop";
     }
 
     return () => {
@@ -608,7 +608,7 @@ const BlogPage = () => {
           </h1>
 
           <p className="mx-auto mt-2 max-w-2xl text-gray-500">
-            Những câu chuyện, kiến thức và cảm hứng từ Flower Shop.
+            Những câu chuyện, kiến thức và cảm hứng từ HTH Flower Shop.
           </p>
         </header>
 
@@ -623,7 +623,7 @@ const BlogPage = () => {
 
               const excerpt =
                 stripHtml(normalizeBlogPostContent(post.content)) ||
-                "Khám phá bài viết mới từ Flower Shop.";
+                "Khám phá bài viết mới từ HTH Flower Shop.";
 
               const displayDate = formatPostDate(post.date);
 
@@ -645,7 +645,7 @@ const BlogPage = () => {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                          Flower Shop
+                          HTH Flower Shop
                         </div>
                       )}
                     </div>

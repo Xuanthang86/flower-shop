@@ -11,11 +11,6 @@ import {
 
 import { Link } from "react-router-dom";
 
-import {
-  readSiteSettings,
-  SITE_SETTINGS_UPDATED_EVENT,
-} from "@/services/siteSettings";
-
 import { ROLES, useAuth } from "@/context/AuthContext";
 
 import {

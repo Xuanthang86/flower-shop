@@ -28,12 +28,24 @@ import { uploadImageFile } from "@/services/media";
 
 import { useNotification } from "@/context/NotificationProvider";
 
+const getCurrentDate = () => new Date().toISOString().slice(0, 10);
+
+const getCurrentTime = () => new Date().toTimeString().slice(0, 5);
+
 const EMPTY_POST = {
+  categoryId: "",
   title: "",
-  date: new Date().toISOString().slice(0, 10),
-  time: new Date().toTimeString().slice(0, 5),
+  slug: "",
+  excerpt: "",
   image: "",
+  author: "HTH Flower Shop",
+  status: "published",
+  date: getCurrentDate(),
+  time: getCurrentTime(),
+  publishedAt: new Date().toISOString(),
   content: "",
+  seoTitle: "",
+  seoDescription: "",
 };
 
 const inputClass =
@@ -46,6 +58,16 @@ const stripHtml = (html = "") =>
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const slugify = (value = "") =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
 
 const normalizeDateValue = (value) => {
   const raw = String(value || "")
@@ -64,6 +86,12 @@ const normalizeDateValue = (value) => {
     const [, day, month, year] = slashMatch;
 
     return `${year}-${month}-${day}`;
+  }
+
+  const date = new Date(raw);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(0, 10);
   }
 
   return raw;
@@ -101,6 +129,10 @@ const getBlogStyle = (settings) =>
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
+  const blogCategories = Array.isArray(settings.blogCategories)
+    ? settings.blogCategories
+    : [];
+
   const [editorOpen, setEditorOpen] = useState(false);
 
   const [editingPost, setEditingPost] = useState(null);
@@ -117,38 +149,43 @@ const AdminBlogManagementPage = () => {
 
   const { notifySuccess, notifyError } = useNotification();
 
+  /*
+   * Cập nhật title của trang.
+   *
+   * LƯU Ý:
+   * Đây là useEffect độc lập.
+   * Không lồng useEffect bên trong useEffect.
+   */
   useEffect(() => {
-    document.title = "Quản lý bài viết | Flower Shop";
+    const currentSettings = readSiteSettings();
 
-    let robots = document.querySelector('meta[name="robots"]');
+    const siteName = currentSettings?.branding?.siteName || "HTH Flower Shop";
 
-    if (!robots) {
-      robots = document.createElement("meta");
-      robots.name = "robots";
-      document.head.appendChild(robots);
-    }
-
-    robots.content = "noindex,nofollow";
-
-    return () => {
-      robots.content = "index,follow";
-    };
+    document.title = `Quản lý bài viết | ${siteName}`;
   }, []);
 
+  /*
+   * Đồng bộ settings khi site settings thay đổi.
+   */
   useEffect(() => {
     const refresh = () => {
       setSettings(readSiteSettings());
     };
 
     window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
     window.addEventListener("storage", refresh);
 
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
+
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
+  /*
+   * Khởi tạo nội dung editor khi mở hoặc chuyển bài viết.
+   */
   useEffect(() => {
     if (!editorOpen) {
       return;
@@ -193,15 +230,27 @@ const AdminBlogManagementPage = () => {
   const openCreate = () => {
     const latestSettings = readSiteSettings();
 
+    const now = new Date();
+
     setSettings(latestSettings);
 
     setEditingPost(null);
 
     setForm({
       ...EMPTY_POST,
+      categoryId: "",
+      title: "",
+      slug: "",
+      excerpt: "",
+      image: "",
+      author: "HTH Flower Shop",
+      status: "published",
+      publishedAt: new Date().toISOString(),
+      content: "",
+      seoTitle: "",
+      seoDescription: "",
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
-      content: "",
     });
 
     selectionRef.current = null;
@@ -212,17 +261,36 @@ const AdminBlogManagementPage = () => {
   const openEdit = (post) => {
     const latestSettings = readSiteSettings();
 
+    const publishedDate = normalizeDateValue(
+      post.date || post.publishedAt || new Date().toISOString()
+    );
+
     setSettings(latestSettings);
 
     setEditingPost(post);
 
     setForm({
+      categoryId: post.categoryId || "",
       title: post.title || "",
-      date:
-        normalizeDateValue(post.date) || new Date().toISOString().slice(0, 10),
-      time: post.time || "08:00",
+      slug: post.slug || "",
+      excerpt: post.excerpt || "",
       image: post.image || "",
+      author: post.author || "HTH Flower Shop",
+      status: post.status || "published",
+
+      date: /^\d{4}-\d{2}-\d{2}$/.test(publishedDate)
+        ? publishedDate
+        : getCurrentDate(),
+
+      time: post.time || "08:00",
+
+      publishedAt:
+        post.publishedAt || `${publishedDate}T${post.time || "08:00"}:00`,
+
       content: normalizeBlogPostContent(post.content || ""),
+
+      seoTitle: post.seoTitle || "",
+      seoDescription: post.seoDescription || "",
     });
 
     selectionRef.current = null;
@@ -239,13 +307,16 @@ const AdminBlogManagementPage = () => {
 
     setForm({
       ...EMPTY_POST,
-      date: new Date().toISOString().slice(0, 10),
-      time: new Date().toTimeString().slice(0, 5),
+      date: getCurrentDate(),
+      time: getCurrentTime(),
+      publishedAt: new Date().toISOString(),
+      content: "",
     });
   };
 
   const saveEditorSelection = () => {
     const editor = editorRef.current;
+
     const selection = window.getSelection();
 
     if (
@@ -284,6 +355,7 @@ const AdminBlogManagementPage = () => {
       editor.contains(selectionRef.current.commonAncestorContainer)
     ) {
       selection.removeAllRanges();
+
       selection.addRange(selectionRef.current);
 
       return true;
@@ -427,6 +499,7 @@ const AdminBlogManagementPage = () => {
 
       if (!editor || !editor.isConnected) {
         notifyError("Trình soạn thảo chưa sẵn sàng.");
+
         return;
       }
 
@@ -438,6 +511,7 @@ const AdminBlogManagementPage = () => {
 
       if (!selection || selection.rangeCount === 0) {
         notifyError("Không xác định được vị trí chèn ảnh.");
+
         return;
       }
 
@@ -445,6 +519,7 @@ const AdminBlogManagementPage = () => {
 
       if (!editor.contains(range.commonAncestorContainer)) {
         notifyError("Không xác định được vị trí chèn ảnh.");
+
         return;
       }
 
@@ -462,12 +537,14 @@ const AdminBlogManagementPage = () => {
       imageElement.style.borderRadius = "12px";
 
       range.deleteContents();
+
       range.insertNode(imageElement);
 
       range.setStartAfter(imageElement);
       range.collapse(true);
 
       selection.removeAllRanges();
+
       selection.addRange(range);
 
       selectionRef.current = range.cloneRange();
@@ -482,16 +559,18 @@ const AdminBlogManagementPage = () => {
     }
   };
 
+  const categories = Array.isArray(settings.blogCategories)
+    ? settings.blogCategories
+    : [];
+
   const savePost = () => {
-    const title = form.title.trim();
+    const title = String(form.title || "").trim();
 
     const editor = editorRef.current;
 
     const content = editor?.isConnected
       ? normalizeBlogPostContent(editor.innerHTML || "")
-      : normalizeBlogPostContent(form.content);
-
-    const normalizedDate = normalizeDateValue(form.date);
+      : normalizeBlogPostContent(form.content || "");
 
     if (!title) {
       notifyError("Vui lòng nhập tiêu đề bài viết.");
@@ -503,21 +582,58 @@ const AdminBlogManagementPage = () => {
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
-      notifyError("Ngày đăng không hợp lệ.");
-      return;
-    }
+    const selectedCategory = blogCategories.find(
+      (category) => String(category.id) === String(form.categoryId || "")
+    );
+
+    const now = new Date().toISOString();
+
+    const slug = String(form.slug || "").trim() || slugify(title);
+
+    const excerpt =
+      String(form.excerpt || "").trim() || stripHtml(content).slice(0, 180);
+
+    const publishedAt = form.publishedAt || now;
 
     const post = {
       id:
         editingPost?.id ||
-        `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        `blog-post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+
+      categoryId: form.categoryId || "",
+
+      categorySlug: selectedCategory?.slug || "",
+
+      categoryName: selectedCategory?.name || "",
+
       title,
-      date: normalizedDate,
-      time: form.time || "08:00",
-      image: form.image || "",
+
+      slug,
+
+      excerpt,
+
       content,
-      updatedAt: new Date().toISOString(),
+
+      image: form.image || "",
+
+      author: String(form.author || "").trim() || "HTH Flower Shop",
+
+      status: form.status === "draft" ? "draft" : "published",
+
+      publishedAt,
+
+      updatedAt: now,
+
+      seoTitle: String(form.seoTitle || "").trim(),
+
+      seoDescription: String(form.seoDescription || "").trim(),
+
+      /*
+       * Giữ dữ liệu cũ để migration.
+       */
+      date: normalizeDateValue(form.date) || String(publishedAt).slice(0, 10),
+
+      time: form.time || "08:00",
     };
 
     const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
@@ -554,17 +670,20 @@ const AdminBlogManagementPage = () => {
     try {
       const saved = saveSiteSettings({
         ...settings,
+
         blogPosts: (settings.blogPosts || []).filter(
           (item) => String(item.id) !== String(confirmDelete.id)
         ),
       });
 
       setSettings(saved);
+
       setConfirmDelete(null);
 
       notifySuccess("Đã xóa bài viết.");
     } catch (deleteError) {
       setConfirmDelete(null);
+
       notifyError(deleteError?.message || "Không thể xóa bài viết.");
     }
   };
@@ -577,19 +696,29 @@ const AdminBlogManagementPage = () => {
 
   const toolbar = [
     ["bold", <FiBold />, "In đậm"],
+
     ["italic", <FiItalic />, "In nghiêng"],
+
     ["underline", <FiUnderline />, "Gạch chân"],
+
     ["justifyLeft", <FiAlignLeft />, "Căn trái"],
+
     ["justifyCenter", <FiAlignCenter />, "Căn giữa"],
+
     ["justifyRight", <FiAlignRight />, "Căn phải"],
+
     ["justifyFull", <FiAlignJustify />, "Căn đều"],
+
     ["insertUnorderedList", <FiList />, "Danh sách"],
+
     [
       "insertOrderedList",
       <span className="text-xs font-bold">1.</span>,
       "Danh sách số",
     ],
+
     ["undo", <span className="text-lg leading-none">↶</span>, "Hoàn tác"],
+
     ["redo", <span className="text-lg leading-none">↷</span>, "Làm lại"],
   ];
 
@@ -642,7 +771,8 @@ const AdminBlogManagementPage = () => {
                 </h2>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  {formatPostDate(post.date)} {post.time || "08:00"}
+                  {formatPostDate(post.date || post.publishedAt)}{" "}
+                  {post.time || "08:00"}
                 </p>
 
                 <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
@@ -706,6 +836,90 @@ const AdminBlogManagementPage = () => {
                   className={inputClass}
                 />
 
+                <div>
+                  <label
+                    htmlFor="blog-category"
+                    className="mb-2 block text-sm font-semibold"
+                  >
+                    Danh mục
+                  </label>
+
+                  <select
+                    id="blog-category"
+                    value={form.categoryId || ""}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        categoryId: event.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">-- Chọn danh mục --</option>
+
+                    {blogCategories
+                      .filter((category) => category.active !== false)
+                      .map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="blog-slug"
+                    className="mb-2 block text-sm font-semibold"
+                  >
+                    Slug
+                  </label>
+
+                  <input
+                    id="blog-slug"
+                    value={form.slug || ""}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        slug: slugify(event.target.value),
+                      }))
+                    }
+                    placeholder="hoa-tuoi-sinh-nhat"
+                    className={inputClass}
+                  />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nếu bỏ trống, hệ thống tự tạo từ tiêu đề bài viết.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="blog-excerpt"
+                    className="mb-2 block text-sm font-semibold"
+                  >
+                    Mô tả ngắn
+                  </label>
+
+                  <textarea
+                    id="blog-excerpt"
+                    value={form.excerpt || ""}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        excerpt: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                    placeholder="Mô tả ngắn hiển thị ở danh sách bài viết..."
+                    className={inputClass}
+                  />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nếu bỏ trống, hệ thống sẽ tự lấy nội dung đầu bài viết.
+                  </p>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-semibold">
@@ -732,7 +946,7 @@ const AdminBlogManagementPage = () => {
 
                     <input
                       type="time"
-                      value={form.time}
+                      value={form.time || "08:00"}
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
@@ -742,6 +956,33 @@ const AdminBlogManagementPage = () => {
                       className={inputClass}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="blog-excerpt"
+                    className="mb-2 block text-sm font-semibold"
+                  >
+                    Mô tả ngắn
+                  </label>
+
+                  <textarea
+                    id="blog-excerpt"
+                    value={form.excerpt || ""}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        excerpt: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                    placeholder="Mô tả ngắn hiển thị ở danh sách bài viết..."
+                    className={inputClass}
+                  />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nếu bỏ trống, hệ thống sẽ tự lấy nội dung đầu bài viết.
+                  </p>
                 </div>
 
                 <div>
@@ -755,6 +996,7 @@ const AdminBlogManagementPage = () => {
                       className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
                     >
                       <FiImage />
+
                       {uploading ? "Đang tải..." : "Chọn tệp"}
                     </label>
 
@@ -785,6 +1027,55 @@ const AdminBlogManagementPage = () => {
                   )}
                 </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="blog-author"
+                      className="mb-2 block text-sm font-semibold"
+                    >
+                      Tác giả
+                    </label>
+
+                    <input
+                      id="blog-author"
+                      value={form.author || ""}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          author: event.target.value,
+                        }))
+                      }
+                      placeholder="HTH Flower Shop"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="blog-status"
+                      className="mb-2 block text-sm font-semibold"
+                    >
+                      Trạng thái
+                    </label>
+
+                    <select
+                      id="blog-status"
+                      value={form.status || "published"}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          status: event.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    >
+                      <option value="published">Đã xuất bản</option>
+
+                      <option value="draft">Bản nháp</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="mb-2 block text-sm font-semibold">
                     Nội dung bài viết
@@ -803,7 +1094,9 @@ const AdminBlogManagementPage = () => {
                           type="button"
                           onMouseDown={(event) => {
                             event.preventDefault();
+
                             saveEditorSelection();
+
                             executeFormat(command);
                           }}
                           className="rounded-lg p-2.5 hover:bg-white"
@@ -824,8 +1117,11 @@ const AdminBlogManagementPage = () => {
                         aria-label="Định dạng đoạn văn"
                       >
                         <option value="">Đoạn văn</option>
+
                         <option value="h2">Tiêu đề H2</option>
+
                         <option value="h3">Tiêu đề H3</option>
+
                         <option value="p">Đoạn văn</option>
                       </select>
 
@@ -833,7 +1129,9 @@ const AdminBlogManagementPage = () => {
                         type="button"
                         onMouseDown={(event) => {
                           event.preventDefault();
+
                           saveEditorSelection();
+
                           createLink();
                         }}
                         className="rounded-lg p-2.5 hover:bg-white"
@@ -866,7 +1164,9 @@ const AdminBlogManagementPage = () => {
                         type="button"
                         onMouseDown={(event) => {
                           event.preventDefault();
+
                           saveEditorSelection();
+
                           executeFormat("removeFormat");
                         }}
                         className="rounded-lg px-3 py-2 text-xs font-semibold hover:bg-white"
@@ -908,10 +1208,15 @@ const AdminBlogManagementPage = () => {
                     className="blog-default-shop-preview overflow-hidden"
                     style={{
                       backgroundColor: blogStyle.backgroundColor,
+
                       borderColor: blogStyle.borderColor,
+
                       borderWidth: 1,
+
                       borderStyle: "solid",
+
                       borderRadius: `${blogStyle.borderRadius}px`,
+
                       padding: `${blogStyle.padding}px`,
                     }}
                   >
@@ -921,7 +1226,9 @@ const AdminBlogManagementPage = () => {
                       }}
                       style={{
                         color: blogStyle.textColor,
+
                         fontSize: `${blogStyle.bodyFontSize}px`,
+
                         lineHeight: blogStyle.lineHeight,
                       }}
                     />

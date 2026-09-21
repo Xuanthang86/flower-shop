@@ -142,9 +142,9 @@ export const DEFAULT_BLOG_SHOP_INFO_STYLE = {
 };
 
 const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
-<h2>Về Flower Shop</h2>
+<h2>Về HTH Flower Shop</h2>
 <p>
-  Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
+  HTH Flower Shop là cửa hàng hoa tươi chuyên cung cấp những sản phẩm hoa đẹp,
   được tuyển chọn và chăm sóc kỹ lưỡng cho nhiều dịp đặc biệt như sinh nhật,
   khai trương, cưới hỏi, chúc mừng, tri ân và các sự kiện quan trọng.
 </p>
@@ -198,7 +198,7 @@ const isLegacyDefaultBlogShopInfo = (value) => {
   }
 
   if (
-    normalized.includes("Về Flower Shop") &&
+    normalized.includes("Về HTH Flower Shop") &&
     normalized.includes("Thông tin liên hệ") &&
     normalized.includes("Danh mục sản phẩm") &&
     normalized.includes("/contact")
@@ -278,7 +278,7 @@ export const buildDefaultBlogShopInfoHtml = (settings) => {
   return template
     .replace(
       /\{\{siteName\}\}/g,
-      escapeHtml(branding.siteName || "Flower Shop")
+      escapeHtml(branding.siteName || "HTH Flower Shop")
     )
     .replace(/\{\{tagline\}\}/g, escapeHtml(branding.tagline || ""))
     .replace(/\{\{address\}\}/g, escapeHtml(contact.address || "Đang cập nhật"))
@@ -403,30 +403,6 @@ export const composeBlogPostContent = (content, settings) => {
   return `${articleContent}${defaultShopInfo}`;
 };
 
-const normalizeStoredBlogPosts = (posts) => {
-  if (!Array.isArray(posts)) {
-    return [];
-  }
-
-  return posts.map((post) => {
-    if (!post || typeof post !== "object") {
-      return post;
-    }
-
-    const originalContent = String(post.content || "");
-    const cleanedContent = normalizeBlogPostContent(originalContent);
-
-    if (cleanedContent === originalContent) {
-      return post;
-    }
-
-    return {
-      ...post,
-      content: cleanedContent,
-    };
-  });
-};
-
 export const DEFAULT_SITE_SETTINGS = {
   announcementMessages: [
     "🌸 Miễn phí giao hàng cho đơn từ 500.000đ",
@@ -491,7 +467,7 @@ export const DEFAULT_SITE_SETTINGS = {
   customerLogos: [],
 
   footer: {
-    copyright: "© 2026 Flower Shop. All Rights Reserved.",
+    copyright: "© 2026 HTH Flower Shop. All Rights Reserved.",
   },
 
   shipping: {
@@ -502,7 +478,7 @@ export const DEFAULT_SITE_SETTINGS = {
     title: "Liên hệ",
 
     description:
-      "Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp.",
+      "HTH Flower Shop luôn sẵn sàng tư vấn và hỗ trợ bạn lựa chọn những bó hoa phù hợp.",
 
     phone: "",
     email: "",
@@ -856,6 +832,8 @@ const mergeSettings = (input = {}) => {
     ...source,
 
     branding,
+
+    seo,
 
     hero: {
       ...defaults.hero,

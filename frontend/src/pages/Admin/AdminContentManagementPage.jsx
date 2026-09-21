@@ -153,6 +153,21 @@ const AdminContentManagementPage = () => {
     }));
   };
 
+  const updateSeo = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+
+      seo: {
+        ...(current.seo || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveSeo = () => {
+    saveSettings(settings, "Đã lưu cấu hình SEO.");
+  };
+
   const saveBranding = () => {
     saveSettings(settings, "Đã lưu thông tin Logo & thương hiệu.");
   };
@@ -367,7 +382,9 @@ const AdminContentManagementPage = () => {
                     <img
                       src={branding.logoImage}
                       alt={
-                        branding.logoAlt || branding.siteName || "Flower Shop"
+                        branding.logoAlt ||
+                        branding.siteName ||
+                        "HTH Flower Shop"
                       }
                       className="h-28 w-28 rounded-full object-contain"
                     />
@@ -422,6 +439,29 @@ const AdminContentManagementPage = () => {
                   />
                 </div>
 
+                <div>
+                  <label
+                    htmlFor="brand-email-domain"
+                    className="mb-2 block text-sm font-semibold text-gray-700"
+                  >
+                    Domain email thương hiệu
+                  </label>
+
+                  <input
+                    id="brand-email-domain"
+                    value={branding.emailDomain || ""}
+                    onChange={(event) =>
+                      updateBranding("emailDomain", event.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="hth.flowershop.vn"
+                  />
+
+                  <p className="mt-2 text-xs leading-5 text-gray-500">
+                    Chỉ nhập domain, không nhập dấu @. Ví dụ: hth.flowershop.vn
+                  </p>
+                </div>
+
                 <div className="flex flex-wrap gap-3">
                   <label
                     htmlFor="site-logo"
@@ -451,6 +491,128 @@ const AdminContentManagementPage = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                SEO Title & mô tả website
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                Quản lý tiêu đề hiển thị trên tab trình duyệt và mô tả SEO cho
+                các trang chính của website.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="seo-home-title"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  SEO Title trang chủ
+                </label>
+
+                <input
+                  id="seo-home-title"
+                  value={settings.seo?.homeTitle || ""}
+                  onChange={(event) =>
+                    updateSeo("homeTitle", event.target.value)
+                  }
+                  className={inputClass}
+                  placeholder="HTH Flower Shop | Hoa tươi cho những khoảnh khắc đáng nhớ"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="seo-contact-title"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  SEO Title trang Liên hệ
+                </label>
+
+                <input
+                  id="seo-contact-title"
+                  value={settings.seo?.contactTitle || ""}
+                  onChange={(event) =>
+                    updateSeo("contactTitle", event.target.value)
+                  }
+                  className={inputClass}
+                  placeholder="Quản lý thông tin liên hệ | HTH Flower Shop"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="seo-blog-title"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  SEO Title trang Blog
+                </label>
+
+                <input
+                  id="seo-blog-title"
+                  value={settings.seo?.blogTitle || ""}
+                  onChange={(event) =>
+                    updateSeo("blogTitle", event.target.value)
+                  }
+                  className={inputClass}
+                  placeholder="Bài viết | HTH Flower Shop"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="seo-products-title"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  SEO Title trang Sản phẩm
+                </label>
+
+                <input
+                  id="seo-products-title"
+                  value={settings.seo?.productsTitle || ""}
+                  onChange={(event) =>
+                    updateSeo("productsTitle", event.target.value)
+                  }
+                  className={inputClass}
+                  placeholder="Hoa tươi | HTH Flower Shop"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="seo-default-description"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  SEO Description mặc định
+                </label>
+
+                <textarea
+                  id="seo-default-description"
+                  value={settings.seo?.defaultDescription || ""}
+                  onChange={(event) =>
+                    updateSeo("defaultDescription", event.target.value)
+                  }
+                  rows={4}
+                  className={inputClass}
+                  placeholder="Mô tả ngắn về website..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={saveSeo}
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu cấu hình SEO
+              </button>
             </div>
           </section>
 

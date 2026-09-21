@@ -222,12 +222,44 @@ const CheckoutPage = () => {
     ? Number(shippingCalculation.shippingFee) || 0
     : 0;
 
-  const discountAmount = Math.min(
-    subtotal,
-    Math.max(0, Number(appliedCoupon?.discountAmount) || 0)
-  );
+  const calculateCheckoutTotals = ({
+    subtotal = 0,
+    shippingFee = 0,
+    couponResult = null,
+  }) => {
+    const safeSubtotal = Math.max(0, Number(subtotal) || 0);
 
-  const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount);
+    const safeShippingFee = Math.max(0, Number(shippingFee) || 0);
+
+    const requestedDiscount = Math.max(
+      0,
+      Number(couponResult?.discountAmount) || 0
+    );
+
+    const discountAmount = Math.min(safeSubtotal, requestedDiscount);
+
+    const grandTotal = Math.max(
+      0,
+      safeSubtotal + safeShippingFee - discountAmount
+    );
+
+    return {
+      subtotal: safeSubtotal,
+      shippingFee: safeShippingFee,
+      discountAmount,
+      grandTotal,
+    };
+  };
+
+  const checkoutTotals = calculateCheckoutTotals({
+    subtotal,
+    shippingFee,
+    couponResult: appliedCoupon,
+  });
+
+  const discountAmount = checkoutTotals.discountAmount;
+
+  const grandTotal = checkoutTotals.grandTotal;
 
   const checkoutPaymentAmount = Math.round(Number(grandTotal) || 0);
 
@@ -1229,22 +1261,15 @@ const CheckoutPage = () => {
         setAppliedCoupon(finalCouponResult);
       }
 
-      const finalDiscountAmount = Math.min(
+      const finalCheckoutTotals = calculateCheckoutTotals({
         subtotal,
-        Math.max(
-          0,
-          Number(
-            finalCouponResult?.discountAmount ??
-              appliedCoupon?.discountAmount ??
-              0
-          )
-        )
-      );
+        shippingFee: finalShippingFee,
+        couponResult: finalCouponResult || appliedCoupon,
+      });
 
-      const finalGrandTotal = Math.max(
-        0,
-        subtotal + finalShippingFee - finalDiscountAmount
-      );
+      const finalDiscountAmount = finalCheckoutTotals.discountAmount;
+
+      const finalGrandTotal = finalCheckoutTotals.grandTotal;
 
       if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
         const expectedPaymentAmount = Math.round(Number(finalGrandTotal) || 0);
