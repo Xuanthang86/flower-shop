@@ -1,7 +1,7 @@
 export const ORDER_STATUS = {
   PENDING: "pending",
   CONFIRMED: "confirmed",
-  PREPARING: "preparing",
+  PROCESSING: "processing",
   SHIPPING: "shipping",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
@@ -17,7 +17,7 @@ export const STATUS_OPTIONS = [
     label: "Đã xác nhận",
   },
   {
-    value: ORDER_STATUS.PREPARING,
+    value: ORDER_STATUS.PROCESSING,
     label: "Đang chuẩn bị",
   },
   {
@@ -49,8 +49,11 @@ export const normalizeOrderStatus = (status) => {
     confirmed: ORDER_STATUS.CONFIRMED,
     "đã xác nhận": ORDER_STATUS.CONFIRMED,
 
-    preparing: ORDER_STATUS.PREPARING,
-    "đang chuẩn bị": ORDER_STATUS.PREPARING,
+    processing: ORDER_STATUS.PROCESSING,
+    "đang chuẩn bị": ORDER_STATUS.PROCESSING,
+
+    // Dữ liệu cũ
+    preparing: ORDER_STATUS.PROCESSING,
 
     shipping: ORDER_STATUS.SHIPPING,
     "đang giao": ORDER_STATUS.SHIPPING,
@@ -58,7 +61,7 @@ export const normalizeOrderStatus = (status) => {
     delivered: ORDER_STATUS.DELIVERED,
     "đã giao": ORDER_STATUS.DELIVERED,
 
-    // Dữ liệu cũ của website
+    // Dữ liệu cũ
     completed: ORDER_STATUS.DELIVERED,
     "hoàn thành": ORDER_STATUS.DELIVERED,
 
@@ -87,7 +90,7 @@ export const getStatusClass = (status) => {
     case ORDER_STATUS.CONFIRMED:
       return "bg-blue-100 text-blue-700";
 
-    case ORDER_STATUS.PREPARING:
+    case ORDER_STATUS.PROCESSING:
       return "bg-purple-100 text-purple-700";
 
     case ORDER_STATUS.SHIPPING:

@@ -285,7 +285,7 @@ export const buildVietQrUrl = ({
     return "";
   }
 
-  if (account.length < 6 || account.length > 19) {
+  if (account.length > 19) {
     return "";
   }
 

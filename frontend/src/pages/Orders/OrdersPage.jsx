@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
     label: "Đã xác nhận",
   },
   {
-    value: "preparing",
+    value: "processing",
     label: "Đang chuẩn bị",
   },
   {
