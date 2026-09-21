@@ -94,7 +94,6 @@ const CheckoutPage = () => {
   const [paymentSettings, setPaymentSettings] = useState(() =>
     readPaymentSettings()
   );
-  const [paymentQrVersion, setPaymentQrVersion] = useState(() => Date.now());
 
   const [resolvedBankCode, setResolvedBankCode] = useState("");
 
@@ -245,7 +244,6 @@ const CheckoutPage = () => {
   useEffect(() => {
     const refreshPaymentSettings = () => {
       setPaymentSettings(readPaymentSettings());
-      setPaymentQrVersion(Date.now());
     };
 
     window.addEventListener(
@@ -2067,7 +2065,7 @@ const CheckoutPage = () => {
                             </div>
                           ) : (
                             <div className="flex min-h-48 items-center justify-center rounded-xl bg-white p-4 text-center text-xs text-gray-500">
-                              Admin chưa cấu hình QR hoặc mã ngân hàng.
+                              Mã QR hoặc mã ngân hàng đang được tạo.
                             </div>
                           )}
                         </div>
