@@ -447,6 +447,22 @@ export const DEFAULT_SITE_SETTINGS = {
 
     defaultDescription:
       "HTH Flower Shop cung cấp hoa tươi cho sinh nhật, khai trương, cưới hỏi, chúc mừng và những dịp đặc biệt.",
+
+    pageTitles: {
+      admin: "Khu vực quản lý",
+      orders: "Quản lý đơn hàng",
+      products: "Quản lý sản phẩm",
+      categories: "Quản lý danh mục hoa",
+      content: "Quản lý nội dung website",
+      blog: "Quản lý bài viết",
+      blogCategories: "Danh mục bài viết",
+      images: "Quản lý hình ảnh",
+      contact: "Quản lý thông tin liên hệ",
+      payment: "Cấu hình thanh toán",
+      coupons: "Quản lý khuyến mãi",
+      users: "Quản lý tài khoản",
+      appearance: "Tùy chỉnh giao diện",
+    },
   },
 
   hero: {

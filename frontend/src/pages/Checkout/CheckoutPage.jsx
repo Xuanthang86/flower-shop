@@ -643,54 +643,38 @@ const CheckoutPage = () => {
     let cancelled = false;
 
     if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+      setPaymentIntent(EMPTY_PAYMENT_INTENT);
+      setPaymentVerified(false);
+      setPaymentError("");
+      setPaymentIntentLoading(false);
+
       return undefined;
     }
 
     if (paymentSettings?.bankTransfer?.enabled === false) {
+      setPaymentIntent(EMPTY_PAYMENT_INTENT);
+      setPaymentVerified(false);
       setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
+      setPaymentIntentLoading(false);
 
       return undefined;
     }
 
     if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
-      return undefined;
-    }
-
-    const normalizedAmount = checkoutPaymentAmount;
-
-    /*
-     * Nếu Payment Intent hiện tại khác tổng tiền Checkout,
-     * tuyệt đối không được sử dụng lại.
-     */
-    if (
-      paymentIntent?.id &&
-      Number(paymentIntent.amount) !== normalizedAmount
-    ) {
       setPaymentIntent(EMPTY_PAYMENT_INTENT);
-
       setPaymentVerified(false);
-
       setPaymentError("");
+      setPaymentIntentLoading(false);
 
       return undefined;
     }
 
-    /*
-     * Payment Intent hiện tại đã đúng số tiền.
-     */
-    if (
-      paymentIntent?.id &&
-      paymentIntent?.orderCode &&
-      Number(paymentIntent.amount) === normalizedAmount
-    ) {
-      return undefined;
-    }
+    const normalizedAmount = Math.round(Number(checkoutPaymentAmount) || 0);
 
-    setPaymentIntentLoading(true);
-
-    setPaymentError("");
-
+    setPaymentIntent(EMPTY_PAYMENT_INTENT);
     setPaymentVerified(false);
+    setPaymentError("");
+    setPaymentIntentLoading(true);
 
     createBankTransferPaymentIntent({
       amount: normalizedAmount,
@@ -708,9 +692,6 @@ const CheckoutPage = () => {
 
         const receivedAmount = Math.round(Number(intent.amount) || 0);
 
-        /*
-         * Tuyệt đối không nhận Payment Intent sai số tiền.
-         */
         if (receivedAmount !== normalizedAmount) {
           throw new Error(
             "Số tiền Payment Intent không khớp với tổng tiền Checkout."
@@ -725,7 +706,6 @@ const CheckoutPage = () => {
         }
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
-
         setPaymentVerified(false);
 
         setPaymentError(

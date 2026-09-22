@@ -15,7 +15,33 @@ import { useNavigate } from "react-router-dom";
 
 import { PERMISSIONS, ROLES, useAuth } from "@/context/AuthContext";
 
+import { useEffect } from "react";
+
+import { getAdminPageTitle } from "@/services/pageTitles";
+
+import {
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
+
 const AdminManagementPage = () => {
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getAdminPageTitle("admin", readSiteSettings());
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
+  }, []);
   const navigate = useNavigate();
 
   const { user, hasPermission } = useAuth();

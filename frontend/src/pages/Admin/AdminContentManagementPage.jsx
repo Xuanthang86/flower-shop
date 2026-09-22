@@ -624,6 +624,62 @@ const AdminContentManagementPage = () => {
                   placeholder="Mô tả ngắn về website..."
                 />
               </div>
+
+              <div className="md:col-span-2 mt-4 border-t border-gray-100 pt-6">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Title các giao diện quản lý Admin
+                </h3>
+
+                <p className="mt-1 text-sm leading-6 text-gray-500">
+                  Quản lý title của từng giao diện trong khu vực Admin. Mỗi giao
+                  diện sử dụng một title riêng và không ghi đè title của giao
+                  diện khác.
+                </p>
+              </div>
+
+              {[
+                ["admin", "Khu vực quản lý"],
+                ["orders", "Quản lý đơn hàng"],
+                ["products", "Quản lý sản phẩm"],
+                ["categories", "Quản lý danh mục hoa"],
+                ["content", "Quản lý nội dung website"],
+                ["blog", "Quản lý bài viết"],
+                ["blogCategories", "Danh mục bài viết"],
+                ["images", "Quản lý hình ảnh"],
+                ["contact", "Quản lý thông tin liên hệ"],
+                ["payment", "Cấu hình thanh toán"],
+                ["coupons", "Quản lý khuyến mãi"],
+                ["users", "Quản lý tài khoản"],
+                ["appearance", "Tùy chỉnh giao diện"],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label
+                    htmlFor={`admin-page-title-${key}`}
+                    className="mb-2 block text-sm font-semibold text-gray-700"
+                  >
+                    {label}
+                  </label>
+
+                  <input
+                    id={`admin-page-title-${key}`}
+                    value={settings.seo?.pageTitles?.[key] || ""}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        seo: {
+                          ...(current.seo || {}),
+                          pageTitles: {
+                            ...(current.seo?.pageTitles || {}),
+                            [key]: event.target.value,
+                          },
+                        },
+                      }))
+                    }
+                    className={inputClass}
+                    placeholder={label}
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="mt-6 flex justify-center">

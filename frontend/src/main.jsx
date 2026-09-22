@@ -32,6 +32,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import App from "./App";
+import ScrollToTop from "./components/common/ScrollToTop";
 
 import "./index.css";
 import "./styles/global.css";
@@ -44,6 +45,8 @@ import { ThemeProvider } from "./context/ThemeProvider";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ScrollToTop />
+
       <ThemeProvider>
         <AuthProvider>
           <OrderProvider>

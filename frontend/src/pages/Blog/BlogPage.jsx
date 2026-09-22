@@ -97,6 +97,15 @@ const BlogPage = () => {
     [settings.blogCategories]
   );
 
+  const totalPosts = posts.length;
+
+  const getCategoryPostCount = (category) =>
+    posts.filter(
+      (post) =>
+        String(post?.categoryId || "") === String(category?.id || "") ||
+        String(post?.categorySlug || "") === String(category?.slug || "")
+    ).length;
+
   /*
    * Khi Admin thay đổi Site Settings,
    * Blog tự cập nhật mà không cần reload.
@@ -457,14 +466,38 @@ const BlogPage = () => {
                     }
 
                     .blog-detail-content img {
-                      display: block;
-                      width: 66.666667%;
-                      max-width: 66.666667%;
-                      height: auto;
-                      max-height: 420px;
-                      margin: .75rem auto;
-                      border-radius: .75rem;
-                      object-fit: contain;
+                    display: block;
+                    width: 66.666667%;
+                    max-width: 66.666667%;
+                    height: auto;
+                    max-height: 420px;
+                    margin: .75rem auto;
+                    border-radius: 16px !important;
+                    overflow: hidden;
+                    object-fit: contain;
+                    clip-path: inset(0 round 16px);
+                    }
+
+                    .blog-detail-content figure {
+                    width: 100%;
+                    margin: 1rem 0;
+                    overflow: hidden;
+                    border-radius: 16px;
+                    }
+
+                    .blog-detail-content figure img {
+                    width: 100%;
+                    max-width: 100%;
+                    border-radius: 16px !important;
+                    clip-path: inset(0 round 16px);
+                    }
+
+                    .blog-detail-content div img {
+                    border-radius: 16px !important;
+                    }
+
+                    .blog-detail-content p img {
+                    border-radius: 16px !important;
                     }
 
                     .blog-detail-content a {
@@ -586,7 +619,7 @@ const BlogPage = () => {
                   : "bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600"
               }`}
             >
-              Tất cả
+              Tất cả ({totalPosts})
             </Link>
 
             {categories.map((category) => (
@@ -599,7 +632,7 @@ const BlogPage = () => {
                     : "bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600"
                 }`}
               >
-                {category.name}
+                {category.name} ({getCategoryPostCount(category)})
               </Link>
             ))}
           </div>

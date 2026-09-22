@@ -28,7 +28,7 @@ export const DEFAULT_PAGE_TITLES = {
   appearance: "Tùy chỉnh giao diện",
 };
 
-export const getPageTitle = (pageKey, settings = readSiteSettings()) => {
+export const getAdminPageTitle = (pageKey, settings = readSiteSettings()) => {
   const siteName = getSiteName(settings);
 
   const configuredTitle = settings?.seo?.pageTitles?.[pageKey];
