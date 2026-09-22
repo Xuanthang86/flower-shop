@@ -17,6 +17,7 @@ import {
 
 import {
   buildDefaultBlogShopInfoHtml,
+  getPageTitle,
   readSiteSettings,
   saveSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
@@ -95,6 +96,27 @@ const AdminContentManagementPage = () => {
     if (editor.innerHTML.trim() !== String(html).trim()) {
       editor.innerHTML = html;
     }
+  }, []);
+
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getPageTitle(
+        readSiteSettings(),
+        "Quản lý nội dung website"
+      );
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
   }, []);
 
   useEffect(() => {
@@ -863,6 +885,117 @@ const AdminContentManagementPage = () => {
               >
                 <FiSave />
                 Lưu cấu hình giao hàng
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Nội dung đầu trang Blog
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Quản lý nội dung hiển thị ở đầu trang Bài viết. Bạn có thể thay
+                đổi nội dung mà không cần sửa code.
+              </p>
+            </div>
+
+            <div className="mt-5 space-y-5">
+              <div>
+                <label
+                  htmlFor="blog-intro-title"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Tiêu đề Blog
+                </label>
+
+                <input
+                  id="blog-intro-title"
+                  value={blog.introTitle || ""}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+
+                      blog: {
+                        ...(current.blog || {}),
+
+                        introTitle: event.target.value,
+                      },
+                    }))
+                  }
+                  className={inputClass}
+                  placeholder="Bài viết"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="blog-intro-description"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Mô tả đầu trang Blog
+                </label>
+
+                <textarea
+                  id="blog-intro-description"
+                  value={blog.introDescription || ""}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+
+                      blog: {
+                        ...(current.blog || {}),
+
+                        introDescription: event.target.value,
+                      },
+                    }))
+                  }
+                  rows={3}
+                  className={inputClass}
+                  placeholder="Những câu chuyện, kiến thức và cảm hứng từ {{siteName}}."
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="blog-shop-summary"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Tóm tắt về Shop
+                </label>
+
+                <textarea
+                  id="blog-shop-summary"
+                  value={blog.shopSummary || ""}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+
+                      blog: {
+                        ...(current.blog || {}),
+
+                        shopSummary: event.target.value,
+                      },
+                    }))
+                  }
+                  rows={4}
+                  className={inputClass}
+                  placeholder="Giới thiệu ngắn về Shop..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() =>
+                  saveSettings(settings, "Đã lưu nội dung đầu trang Blog.")
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu nội dung Blog
               </button>
             </div>
           </section>

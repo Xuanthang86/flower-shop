@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getPageTitle,
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
 
 import {
   FiChevronDown,
@@ -73,6 +78,23 @@ const getEmailPrefix = (email) => {
 };
 
 const AdminUsersPage = () => {
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getPageTitle(readSiteSettings(), "Quản lý tài khoản");
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
+  }, []);
   const {
     user,
     users,

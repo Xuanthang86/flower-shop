@@ -161,7 +161,7 @@ const AdminBlogManagementPage = () => {
 
     const siteName = currentSettings?.branding?.siteName || "HTH Flower Shop";
 
-    document.title = `Quản lý bài viết | ${siteName}`;
+    document.title = `Danh mục bài viết | ${siteName}`;
   }, []);
 
   /*
@@ -229,8 +229,6 @@ const AdminBlogManagementPage = () => {
 
   const openCreate = () => {
     const latestSettings = readSiteSettings();
-
-    const now = new Date();
 
     setSettings(latestSettings);
 

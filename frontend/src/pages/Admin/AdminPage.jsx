@@ -1,4 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+
+import {
+  getPageTitle,
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
 
 import {
   FiCheckCircle,
@@ -27,6 +33,23 @@ const getOrderTotal = (order) =>
   );
 
 const AdminPage = () => {
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getPageTitle(readSiteSettings(), "Quản lý đơn hàng");
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
+  }, []);
   const { orders = [] } = useOrder();
 
   const totalOrders = orders.length;

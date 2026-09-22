@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  getPageTitle,
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
+import {
   FiAlertTriangle,
   FiArrowRight,
   FiCheck,
@@ -52,6 +57,23 @@ const countProductsByCategory = (products, slug) =>
     .length;
 
 const AdminCategoriesPage = () => {
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getPageTitle(readSiteSettings(), "Quản lý danh mục hoa");
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
+  }, []);
   const [categories, setCategories] = useState(() => readCategories());
 
   const [products, setProducts] = useState(() => readProducts());

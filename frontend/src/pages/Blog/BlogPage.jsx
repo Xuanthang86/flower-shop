@@ -10,6 +10,7 @@ import {
   normalizeBlogPostContent,
   readSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
+  getSiteName,
 } from "@/services/siteSettings";
 
 const stripHtml = (html = "") =>
@@ -29,9 +30,6 @@ const getFirstImageFromHtml = (html = "") => {
 const getCoverImage = (post) =>
   post?.image || getFirstImageFromHtml(post?.content);
 
-const normalizeBlogContent = (content = "") =>
-  normalizeBlogPostContent(content);
-
 const formatPostDate = (value) => {
   const raw = String(value ?? "")
     .replace(/\u00a0/g, " ")
@@ -41,16 +39,6 @@ const formatPostDate = (value) => {
     return "";
   }
 
-  /*
-   * Luôn tìm ngày DD/MM/YYYY bên trong chuỗi,
-   * thay vì chỉ kiểm tra chuỗi có đúng định dạng hay không.
-   *
-   * Ví dụ:
-   * ", 14/09/2026" -> "14/09/2026"
-   * "，14/09/2026" -> "14/09/2026"
-   * "Ngày đăng, 14/09/2026" -> "14/09/2026"
-   * "14 / 09 / 2026" -> "14/09/2026"
-   */
   const vietnameseDateMatch = raw.match(
     /(?:^|[^\d])(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})(?:$|[^\d])/
   );
@@ -61,12 +49,6 @@ const formatPostDate = (value) => {
     return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
   }
 
-  /*
-   * Hỗ trợ:
-   * 2026-09-14
-   * 2026-9-14
-   * Ngày đăng: 2026-09-14
-   */
   const isoDateMatch = raw.match(
     /(?:^|[^\d])(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})(?:$|[^\d])/
   );
@@ -77,25 +59,48 @@ const formatPostDate = (value) => {
     return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
   }
 
-  /*
-   * Nếu dữ liệu cũ có dấu câu ở đầu nhưng không
-   * chứa ngày hợp lệ, vẫn loại bỏ dấu câu đầu chuỗi.
-   */
   return raw.replace(/^[\s,，.;:|_-]+/, "").trim();
 };
 
-const normalizePostForDisplay = (post) => ({
-  ...post,
-  date: formatPostDate(post?.date),
-});
+const normalizeBlogContent = (content = "") =>
+  normalizeBlogPostContent(content);
 
 const BlogPage = () => {
   const { slug, categorySlug } = useParams();
 
   const [settings, setSettings] = useState(() => readSiteSettings());
 
-  const siteName = settings?.branding?.siteName || "HTH Flower Shop";
+  const siteName = getSiteName(settings);
 
+  /*
+   * Toàn bộ bài viết lấy từ siteSettings.
+   * Không còn biến posts undefined.
+   */
+  const posts = useMemo(
+    () =>
+      Array.isArray(settings.blogPosts)
+        ? settings.blogPosts.filter((post) => post?.status !== "draft")
+        : [],
+    [settings.blogPosts]
+  );
+
+  /*
+   * Danh mục bài viết.
+   */
+  const categories = useMemo(
+    () =>
+      Array.isArray(settings.blogCategories)
+        ? settings.blogCategories.filter(
+            (category) => category?.active !== false
+          )
+        : [],
+    [settings.blogCategories]
+  );
+
+  /*
+   * Khi Admin thay đổi Site Settings,
+   * Blog tự cập nhật mà không cần reload.
+   */
   useEffect(() => {
     const refresh = () => {
       setSettings(readSiteSettings());
@@ -112,27 +117,62 @@ const BlogPage = () => {
     };
   }, []);
 
-  const categories = Array.isArray(settings.blogCategories)
-    ? settings.blogCategories.filter((category) => category.active !== false)
-    : [];
+  /*
+   * Lọc bài viết theo danh mục.
+   *
+   * /blog
+   *      -> tất cả
+   *
+   * /blog/category/slug
+   *      -> danh mục tương ứng
+   */
+  const filteredPosts = useMemo(() => {
+    if (!categorySlug) {
+      return posts;
+    }
+
+    return posts.filter(
+      (post) =>
+        String(post?.categorySlug || "") === String(categorySlug) ||
+        String(post?.categoryId || "") === String(categorySlug)
+    );
+  }, [posts, categorySlug]);
 
   /*
-   * Chuẩn hóa ngày của toàn bộ bài viết trước khi
-   * tìm currentPost và render danh sách.
-   *
-   * Nhờ vậy dữ liệu cũ trong localStorage như:
-   * ", 14/09/2026"
-   * sẽ không thể đi thẳng ra giao diện.
+   * Chỉ hiển thị tối đa 8 bài mới nhất ở trang Blog.
    */
-  const currentPost = useMemo(
-    () =>
+  const displayPosts = useMemo(() => {
+    return [...filteredPosts]
+      .sort((a, b) => {
+        const dateA = new Date(a?.publishedAt || a?.date || 0).getTime();
+
+        const dateB = new Date(b?.publishedAt || b?.date || 0).getTime();
+
+        return dateB - dateA;
+      })
+      .slice(0, 8);
+  }, [filteredPosts]);
+
+  /*
+   * Tìm bài viết chi tiết.
+   *
+   * Hỗ trợ cả:
+   * /blog/:id
+   * /blog/:slug
+   */
+  const currentPost = useMemo(() => {
+    if (!slug) {
+      return null;
+    }
+
+    return (
       posts.find(
         (post) =>
-          String(post.id) === String(slug) ||
-          String(post.slug || "") === String(slug)
-      ),
-    [posts, slug]
-  );
+          String(post?.id || "") === String(slug) ||
+          String(post?.slug || "") === String(slug)
+      ) || null
+    );
+  }, [posts, slug]);
 
   const renderedDefaultTemplate = useMemo(
     () => buildDefaultBlogShopInfoHtml(settings),
@@ -145,126 +185,135 @@ const BlogPage = () => {
     [currentPost, settings]
   );
 
+  /*
+   * SEO / document.title.
+   */
   useEffect(() => {
     const existingSchema = document.getElementById("flower-shop-blog-schema");
 
-    if (existingSchema) {
-      existingSchema.remove();
-    }
+    existingSchema?.remove();
 
-    if (currentPost) {
-      const siteName = getSiteName(settings);
-
-      document.title = `${currentPost.title} | ${siteName}`;
-
-      let description = document.querySelector('meta[name="description"]');
-
-      if (!description) {
-        description = document.createElement("meta");
-
-        description.name = "description";
-
-        document.head.appendChild(description);
-      }
-
-      description.content =
-        stripHtml(normalizeBlogPostContent(currentPost.content)).slice(
-          0,
-          155
-        ) || `Bài viết từ ${siteName}.`;
-
-      let canonical = document.querySelector('link[rel="canonical"]');
-
-      if (!canonical) {
-        canonical = document.createElement("link");
-
-        canonical.rel = "canonical";
-
-        document.head.appendChild(canonical);
-      }
-
-      canonical.href = `${window.location.origin}/blog/${currentPost.id}`;
-
-      const coverImage = getCoverImage(currentPost);
-
-      const normalizedDate = formatPostDate(currentPost.date);
-
-      const schemaDate = normalizedDate
-        ? normalizedDate.split("/").reverse().join("-")
-        : "";
-
-      const schema = {
-        "@context": "https://schema.org",
-
-        "@type": "BlogPosting",
-
-        headline: currentPost.title,
-
-        description: stripHtml(
-          normalizeBlogPostContent(currentPost.content)
-        ).slice(0, 300),
-
-        url: canonical.href,
-
-        mainEntityOfPage: {
-          "@type": "WebPage",
-          "@id": canonical.href,
-        },
-
-        datePublished: schemaDate
-          ? `${schemaDate}T${currentPost.time || "08:00"}:00`
-          : undefined,
-
-        dateModified: currentPost.updatedAt || undefined,
-
-        image: coverImage ? [coverImage] : undefined,
-
-        author: {
-          "@type": "Organization",
-          name: siteName,
-          url: window.location.origin,
-        },
-
-        publisher: {
-          "@type": "Organization",
-          name: siteName,
-          url: window.location.origin,
-
-          logo: settings.branding?.logoImage
-            ? {
-                "@type": "ImageObject",
-
-                url: settings.branding.logoImage,
-              }
-            : undefined,
-        },
-      };
-
-      Object.keys(schema).forEach((key) => {
-        if (schema[key] === undefined || schema[key] === null) {
-          delete schema[key];
-        }
-      });
-
-      const schemaScript = document.createElement("script");
-
-      schemaScript.id = "flower-shop-blog-schema";
-
-      schemaScript.type = "application/ld+json";
-
-      schemaScript.textContent = JSON.stringify(schema);
-
-      document.head.appendChild(schemaScript);
-    } else if (!postId) {
+    if (!slug) {
       document.title = `Bài viết | ${siteName}`;
+
+      return undefined;
     }
+
+    if (!currentPost) {
+      document.title = `Bài viết | ${siteName}`;
+
+      return undefined;
+    }
+
+    document.title = `${currentPost.title} | ${siteName}`;
+
+    let description = document.querySelector('meta[name="description"]');
+
+    if (!description) {
+      description = document.createElement("meta");
+
+      description.name = "description";
+
+      document.head.appendChild(description);
+    }
+
+    description.content =
+      stripHtml(normalizeBlogPostContent(currentPost.content)).slice(0, 155) ||
+      `Bài viết từ ${siteName}.`;
+
+    let canonical = document.querySelector('link[rel="canonical"]');
+
+    if (!canonical) {
+      canonical = document.createElement("link");
+
+      canonical.rel = "canonical";
+
+      document.head.appendChild(canonical);
+    }
+
+    canonical.href = `${window.location.origin}/blog/${currentPost.slug || currentPost.id}`;
+
+    const coverImage = getCoverImage(currentPost);
+
+    const normalizedDate = formatPostDate(currentPost.date);
+
+    const schemaDate = normalizedDate
+      ? normalizedDate.split("/").reverse().join("-")
+      : "";
+
+    const schema = {
+      "@context": "https://schema.org",
+
+      "@type": "BlogPosting",
+
+      headline: currentPost.title,
+
+      description: stripHtml(
+        normalizeBlogPostContent(currentPost.content)
+      ).slice(0, 300),
+
+      url: canonical.href,
+
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": canonical.href,
+      },
+
+      datePublished: schemaDate
+        ? `${schemaDate}T${currentPost.time || "08:00"}:00`
+        : undefined,
+
+      dateModified: currentPost.updatedAt || undefined,
+
+      image: coverImage ? [coverImage] : undefined,
+
+      author: {
+        "@type": "Organization",
+        name: siteName,
+        url: window.location.origin,
+      },
+
+      publisher: {
+        "@type": "Organization",
+        name: siteName,
+        url: window.location.origin,
+
+        logo: settings.branding?.logoImage
+          ? {
+              "@type": "ImageObject",
+              url: settings.branding.logoImage,
+            }
+          : undefined,
+      },
+    };
+
+    Object.keys(schema).forEach((key) => {
+      if (schema[key] === undefined || schema[key] === null) {
+        delete schema[key];
+      }
+    });
+
+    const schemaScript = document.createElement("script");
+
+    schemaScript.id = "flower-shop-blog-schema";
+
+    schemaScript.type = "application/ld+json";
+
+    schemaScript.textContent = JSON.stringify(schema);
+
+    document.head.appendChild(schemaScript);
 
     return () => {
       document.getElementById("flower-shop-blog-schema")?.remove();
     };
-  }, [currentPost, postId, settings]);
+  }, [currentPost, siteName, slug, settings]);
 
-  if (postId) {
+  /*
+   * =====================================================
+   * CHI TIẾT BÀI VIẾT
+   * =====================================================
+   */
+  if (slug) {
     if (!currentPost) {
       return (
         <section className="min-h-screen bg-gray-50 py-16">
@@ -272,6 +321,10 @@ const BlogPage = () => {
             <h1 className="text-3xl font-bold text-gray-800">
               Không tìm thấy bài viết
             </h1>
+
+            <p className="mt-3 text-gray-500">
+              Bài viết bạn đang tìm kiếm không tồn tại hoặc đã được thay đổi.
+            </p>
 
             <Link
               to="/blog"
@@ -324,7 +377,7 @@ const BlogPage = () => {
                   alt={currentPost.title}
                   loading="eager"
                   decoding="async"
-                  className="block h-auto max-h-[260px] w-1/3 min-w-[220px] rounded-xl object-contain"
+                  className="block h-auto max-h-[320px] w-2/3 rounded-xl object-contain"
                 />
               </div>
             )}
@@ -342,260 +395,152 @@ const BlogPage = () => {
                   <FiClock size={15} />
                   {currentPost.time || "08:00"}
                 </span>
+
+                {currentPost.categoryName && (
+                  <span className="rounded-full bg-pink-50 px-3 py-1 font-medium text-pink-600">
+                    {currentPost.categoryName}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-3xl font-bold leading-tight text-gray-900 md:text-4xl">
                 {currentPost.title}
               </h1>
 
-              <style>
-                {`
-                  .blog-detail-content {
-                    color: #374151;
-                    font-size: 16px;
-                    line-height: 1.6;
-                    overflow-x: hidden;
-                    overflow-wrap: anywhere;
-                    word-break: break-word;
-                    white-space: normal;
-                  }
-
-                  .blog-detail-content > p {
-                    margin: .4rem 0 !important;
-                  }
-
-                  .blog-detail-content > p:first-child {
-                    margin-top: .65rem !important;
-                  }
-
-                  .blog-detail-content > p:last-child {
-                    margin-bottom: 0 !important;
-                  }
-
-                  .blog-detail-content h2 {
-                    margin: .9rem 0 .35rem !important;
-                    font-size: 1.4rem;
-                    line-height: 1.3;
-                    font-weight: 700;
-                    color: #111827;
-                  }
-
-                  .blog-detail-content h3 {
-                    margin: .7rem 0 .3rem !important;
-                    font-size: 1.12rem;
-                    line-height: 1.3;
-                    font-weight: 700;
-                    color: #1f2937;
-                  }
-
-                  .blog-detail-content h4,
-                  .blog-detail-content h5,
-                  .blog-detail-content h6 {
-                    margin: .6rem 0 .25rem !important;
-                    line-height: 1.35;
-                    font-weight: 700;
-                    color: #1f2937;
-                  }
-
-                  .blog-detail-content ul,
-                  .blog-detail-content ol {
-                    margin: .35rem 0 .5rem !important;
-                    padding-left: 1.3rem;
-                  }
-
-                  .blog-detail-content li {
-                    margin: 0 0 .12rem !important;
-                  }
-
-                  .blog-detail-content blockquote {
-                    margin: .55rem 0 !important;
-                    padding: .6rem .8rem;
-                    border-left: 4px solid #db2777;
-                    background: #fdf2f8;
-                    border-radius: .6rem;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"] {
-                    width: 100%;
-                    max-width: 100%;
-                    box-sizing: border-box;
-                    margin: .85rem 0 0 !important;
-                    padding: ${blogStyle.padding}px !important;
-                    border: 1px solid ${blogStyle.borderColor};
-                    border-radius: ${blogStyle.borderRadius}px;
-                    background: ${blogStyle.backgroundColor};
-                    color: ${blogStyle.textColor};
-                    font-size: ${blogStyle.bodyFontSize}px;
-                    line-height: ${blogStyle.lineHeight};
-                    overflow-x: hidden;
-                    overflow-wrap: anywhere;
-                    word-break: break-word;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    header {
-                    margin: 0 0 .55rem !important;
-                    padding: 0 0 .45rem !important;
-                    border-bottom: 1px solid ${blogStyle.borderColor};
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    header p:first-child {
-                    margin: 0 0 .2rem !important;
-                    color: ${blogStyle.accentColor};
-                    font-size: 11px !important;
-                    line-height: 1.35 !important;
-                    font-weight: 700;
-                    letter-spacing: .08em;
-                    text-transform: uppercase;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    header h2 {
-                    margin: 0 !important;
-                    color: ${blogStyle.headingColor};
-                    font-size: ${blogStyle.headingFontSize}px !important;
-                    line-height: 1.25 !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    header p:last-child {
-                    margin: .2rem 0 0 !important;
-                    color: ${blogStyle.textColor};
-                    font-size: 12px !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    > div {
-                    color: ${blogStyle.textColor};
-                    font-size: ${blogStyle.bodyFontSize}px;
-                    line-height: ${blogStyle.lineHeight};
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    > div > p {
-                    margin: 0 0 .45rem !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    section {
-                    margin: .4rem 0 !important;
-                    padding: .55rem .7rem !important;
-                    border: 1px solid #f3f4f6;
-                    border-radius: .65rem;
-                    background: #fff;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    section:last-child {
-                    margin-bottom: 0 !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    section h3 {
-                    margin: 0 0 .25rem !important;
-                    color: ${blogStyle.headingColor};
-                    font-size: ${blogStyle.subHeadingFontSize}px !important;
-                    line-height: 1.3 !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    section p {
-                    margin: 0 0 .25rem !important;
-                    font-size: ${blogStyle.bodyFontSize}px !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    section p:last-child {
-                    margin-bottom: 0 !important;
-                  }
-
-                  .blog-detail-content
-                    [data-flower-shop-default-info="true"]
-                    a {
-                    color: ${blogStyle.accentColor};
-                    font-weight: 600;
-                    text-decoration: none;
-                    overflow-wrap: anywhere;
-                  }
-
-                  .blog-detail-content img {
-                    display: block;
-                    width: 66.666667%;
-                    max-width: 66.666667%;
-                    max-height: 420px;
-                    height: auto;
-                    margin: .65rem auto;
-                    border: 0;
-                    border-radius: .75rem;
-                    object-fit: contain;
-                  }
-
-                  .blog-detail-content a {
-                    color: #db2777;
-                    text-decoration: underline;
-                  }
-
-                  .blog-detail-content strong {
-                    font-weight: 700;
-                  }
-
-                  .blog-detail-content em {
-                    font-style: italic;
-                  }
-
-                  .blog-detail-content u {
-                    text-decoration: underline;
-                  }
-
-                  .blog-detail-content table {
-                    width: 100%;
-                    margin: .65rem 0;
-                    border-collapse: collapse;
-                  }
-
-                  .blog-detail-content th,
-                  .blog-detail-content td {
-                    border: 1px solid #e5e7eb;
-                    padding: .45rem;
-                    text-align: left;
-                    overflow-wrap: anywhere;
-                  }
-
-                  .blog-detail-content th {
-                    background: #f9fafb;
-                    font-weight: 700;
-                  }
-
-                  @media (max-width: 767px) {
-                    .blog-detail-content img {
-                      width: 100%;
-                      max-width: 100%;
+              <div className="blog-detail-content mt-5">
+                <style>
+                  {`
+                    .blog-detail-content {
+                      color: #374151;
+                      font-size: 16px;
+                      line-height: 1.6;
+                      overflow-wrap: anywhere;
+                      word-break: break-word;
                     }
-                  }
-                `}
-              </style>
 
-              <div
-                className="blog-detail-content mt-4"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    composedCurrentContent ||
-                    `${articleContent}${renderedDefaultTemplate}`,
-                }}
-              />
+                    .blog-detail-content p {
+                      margin: .55rem 0;
+                    }
+
+                    .blog-detail-content h2 {
+                      margin: 1rem 0 .4rem;
+                      font-size: 1.4rem;
+                      line-height: 1.3;
+                      font-weight: 700;
+                      color: #111827;
+                    }
+
+                    .blog-detail-content h3 {
+                      margin: .8rem 0 .35rem;
+                      font-size: 1.15rem;
+                      line-height: 1.3;
+                      font-weight: 700;
+                      color: #1f2937;
+                    }
+
+                    .blog-detail-content ul,
+                    .blog-detail-content ol {
+                      margin: .5rem 0;
+                      padding-left: 1.4rem;
+                    }
+
+                    .blog-detail-content li {
+                      margin-bottom: .15rem;
+                    }
+
+                    .blog-detail-content blockquote {
+                      margin: .75rem 0;
+                      padding: .75rem 1rem;
+                      border-left: 4px solid #db2777;
+                      border-radius: .5rem;
+                      background: #fdf2f8;
+                    }
+
+                    .blog-detail-content img {
+                      display: block;
+                      width: 66.666667%;
+                      max-width: 66.666667%;
+                      height: auto;
+                      max-height: 420px;
+                      margin: .75rem auto;
+                      border-radius: .75rem;
+                      object-fit: contain;
+                    }
+
+                    .blog-detail-content a {
+                      color: #db2777;
+                      text-decoration: underline;
+                    }
+
+                    .blog-detail-content strong {
+                      font-weight: 700;
+                    }
+
+                    .blog-detail-content em {
+                      font-style: italic;
+                    }
+
+                    .blog-detail-content table {
+                      width: 100%;
+                      margin: .75rem 0;
+                      border-collapse: collapse;
+                    }
+
+                    .blog-detail-content th,
+                    .blog-detail-content td {
+                      border: 1px solid #e5e7eb;
+                      padding: .5rem;
+                      text-align: left;
+                    }
+
+                    .blog-detail-content th {
+                      background: #f9fafb;
+                      font-weight: 700;
+                    }
+
+                    .blog-detail-content
+                    [data-flower-shop-default-info="true"] {
+                      width: 100%;
+                      box-sizing: border-box;
+                      margin-top: 1rem;
+                      padding: ${blogStyle.padding}px;
+                      border: 1px solid ${blogStyle.borderColor};
+                      border-radius: ${blogStyle.borderRadius}px;
+                      background: ${blogStyle.backgroundColor};
+                      color: ${blogStyle.textColor};
+                      font-size: ${blogStyle.bodyFontSize}px;
+                      line-height: ${blogStyle.lineHeight};
+                    }
+
+                    .blog-detail-content
+                    [data-flower-shop-default-info="true"] h2 {
+                      color: ${blogStyle.headingColor};
+                      font-size: ${blogStyle.headingFontSize}px;
+                    }
+
+                    .blog-detail-content
+                    [data-flower-shop-default-info="true"] h3 {
+                      color: ${blogStyle.headingColor};
+                      font-size: ${blogStyle.subHeadingFontSize}px;
+                    }
+
+                    @media (max-width: 767px) {
+                      .blog-detail-content img {
+                        width: 100%;
+                        max-width: 100%;
+                      }
+                    }
+                  `}
+                </style>
+
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      composedCurrentContent ||
+                      `${articleContent}${renderedDefaultTemplate}`,
+                  }}
+                />
+              </div>
             </div>
           </div>
         </article>
@@ -603,6 +548,11 @@ const BlogPage = () => {
     );
   }
 
+  /*
+   * =====================================================
+   * DANH SÁCH BÀI VIẾT
+   * =====================================================
+   */
   return (
     <section className="min-h-screen bg-gray-50 py-8 md:py-12">
       <div className="mx-auto max-w-7xl px-4">
@@ -626,25 +576,59 @@ const BlogPage = () => {
           </p>
         </header>
 
-        {posts.length === 0 ? (
+        {categories.length > 0 && (
+          <div className="mb-8 flex flex-wrap justify-center gap-2">
+            <Link
+              to="/blog"
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                !categorySlug
+                  ? "bg-pink-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600"
+              }`}
+            >
+              Tất cả
+            </Link>
+
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                to={`/blog/category/${category.slug}`}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  categorySlug === category.slug
+                    ? "bg-pink-600 text-white"
+                    : "bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600"
+                }`}
+              >
+                {category.name}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {displayPosts.length === 0 ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
-            <p className="text-gray-500">Chưa có bài viết.</p>
+            <p className="text-gray-500">
+              {categorySlug
+                ? "Chưa có bài viết trong danh mục này."
+                : "Chưa có bài viết."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {posts.map((post) => {
+            {displayPosts.map((post) => {
               const coverImage = getCoverImage(post);
 
               const excerpt =
+                String(post.excerpt || "").trim() ||
                 stripHtml(normalizeBlogPostContent(post.content)) ||
-                "Khám phá bài viết mới từ HTH Flower Shop.";
+                `Khám phá bài viết mới từ ${siteName}.`;
 
               const displayDate = formatPostDate(post.date);
 
               return (
                 <Link
                   key={post.id}
-                  to={`/blog/${post.id}`}
+                  to={`/blog/${post.slug || post.id}`}
                   className="group flex h-full overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                 >
                   <div className="flex w-full flex-col">
@@ -659,7 +643,7 @@ const BlogPage = () => {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                          HTH Flower Shop
+                          {siteName}
                         </div>
                       )}
                     </div>
@@ -678,6 +662,12 @@ const BlogPage = () => {
                           {post.time || "08:00"}
                         </span>
                       </div>
+
+                      {post.categoryName && (
+                        <span className="mt-2 w-fit rounded-full bg-pink-50 px-2.5 py-1 text-xs font-semibold text-pink-600">
+                          {post.categoryName}
+                        </span>
+                      )}
 
                       <h2 className="mt-2 line-clamp-2 text-xl font-bold leading-7 text-gray-900 group-hover:text-pink-600">
                         {post.title}

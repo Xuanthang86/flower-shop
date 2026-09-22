@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 import { formatCouponDiscount, validateCoupon } from "@/services/coupon";
@@ -134,26 +134,35 @@ const CheckoutPage = () => {
 
     if (paymentSettings?.bankTransfer?.enabled === false) {
       setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
       setPaymentVerified(false);
+
       setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
+
+      setPaymentIntentLoading(false);
 
       return undefined;
     }
 
     if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
+      setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+      setPaymentVerified(false);
+
+      setPaymentError("");
+
+      setPaymentIntentLoading(false);
+
       return undefined;
     }
 
     const normalizedAmount = checkoutPaymentAmount;
 
     /*
-     * Mỗi khi tổng tiền Checkout thay đổi,
-     * phải tạo Payment Intent mới.
+     * Tổng tiền thay đổi => tạo Payment Intent mới.
      *
-     * Không được kiểm tra/reuse Payment Intent cũ ở đây.
+     * Không reuse Payment Intent cũ.
      */
-    paymentIntentAmountRef.current = normalizedAmount;
-
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
     setPaymentVerified(false);
@@ -190,8 +199,6 @@ const CheckoutPage = () => {
         if (cancelled) {
           return;
         }
-
-        paymentIntentAmountRef.current = null;
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
@@ -259,8 +266,6 @@ const CheckoutPage = () => {
 
   const [paymentIntent, setPaymentIntent] = useState(EMPTY_PAYMENT_INTENT);
 
-  const paymentIntentAmountRef = useRef(null);
-
   const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
   const [paymentVerified, setPaymentVerified] = useState(false);
@@ -317,8 +322,6 @@ const CheckoutPage = () => {
   const checkoutPaymentAmount = Math.round(Number(grandTotal) || 0);
 
   const resetPaymentIntentForAmountChange = () => {
-    paymentIntentAmountRef.current = null;
-
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
     setPaymentVerified(false);
@@ -763,8 +766,6 @@ const CheckoutPage = () => {
       paymentIntent?.id &&
       Number(paymentIntent.amount) !== normalizedAmount
     ) {
-      paymentIntentAmountRef.current = null;
-
       setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
       setPaymentVerified(false);
@@ -780,13 +781,10 @@ const CheckoutPage = () => {
     if (
       paymentIntent?.id &&
       paymentIntent?.orderCode &&
-      Number(paymentIntent.amount) === normalizedAmount &&
-      paymentIntentAmountRef.current === normalizedAmount
+      Number(paymentIntent.amount) === normalizedAmount
     ) {
       return undefined;
     }
-
-    paymentIntentAmountRef.current = normalizedAmount;
 
     setPaymentIntentLoading(true);
 
@@ -825,8 +823,6 @@ const CheckoutPage = () => {
         if (cancelled) {
           return;
         }
-
-        paymentIntentAmountRef.current = null;
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
@@ -981,7 +977,7 @@ const CheckoutPage = () => {
 
         accountNumber: paymentSettings?.bankTransfer?.accountNumber,
 
-        amount: paymentIntentAmount,
+        amount: checkoutPaymentAmount,
 
         accountName: paymentSettings?.bankTransfer?.accountName,
 

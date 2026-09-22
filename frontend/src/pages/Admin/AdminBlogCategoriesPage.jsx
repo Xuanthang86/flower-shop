@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import { FiEdit2, FiPlus, FiSave, FiTrash2, FiX } from "react-icons/fi";
 
-import { readSiteSettings, saveSiteSettings } from "@/services/siteSettings";
+import {
+  getPageTitle,
+  readSiteSettings,
+  saveSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
 
 import { useNotification } from "@/context/NotificationProvider";
 
@@ -35,6 +40,23 @@ const EMPTY_FORM = {
 };
 
 const AdminBlogCategoriesPage = () => {
+  useEffect(() => {
+    const updateTitle = () => {
+      document.title = getPageTitle(readSiteSettings(), "Danh mục bài viết");
+    };
+
+    updateTitle();
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+    window.addEventListener("storage", updateTitle);
+
+    return () => {
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, updateTitle);
+
+      window.removeEventListener("storage", updateTitle);
+    };
+  }, []);
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [editing, setEditing] = useState(null);
