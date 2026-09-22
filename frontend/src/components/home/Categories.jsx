@@ -65,44 +65,63 @@ const Categories = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              to={`/products/category/${encodeURIComponent(category.slug)}`}
-              className="group block"
-            >
-              <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                <div className="aspect-[4/3] overflow-hidden bg-pink-50">
-                  {category.image ? (
-                    <img
-                      src={category.image}
-                      alt={category.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-pink-300">
-                      Chưa có hình ảnh
+        <div className="overflow-x-auto pb-2 scrollbar-hide lg:overflow-visible">
+          <div
+            className="
+      grid
+      grid-flow-col
+      auto-cols-[calc((100%-9px)/4)]
+      gap-3
+      md:auto-cols-[calc((100%-15px)/6)]
+      lg:grid-flow-row
+      lg:grid-cols-5
+      lg:auto-cols-auto
+      lg:gap-3
+    "
+          >
+            {categories
+              .filter(
+                (category) =>
+                  category.active !== false && category.showOnHome !== false
+              )
+              .map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/products/category/${encodeURIComponent(category.slug)}`}
+                  className="group block"
+                >
+                  <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                    <div className="aspect-[4/3] overflow-hidden bg-pink-50">
+                      {category.image ? (
+                        <img
+                          src={category.image}
+                          alt={category.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-pink-300">
+                          Chưa có hình ảnh
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="p-2.5 text-center">
-                  <h3 className="font-bold uppercase text-gray-800 group-hover:text-pink-600">
-                    {category.name}
-                  </h3>
+                    <div className="p-2.5 text-center">
+                      <h3 className="font-bold uppercase text-gray-800 group-hover:text-pink-600">
+                        {category.name}
+                      </h3>
 
-                  {category.summary && (
-                    <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                      {category.summary}
-                    </p>
-                  )}
-                </div>
-              </article>
-            </Link>
-          ))}
+                      {category.summary && (
+                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                          {category.summary}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                </Link>
+              ))}
+          </div>
         </div>
       </div>
     </section>

@@ -152,6 +152,31 @@ export const DEFAULT_PRODUCT_CATEGORIES = [
 
     updatedAt: null,
   },
+
+  {
+    id: "hoa-lan",
+    name: "Hoa lan",
+    slug: "hoa-lan",
+
+    label: "Hoa lan",
+    query: "hoa-lan",
+
+    summary:
+      "Những mẫu hoa lan sang trọng, thanh lịch dành tặng người thân, đối tác và những dịp đặc biệt.",
+
+    seoTitle: "Hoa lan đẹp, sang trọng | Flower Shop",
+
+    seoDescription:
+      "Khám phá các mẫu hoa lan đẹp, sang trọng và thanh lịch dành cho nhiều dịp đặc biệt.",
+
+    image: "",
+
+    active: true,
+    showOnHome: true,
+    sortOrder: 6,
+
+    updatedAt: null,
+  },
 ];
 
 /*
@@ -209,6 +234,8 @@ export const normalizeCategory = (category = {}, index = 0) => {
     image: category.image || "",
 
     active: category.active !== false,
+
+    showOnHome: category.showOnHome !== false,
 
     sortOrder:
       Number.isFinite(sortOrder) && sortOrder >= 0 ? sortOrder : index + 1,
@@ -268,10 +295,41 @@ export const readProductCategories = () => {
     const parsed = JSON.parse(raw);
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      return normalizeCategories(DEFAULT_PRODUCT_CATEGORIES);
+      const defaults = normalizeCategories(DEFAULT_PRODUCT_CATEGORIES);
+
+      localStorage.setItem(
+        PRODUCT_CATEGORIES_STORAGE_KEY,
+        JSON.stringify(defaults)
+      );
+
+      return defaults;
     }
 
-    return normalizeCategories(parsed);
+    const normalized = normalizeCategories(parsed);
+
+    const orchidDefault = DEFAULT_PRODUCT_CATEGORIES.find(
+      (category) => category.slug === "hoa-lan"
+    );
+
+    const hasOrchid = normalized.some(
+      (category) => category.slug === "hoa-lan"
+    );
+
+    if (orchidDefault && !hasOrchid) {
+      const nextCategories = normalizeCategories([
+        ...normalized,
+        orchidDefault,
+      ]);
+
+      localStorage.setItem(
+        PRODUCT_CATEGORIES_STORAGE_KEY,
+        JSON.stringify(nextCategories)
+      );
+
+      return nextCategories;
+    }
+
+    return normalized;
   } catch (error) {
     console.error("Không thể đọc danh mục sản phẩm:", error);
 

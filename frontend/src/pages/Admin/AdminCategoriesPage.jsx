@@ -42,6 +42,7 @@ const EMPTY_FORM = {
   seoDescription: "",
   image: "",
   active: true,
+  showOnHome: true,
   sortOrder: 1,
   updatedAt: null,
 };
@@ -311,6 +312,9 @@ const AdminCategoriesPage = () => {
         normalizeText(form.seoDescription) || normalizeText(form.summary),
       image: normalizeText(form.image),
       active: Boolean(form.active),
+
+      showOnHome: Boolean(form.showOnHome),
+
       sortOrder: Number(form.sortOrder),
       updatedAt: getNowIso(),
     };
@@ -1007,6 +1011,35 @@ const AdminCategoriesPage = () => {
                       Danh mục đang hoạt động
                     </span>
                   </label>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Hiển thị trên Trang chủ
+                  </label>
+
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.showOnHome)}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          showOnHome: event.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                    />
+
+                    <span className="text-sm font-medium text-gray-700">
+                      Hiển thị danh mục này trên Trang chủ
+                    </span>
+                  </label>
+
+                  <p className="mt-1 text-xs leading-5 text-gray-400">
+                    Bỏ chọn sẽ ẩn danh mục khỏi Trang chủ nhưng danh mục vẫn tồn
+                    tại và sản phẩm vẫn xuất hiện trên trang Sản phẩm.
+                  </p>
                 </div>
               </div>
 

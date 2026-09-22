@@ -65,8 +65,19 @@ const formatPostDate = (value) => {
 const normalizeBlogContent = (content = "") =>
   normalizeBlogPostContent(content);
 
+const DESKTOP_POSTS_PER_PAGE = 9;
+const NON_DESKTOP_POSTS_PER_PAGE = 8;
+
 const BlogPage = () => {
   const { slug, categorySlug } = useParams();
+
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true
+  );
+
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [settings, setSettings] = useState(() => readSiteSettings());
 
@@ -126,6 +137,22 @@ const BlogPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    const handleMediaChange = (event) => {
+      setIsDesktop(event.matches);
+    };
+
+    setIsDesktop(mediaQuery.matches);
+
+    mediaQuery.addEventListener("change", handleMediaChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleMediaChange);
+    };
+  }, []);
+
   /*
    * Lọc bài viết theo danh mục.
    *
@@ -150,17 +177,61 @@ const BlogPage = () => {
   /*
    * Chỉ hiển thị tối đa 8 bài mới nhất ở trang Blog.
    */
-  const displayPosts = useMemo(() => {
-    return [...filteredPosts]
-      .sort((a, b) => {
-        const dateA = new Date(a?.publishedAt || a?.date || 0).getTime();
+  const sortedPosts = useMemo(() => {
+    return [...filteredPosts].sort((a, b) => {
+      const dateA = new Date(a?.publishedAt || a?.date || 0).getTime();
 
-        const dateB = new Date(b?.publishedAt || b?.date || 0).getTime();
+      const dateB = new Date(b?.publishedAt || b?.date || 0).getTime();
 
-        return dateB - dateA;
-      })
-      .slice(0, 8);
+      return dateB - dateA;
+    });
   }, [filteredPosts]);
+
+  const postsPerPage = isDesktop
+    ? DESKTOP_POSTS_PER_PAGE
+    : NON_DESKTOP_POSTS_PER_PAGE;
+
+  const totalPages = isDesktop
+    ? Math.max(1, Math.ceil(sortedPosts.length / postsPerPage))
+    : 1;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categorySlug]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const displayPosts = useMemo(() => {
+    if (!isDesktop) {
+      return sortedPosts.slice(0, NON_DESKTOP_POSTS_PER_PAGE);
+    }
+
+    const startIndex = (currentPage - 1) * DESKTOP_POSTS_PER_PAGE;
+
+    return sortedPosts.slice(startIndex, startIndex + DESKTOP_POSTS_PER_PAGE);
+  }, [sortedPosts, currentPage, isDesktop]);
+
+  const goToBlogPage = (page) => {
+    if (!isDesktop) {
+      return;
+    }
+
+    if (page < 1 || page > totalPages) {
+      return;
+    }
+
+    setCurrentPage(page);
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "smooth",
+    });
+  };
 
   /*
    * Tìm bài viết chi tiết.
@@ -419,142 +490,44 @@ const BlogPage = () => {
               <div className="blog-detail-content mt-5">
                 <style>
                   {`
-                    .blog-detail-content {
-                      color: #374151;
-                      font-size: 16px;
-                      line-height: 1.6;
-                      overflow-wrap: anywhere;
-                      word-break: break-word;
-                    }
-
-                    .blog-detail-content p {
-                      margin: .55rem 0;
-                    }
-
-                    .blog-detail-content h2 {
-                      margin: 1rem 0 .4rem;
-                      font-size: 1.4rem;
-                      line-height: 1.3;
-                      font-weight: 700;
-                      color: #111827;
-                    }
-
-                    .blog-detail-content h3 {
-                      margin: .8rem 0 .35rem;
-                      font-size: 1.15rem;
-                      line-height: 1.3;
-                      font-weight: 700;
-                      color: #1f2937;
-                    }
-
-                    .blog-detail-content ul,
-                    .blog-detail-content ol {
-                      margin: .5rem 0;
-                      padding-left: 1.4rem;
-                    }
-
-                    .blog-detail-content li {
-                      margin-bottom: .15rem;
-                    }
-
-                    .blog-detail-content blockquote {
-                      margin: .75rem 0;
-                      padding: .75rem 1rem;
-                      border-left: 4px solid #db2777;
-                      border-radius: .5rem;
-                      background: #fdf2f8;
+                    .blog-detail-content figure {
+                    display: block;
+                    width: 100%;
+                    margin: 1rem 0;
+                    overflow: hidden !important;
+                    border-radius: 16px !important;
+                    clip-path: inset(0 round 16px);
                     }
 
                     .blog-detail-content img {
-                    display: block;
-                    width: 66.666667%;
-                    max-width: 66.666667%;
-                    height: auto;
+                    display: block !important;
+                    width: 66.666667% !important;
+                    max-width: 66.666667% !important;
+                    height: auto !important;
                     max-height: 420px;
-                    margin: .75rem auto;
+                    margin: .75rem auto !important;
                     border-radius: 16px !important;
-                    overflow: hidden;
+                    overflow: hidden !important;
                     object-fit: contain;
                     clip-path: inset(0 round 16px);
                     }
 
-                    .blog-detail-content figure {
-                    width: 100%;
-                    margin: 1rem 0;
-                    overflow: hidden;
-                    border-radius: 16px;
-                    }
-
-                    .blog-detail-content figure img {
-                    width: 100%;
-                    max-width: 100%;
+                    .blog-detail-content figure img,
+                    .blog-detail-content p img,
+                    .blog-detail-content div img {
                     border-radius: 16px !important;
                     clip-path: inset(0 round 16px);
                     }
 
-                    .blog-detail-content div img {
+                    .blog-detail-content figure img {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                    }
+
+                    .blog-detail-content img[style] {
                     border-radius: 16px !important;
-                    }
-
-                    .blog-detail-content p img {
-                    border-radius: 16px !important;
-                    }
-
-                    .blog-detail-content a {
-                      color: #db2777;
-                      text-decoration: underline;
-                    }
-
-                    .blog-detail-content strong {
-                      font-weight: 700;
-                    }
-
-                    .blog-detail-content em {
-                      font-style: italic;
-                    }
-
-                    .blog-detail-content table {
-                      width: 100%;
-                      margin: .75rem 0;
-                      border-collapse: collapse;
-                    }
-
-                    .blog-detail-content th,
-                    .blog-detail-content td {
-                      border: 1px solid #e5e7eb;
-                      padding: .5rem;
-                      text-align: left;
-                    }
-
-                    .blog-detail-content th {
-                      background: #f9fafb;
-                      font-weight: 700;
-                    }
-
-                    .blog-detail-content
-                    [data-flower-shop-default-info="true"] {
-                      width: 100%;
-                      box-sizing: border-box;
-                      margin-top: 1rem;
-                      padding: ${blogStyle.padding}px;
-                      border: 1px solid ${blogStyle.borderColor};
-                      border-radius: ${blogStyle.borderRadius}px;
-                      background: ${blogStyle.backgroundColor};
-                      color: ${blogStyle.textColor};
-                      font-size: ${blogStyle.bodyFontSize}px;
-                      line-height: ${blogStyle.lineHeight};
-                    }
-
-                    .blog-detail-content
-                    [data-flower-shop-default-info="true"] h2 {
-                      color: ${blogStyle.headingColor};
-                      font-size: ${blogStyle.headingFontSize}px;
-                    }
-
-                    .blog-detail-content
-                    [data-flower-shop-default-info="true"] h3 {
-                      color: ${blogStyle.headingColor};
-                      font-size: ${blogStyle.subHeadingFontSize}px;
+                    clip-path: inset(0 round 16px);
                     }
 
                     @media (max-width: 767px) {
@@ -606,6 +579,10 @@ const BlogPage = () => {
               settings.blog?.shopSummary ||
                 "{{siteName}} chia sẻ những câu chuyện, kiến thức về hoa và cảm hứng cho những dịp đặc biệt."
             ).replace(/\{\{siteName\}\}/g, siteName)}
+          </p>
+
+          <p className="mt-3 text-sm font-semibold text-pink-600">
+            Tổng số bài viết: {filteredPosts.length}
           </p>
         </header>
 
@@ -722,6 +699,50 @@ const BlogPage = () => {
               );
             })}
           </div>
+        )}
+
+        {isDesktop && totalPages > 1 && (
+          <nav
+            aria-label="Phân trang bài viết"
+            className="mt-8 flex items-center justify-center gap-2"
+          >
+            <button
+              type="button"
+              onClick={() => goToBlogPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              aria-label="Trang trước"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              &lt;
+            </button>
+
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+              (page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => goToBlogPage(page)}
+                  className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-semibold transition ${
+                    page === currentPage
+                      ? "bg-pink-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                  }`}
+                >
+                  {page}
+                </button>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={() => goToBlogPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              aria-label="Trang sau"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              &gt;
+            </button>
+          </nav>
         )}
       </div>
     </section>
