@@ -12,7 +12,9 @@ import {
 const Categories = () => {
   const [categories, setCategories] = useState(() =>
     readCategories()
-      .filter((category) => category.active !== false)
+      .filter(
+        (category) => category.active !== false && category.showOnHome !== false
+      )
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
   );
 
@@ -22,12 +24,17 @@ const Categories = () => {
     const refreshCategories = () => {
       setCategories(
         readCategories()
-          .filter((category) => category.active !== false)
+          .filter(
+            (category) =>
+              category.active !== false && category.showOnHome !== false
+          )
           .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
       );
     };
 
-    const refreshSettings = () => setSettings(readSiteSettings());
+    const refreshSettings = () => {
+      setSettings(readSiteSettings());
+    };
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
@@ -68,59 +75,55 @@ const Categories = () => {
         <div className="overflow-x-auto pb-2 scrollbar-hide lg:overflow-visible">
           <div
             className="
-      grid
-      grid-flow-col
-      auto-cols-[calc((100%-9px)/4)]
-      gap-3
-      md:auto-cols-[calc((100%-15px)/6)]
-      lg:grid-flow-row
-      lg:grid-cols-5
-      lg:auto-cols-auto
-      lg:gap-3
-    "
+              grid
+              w-full
+              grid-flow-col
+              auto-cols-[calc((100%_-_0.75rem)/2)]
+              gap-3
+              md:auto-cols-[calc((100%_-_2.25rem)/4)]
+              lg:grid-flow-row
+              lg:grid-cols-5
+              lg:auto-cols-auto
+              lg:gap-3
+            "
           >
-            {categories
-              .filter(
-                (category) =>
-                  category.active !== false && category.showOnHome !== false
-              )
-              .map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/products/category/${encodeURIComponent(category.slug)}`}
-                  className="group block"
-                >
-                  <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                    <div className="aspect-[4/3] overflow-hidden bg-pink-50">
-                      {category.image ? (
-                        <img
-                          src={category.image}
-                          alt={category.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-xs text-pink-300">
-                          Chưa có hình ảnh
-                        </div>
-                      )}
-                    </div>
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                to={`/products/category/${encodeURIComponent(category.slug)}`}
+                className="group block min-w-0"
+              >
+                <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                  <div className="aspect-[4/3] overflow-hidden bg-pink-50">
+                    {category.image ? (
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-xs text-pink-300">
+                        Chưa có hình ảnh
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="p-2.5 text-center">
-                      <h3 className="font-bold uppercase text-gray-800 group-hover:text-pink-600">
-                        {category.name}
-                      </h3>
+                  <div className="p-2.5 text-center">
+                    <h3 className="font-bold uppercase text-gray-800 group-hover:text-pink-600">
+                      {category.name}
+                    </h3>
 
-                      {category.summary && (
-                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                          {category.summary}
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                </Link>
-              ))}
+                    {category.summary && (
+                      <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                        {category.summary}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

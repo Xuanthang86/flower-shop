@@ -61,6 +61,8 @@ const AdminBlogCategoriesPage = () => {
 
   const [editing, setEditing] = useState(null);
 
+  const [editorOpen, setEditorOpen] = useState(false);
+
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { notifySuccess, notifyError } = useNotification();
@@ -94,6 +96,8 @@ const AdminBlogCategoriesPage = () => {
       ...EMPTY_FORM,
       sortOrder: categories.length + 1,
     });
+
+    setEditorOpen(true);
   };
 
   const openEdit = (category) => {
@@ -103,9 +107,12 @@ const AdminBlogCategoriesPage = () => {
       ...EMPTY_FORM,
       ...category,
     });
+
+    setEditorOpen(true);
   };
 
   const closeEditor = () => {
+    setEditorOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
   };
@@ -351,7 +358,7 @@ const AdminBlogCategoriesPage = () => {
         </section>
       </div>
 
-      {(editing !== null || form.name || form.slug) && (
+      {editorOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between">

@@ -825,7 +825,32 @@ export const readCategories = () => {
   const stored = readJson(PRODUCT_CATEGORIES_STORAGE_KEY);
 
   if (Array.isArray(stored) && stored.length > 0) {
-    return normalizeCategories(stored);
+    const normalized = normalizeCategories(stored);
+
+    const orchidDefault = DEFAULT_PRODUCT_CATEGORIES.find(
+      (category) => category.slug === "hoa-lan"
+    );
+
+    const hasOrchid = normalized.some(
+      (category) => category.slug === "hoa-lan"
+    );
+
+    if (orchidDefault && !hasOrchid) {
+      const nextCategories = normalizeCategories([
+        ...normalized,
+        orchidDefault,
+      ]);
+
+      writeJsonSafely(
+        PRODUCT_CATEGORIES_STORAGE_KEY,
+        nextCategories,
+        "bổ sung danh mục Hoa lan"
+      );
+
+      return nextCategories;
+    }
+
+    return normalized;
   }
 
   const seeded = normalizeCategories(DEFAULT_PRODUCT_CATEGORIES);

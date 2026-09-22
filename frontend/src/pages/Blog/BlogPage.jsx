@@ -424,20 +424,6 @@ const BlogPage = () => {
 
     const displayDate = formatPostDate(currentPost.date);
 
-    const blogStyle = settings.blog?.defaultShopInfoStyle || {
-      backgroundColor: "#fff7fb",
-      borderColor: "#fce7f3",
-      accentColor: "#db2777",
-      headingColor: "#1f2937",
-      textColor: "#4b5563",
-      borderRadius: 14,
-      padding: 14,
-      headingFontSize: 19,
-      subHeadingFontSize: 15,
-      bodyFontSize: 14,
-      lineHeight: 1.5,
-    };
-
     return (
       <section className="min-h-screen bg-gray-50 py-8 md:py-10">
         <article className="mx-auto max-w-4xl px-4">

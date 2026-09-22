@@ -109,12 +109,14 @@ const UserMenu = () => {
           )}
         </div>
 
-        <div className="hidden max-w-[140px] text-left lg:block">
-          <p className="truncate text-sm font-semibold text-gray-800">
+        <div className="flex min-w-0 max-w-[96px] flex-col text-left sm:max-w-[140px]">
+          <p className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
             {displayName}
           </p>
 
-          <p className="truncate text-xs text-gray-500">{roleLabel}</p>
+          <p className="truncate text-[11px] text-gray-500 sm:text-xs">
+            {roleLabel}
+          </p>
         </div>
       </button>
 

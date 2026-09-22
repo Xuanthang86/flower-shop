@@ -28,9 +28,13 @@ const FeaturedProducts = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   useEffect(() => {
-    const refreshCategories = () => setCategories(readCategories());
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
 
-    const refreshSettings = () => setSettings(readSiteSettings());
+    const refreshSettings = () => {
+      setSettings(readSiteSettings());
+    };
 
     window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
@@ -38,19 +42,26 @@ const FeaturedProducts = () => {
 
     window.addEventListener("storage", refreshCategories);
 
+    window.addEventListener("storage", refreshSettings);
+
     return () => {
       window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
 
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
 
       window.removeEventListener("storage", refreshCategories);
+
+      window.removeEventListener("storage", refreshSettings);
     };
   }, []);
 
   const groups = useMemo(
     () =>
       categories
-        .filter((category) => category.active !== false)
+        .filter(
+          (category) =>
+            category.active !== false && category.showOnHome !== false
+        )
         .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
         .map((category) => ({
           ...category,
@@ -103,8 +114,13 @@ const FeaturedProducts = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 lg:gap-5">
-              {group.products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {group.products.map((product, index) => (
+                <div
+                  key={product.id}
+                  className={index === 4 ? "hidden lg:block" : "block"}
+                >
+                  <ProductCard product={product} />
+                </div>
               ))}
             </div>
           </div>

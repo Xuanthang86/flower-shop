@@ -687,15 +687,29 @@ const AdminCategoriesPage = () => {
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
-                            category.active
-                              ? "bg-green-50 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
-                          {category.active ? "Đang hoạt động" : "Tạm ẩn"}
-                        </span>
+                        <div className="flex flex-col items-start gap-1.5">
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
+                              category.active
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {category.active ? "Đang hoạt động" : "Tạm ẩn"}
+                          </span>
+
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
+                              category.showOnHome !== false
+                                ? "bg-pink-50 text-pink-600"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {category.showOnHome !== false
+                              ? "Hiển thị Trang chủ"
+                              : "Ẩn khỏi Trang chủ"}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="px-3 py-4">
