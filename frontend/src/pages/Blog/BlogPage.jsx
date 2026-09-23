@@ -566,10 +566,6 @@ const BlogPage = () => {
                 "{{siteName}} chia sẻ những câu chuyện, kiến thức về hoa và cảm hứng cho những dịp đặc biệt."
             ).replace(/\{\{siteName\}\}/g, siteName)}
           </p>
-
-          <p className="mt-3 text-sm font-semibold text-pink-600">
-            Tổng số bài viết: {filteredPosts.length}
-          </p>
         </header>
 
         {categories.length > 0 && (

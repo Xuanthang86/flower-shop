@@ -728,6 +728,10 @@ const AdminBlogManagementPage = () => {
             <p className="mt-2 text-sm text-gray-500">
               Tạo, chỉnh sửa và quản lý nội dung bài viết.
             </p>
+
+            <p className="mt-2 text-sm font-semibold text-pink-600">
+              Tổng số bài viết: {posts.length}
+            </p>
           </div>
 
           <button
