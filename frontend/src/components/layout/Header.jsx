@@ -1,255 +1,249 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, NavLink } from "react-router-dom";
+import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
 
-import { Link, useNavigate } from "react-router-dom";
+import HeaderIcons from "./HeaderIcons";
+import SearchBox from "./SearchBox";
+import Logo from "./Logo";
+
+import { readCategories, CATEGORY_UPDATED_EVENT } from "@/services/catalog";
 
 import {
-  FiHeart,
-  FiKey,
-  FiLogOut,
-  FiPackage,
-  FiSettings,
-  FiUser,
-} from "react-icons/fi";
+  readSiteSettings,
+  SITE_SETTINGS_UPDATED_EVENT,
+} from "@/services/siteSettings";
 
-import { ROLE_LABELS, ROLES, useAuth } from "@/context/AuthContext";
+const navClass = ({ isActive }) =>
+  `py-2 font-semibold whitespace-nowrap transition-colors ${
+    isActive ? "text-pink-600" : "text-gray-700 hover:text-pink-600"
+  }`;
 
-const menuItemClass =
-  "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-gray-700 transition hover:bg-pink-50 hover:text-pink-600";
+const Header = () => {
+  const [categories, setCategories] = useState(() => readCategories());
 
-const UserMenu = () => {
-  const { user, logout } = useAuth();
+  const [settings, setSettings] = useState(() => readSiteSettings());
 
-  const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const [open, setOpen] = useState(false);
+  const [desktopProductsOpen, setDesktopProductsOpen] = useState(false);
 
-  const menuRef = useRef(null);
+  const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
+
+  const productMenuRef = useRef(null);
+
+  useEffect(() => {
+    const refreshCategories = () => {
+      setCategories(readCategories());
+    };
+
+    const refreshSettings = () => {
+      setSettings(readSiteSettings());
+    };
+
+    window.addEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+    window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
+    window.addEventListener("storage", refreshCategories);
+
+    window.addEventListener("storage", refreshSettings);
+
+    return () => {
+      window.removeEventListener(CATEGORY_UPDATED_EVENT, refreshCategories);
+
+      window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refreshSettings);
+
+      window.removeEventListener("storage", refreshCategories);
+
+      window.removeEventListener("storage", refreshSettings);
+    };
+  }, []);
 
   useEffect(() => {
     const outside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setOpen(false);
+      if (
+        productMenuRef.current &&
+        !productMenuRef.current.contains(event.target)
+      ) {
+        setDesktopProductsOpen(false);
       }
     };
 
     document.addEventListener("mousedown", outside);
 
-    return () => document.removeEventListener("mousedown", outside);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+    };
   }, []);
 
-  if (!user) {
-    return (
-      <Link
-        to="/login"
-        className="flex items-center gap-2 rounded-lg px-2 py-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
-        title="Đăng nhập"
-        aria-label="Đăng nhập"
-      >
-        <FiUser size={22} />
+  const activeCategories = categories
+    .filter((category) => category.active !== false)
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
-        <span className="hidden text-sm font-medium sm:inline">Đăng nhập</span>
-      </Link>
-    );
-  }
-
-  const displayName = user.name || user.fullName || user.email || "Tài khoản";
-
-  const roleLabel = ROLE_LABELS?.[user.role] || user.role || "Tài khoản";
-
-  const avatar = user.avatar || user.photoURL || "";
-
-  const isAdmin = user.role === ROLES.ADMIN;
-
-  const isCustomer = user.role === ROLES.CUSTOMER;
-
-  const closeMenu = () => setOpen(false);
-
-  const goToManagement = () => {
-    closeMenu();
-
-    if (
-      [ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(user.role)
-    ) {
-      navigate("/admin");
-      return;
-    }
-
-    navigate("/");
+  const closeMobile = () => {
+    setMobileOpen(false);
+    setMobileProductsOpen(false);
   };
 
-  const handleLogout = () => {
-    closeMenu();
-
-    logout();
-
-    navigate("/", {
-      replace: true,
-    });
+  const closeAll = () => {
+    setDesktopProductsOpen(false);
+    closeMobile();
   };
 
   return (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        title="Thông tin tài khoản"
-      >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-100 font-semibold text-pink-600">
-          {avatar ? (
-            <img
-              src={avatar}
-              alt={displayName}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            displayName.charAt(0).toUpperCase()
-          )}
-        </div>
+    <header className="sticky top-0 z-[100] w-full bg-[#fff9fb]/95 shadow-[0_2px_14px_rgba(190,24,93,0.06)] backdrop-blur">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="flex min-h-[72px] items-center gap-4">
+          <Logo settings={settings} onClick={closeAll} />
 
-        <div className="hidden min-w-0 flex-col text-left sm:flex sm:max-w-[140px]">
-          <p className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
-            {displayName}
-          </p>
+          <nav className="ml-[clamp(2rem,4vw,5rem)] hidden items-center gap-6 lg:flex">
+            <NavLink
+              to="/"
+              className={navClass}
+              style={{
+                fontSize: "var(--fs-header-font-size)",
+              }}
+            >
+              Trang chủ
+            </NavLink>
 
-          <p className="truncate text-[11px] text-gray-500 sm:text-xs">
-            {roleLabel}
-          </p>
-        </div>
-      </button>
+            <div ref={productMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setDesktopProductsOpen((value) => !value)}
+                className="flex items-center gap-1 py-2 font-semibold text-gray-700 hover:text-pink-600"
+              >
+                Sản phẩm
+                <FiChevronDown
+                  size={15}
+                  className={
+                    desktopProductsOpen
+                      ? "rotate-180 transition-transform"
+                      : "transition-transform"
+                  }
+                />
+              </button>
 
-      {open && (
-        <div
-          className="
-            fixed left-2 right-2 top-[68px] z-[120]
-            max-h-[calc(100vh-80px)]
-            overflow-y-auto overflow-x-hidden
-            rounded-2xl bg-white shadow-2xl
-            sm:absolute sm:left-auto sm:right-0 sm:top-full
-            sm:mt-3 sm:max-h-none
-            sm:w-[320px] sm:max-w-[calc(100vw-2rem)]
-            sm:overflow-hidden
-          "
-        >
-          <div className="bg-pink-50 px-4 py-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
-                {avatar ? (
-                  <img
-                    src={avatar}
-                    alt={displayName}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  displayName.charAt(0).toUpperCase()
-                )}
-              </div>
+              {desktopProductsOpen && (
+                <div className="absolute left-0 top-full z-[110] mt-2 w-64 overflow-hidden rounded-xl bg-white p-2 shadow-xl">
+                  <Link
+                    to="/products"
+                    onClick={() => setDesktopProductsOpen(false)}
+                    className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-gray-800 hover:bg-pink-50 hover:text-pink-600"
+                  >
+                    Tất cả sản phẩm
+                  </Link>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-gray-800">
-                  {displayName}
-                </p>
+                  {activeCategories.map((category) => (
+                    <Link
+                      key={category.id}
+                      to={`/products?category=${encodeURIComponent(
+                        category.slug
+                      )}`}
+                      onClick={() => setDesktopProductsOpen(false)}
+                      className="block rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-pink-50 hover:text-pink-600"
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                <p className="truncate text-sm text-gray-500">{user.email}</p>
+            <NavLink to="/blog" className={navClass}>
+              Bài viết
+            </NavLink>
 
-                <span className="mt-1 inline-flex max-w-full rounded-full bg-pink-600 px-2.5 py-1 text-xs font-medium text-white">
-                  <span className="truncate">{roleLabel}</span>
-                </span>
-              </div>
+            <NavLink to="/contact" className={navClass}>
+              Liên hệ
+            </NavLink>
+          </nav>
+
+          <div className="ml-auto hidden min-w-0 items-center gap-3 md:flex">
+            <div className="w-[270px] xl:w-[320px]">
+              <SearchBox />
+            </div>
+
+            <div className="shrink-0">
+              <HeaderIcons />
             </div>
           </div>
 
-          <div className="p-2">
-            <Link to="/profile" onClick={closeMenu} className={menuItemClass}>
-              <FiUser size={18} />
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 hover:bg-pink-50 hover:text-pink-600 md:ml-0 lg:hidden"
+            aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
+          >
+            {mobileOpen ? <FiX size={23} /> : <FiMenu size={23} />}
+          </button>
+        </div>
 
-              <span className="min-w-0 flex-1 truncate">
-                Thông tin tài khoản
-              </span>
-            </Link>
+        {mobileOpen && (
+          <div className="py-4 lg:hidden">
+            <div className="mb-4 md:hidden">
+              <SearchBox />
+            </div>
 
-            <Link
-              to="/change-password"
-              onClick={closeMenu}
-              className={menuItemClass}
-            >
-              <FiKey size={18} />
+            <nav className="flex flex-col">
+              <NavLink to="/" onClick={closeMobile} className={navClass}>
+                Trang chủ
+              </NavLink>
 
-              <span className="min-w-0 flex-1 truncate">Đổi mật khẩu</span>
-            </Link>
-
-            {isCustomer && (
-              <>
-                <Link
-                  to="/orders"
-                  onClick={closeMenu}
-                  className={menuItemClass}
-                >
-                  <FiPackage size={18} />
-
-                  <span className="min-w-0 flex-1 truncate">
-                    Đơn hàng của tôi
-                  </span>
-                </Link>
-
-                <Link
-                  to="/wishlist"
-                  onClick={closeMenu}
-                  className={menuItemClass}
-                >
-                  <FiHeart size={18} />
-
-                  <span className="min-w-0 flex-1 truncate">
-                    Sản phẩm yêu thích
-                  </span>
-                </Link>
-              </>
-            )}
-
-            {!isCustomer && (
               <button
                 type="button"
-                onClick={goToManagement}
-                className={menuItemClass}
+                onClick={() => setMobileProductsOpen((value) => !value)}
+                className="flex w-full items-center justify-between py-2 font-semibold text-gray-700"
               >
-                <FiSettings size={18} />
+                <span>Sản phẩm</span>
 
-                <span className="min-w-0 flex-1 truncate">Quản lý</span>
+                <FiChevronDown
+                  className={mobileProductsOpen ? "rotate-180" : ""}
+                />
               </button>
-            )}
 
-            {isAdmin && (
-              <Link
-                to="/admin/appearance"
-                onClick={closeMenu}
-                className={menuItemClass}
-              >
-                <FiSettings size={18} />
+              {mobileProductsOpen && (
+                <div className="mb-2 ml-3 pl-3">
+                  <Link
+                    to="/products"
+                    onClick={closeMobile}
+                    className="block py-2 font-semibold"
+                  >
+                    Tất cả sản phẩm
+                  </Link>
 
-                <span className="min-w-0 flex-1 truncate">
-                  Tùy chỉnh giao diện
-                </span>
-              </Link>
-            )}
+                  {activeCategories.map((category) => (
+                    <Link
+                      key={category.id}
+                      to={`/products?category=${encodeURIComponent(
+                        category.slug
+                      )}`}
+                      onClick={closeMobile}
+                      className="block py-2 text-sm text-gray-600 hover:text-pink-600"
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
 
-            <div className="mx-4 my-1 border-t border-gray-100" />
+              <NavLink to="/blog" onClick={closeMobile} className={navClass}>
+                Bài viết
+              </NavLink>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-600 transition hover:bg-red-50"
-            >
-              <FiLogOut size={18} />
+              <NavLink to="/contact" onClick={closeMobile} className={navClass}>
+                Liên hệ
+              </NavLink>
+            </nav>
 
-              <span className="min-w-0 flex-1 truncate">Đăng xuất</span>
-            </button>
+            <div className="mt-4 pt-4 md:hidden">
+              <HeaderIcons />
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </header>
   );
 };
 
-export default UserMenu;
+export default Header;

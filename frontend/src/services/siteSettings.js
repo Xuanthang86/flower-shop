@@ -42,6 +42,10 @@ export const getSeoTitle = (settings, key, fallback = "") => {
 
 export const SITE_SETTINGS_STORAGE_KEY = "flower-shop-site-settings";
 
+export const BLOG_POSTS_STORAGE_KEY = "flower-shop-blog-posts";
+
+export const BLOG_POSTS_UPDATED_EVENT = "flower-shop-blog-posts-updated";
+
 export const SITE_SETTINGS_UPDATED_EVENT = "flower-shop-site-settings-updated";
 
 export const DEFAULT_ROLE_PERMISSIONS = {

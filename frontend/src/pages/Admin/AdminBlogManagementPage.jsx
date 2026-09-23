@@ -200,31 +200,14 @@ const AdminBlogManagementPage = () => {
     editor.innerHTML =
       normalizeBlogPostContent(form.content || "") || "<p><br /></p>";
 
-    window.requestAnimationFrame(() => {
-      const currentEditor = editorRef.current;
-
-      if (!currentEditor || !currentEditor.isConnected) {
-        return;
-      }
-
-      currentEditor.focus();
-
-      const selection = window.getSelection();
-
-      if (!selection) {
-        return;
-      }
-
-      const range = document.createRange();
-
-      range.selectNodeContents(currentEditor);
-      range.collapse(false);
-
-      selection.removeAllRanges();
-      selection.addRange(range);
-
-      selectionRef.current = range.cloneRange();
-    });
+    /*
+     * Không tự focus editor khi mở modal.
+     *
+     * Nếu tự focus tại đây, trình duyệt sẽ cuộn modal
+     * xuống khu vực nội dung bài viết, khiến người dùng
+     * không nhìn thấy phần Tên bài viết / Danh mục ở đầu form.
+     */
+    selectionRef.current = null;
   }, [editorOpen, editingPost]);
 
   const openCreate = () => {
