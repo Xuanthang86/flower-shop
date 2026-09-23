@@ -1,6 +1,13 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiPackage, FiEye, FiSearch, FiFilter } from "react-icons/fi";
+import {
+  FiCheck,
+  FiChevronDown,
+  FiEye,
+  FiFilter,
+  FiPackage,
+  FiSearch,
+} from "react-icons/fi";
 
 import { OrderContext } from "@/context/OrderContext";
 
@@ -42,8 +49,16 @@ const STATUS_OPTIONS = [
 /* =====================================================
    CHUẨN HÓA TRẠNG THÁI
 
-   delivered là trạng thái chính.
+   Trạng thái nội bộ chuẩn:
 
+   pending
+   confirmed
+   processing
+   shipping
+   delivered
+   cancelled
+
+   preparing chỉ hỗ trợ dữ liệu cũ.
    completed chỉ hỗ trợ dữ liệu cũ.
 ===================================================== */
 
@@ -62,8 +77,9 @@ const normalizeStatus = (status) => {
     confirmed: "confirmed",
     "đã xác nhận": "confirmed",
 
-    preparing: "preparing",
-    "đang chuẩn bị": "preparing",
+    processing: "processing",
+    preparing: "processing",
+    "đang chuẩn bị": "processing",
 
     shipping: "shipping",
     "đang giao": "shipping",
@@ -108,7 +124,7 @@ const getStatusClass = (status) => {
     case "confirmed":
       return "bg-blue-100 text-blue-700";
 
-    case "preparing":
+    case "processing":
       return "bg-purple-100 text-purple-700";
 
     case "shipping":
@@ -243,6 +259,31 @@ const OrdersPage = () => {
 
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  const statusMenuRef = useRef(null);
+
+  /* ===================================================
+     ĐÓNG DROPDOWN KHI CLICK RA NGOÀI
+  =================================================== */
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        statusMenuRef.current &&
+        !statusMenuRef.current.contains(event.target)
+      ) {
+        setStatusOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
   /* ===================================================
      LỌC
   =================================================== */
@@ -266,26 +307,31 @@ const OrdersPage = () => {
     });
   }, [orders, searchKeyword, statusFilter]);
 
+  const selectedStatus =
+    STATUS_OPTIONS.find((item) => item.value === statusFilter) ||
+    STATUS_OPTIONS[0];
+
   /* ===================================================
      RENDER
   =================================================== */
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 md:py-10">
-      <div className="max-w-6xl mx-auto px-4 md:px-6">
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
         {/* HEADER */}
+
         <div className="mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
               <FiPackage size={22} />
             </div>
 
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
                 Đơn hàng của tôi
               </h1>
 
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 Theo dõi các đơn hàng bạn đã đặt tại T Flower Shop.
               </p>
             </div>
@@ -293,9 +339,12 @@ const OrdersPage = () => {
         </div>
 
         {/* SEARCH + FILTER */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
+
+        <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+            {/* SEARCH */}
+
+            <div className="relative min-w-0">
               <FiSearch
                 size={18}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
@@ -306,41 +355,99 @@ const OrdersPage = () => {
                 value={searchKeyword}
                 onChange={(event) => setSearchKeyword(event.target.value)}
                 placeholder="Tìm theo mã đơn hàng hoặc tên..."
-                className="w-full border border-gray-200 rounded-xl pl-11 pr-4 py-3 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                className="w-full min-w-0 rounded-xl border border-gray-200 py-3 pl-11 pr-4 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
               />
             </div>
 
-            <div className="relative">
+            {/* STATUS DROPDOWN */}
+
+            <div ref={statusMenuRef} className="relative min-w-0">
               <FiFilter
                 size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-gray-400"
               />
 
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="w-full border border-gray-200 rounded-xl pl-11 pr-4 py-3 bg-white outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+              <button
+                type="button"
+                onClick={() => setStatusOpen((value) => !value)}
+                className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-left text-sm text-gray-700 outline-none transition hover:border-pink-300 focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                aria-haspopup="listbox"
+                aria-expanded={statusOpen}
               >
-                {STATUS_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                <span className="min-w-0 flex-1 truncate">
+                  {selectedStatus.label}
+                </span>
+
+                <FiChevronDown
+                  size={18}
+                  className={`shrink-0 transition-transform ${
+                    statusOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {statusOpen && (
+                <div
+                  className="
+                    absolute left-0 right-0 top-full z-[80]
+                    mt-2 max-h-[min(360px,60vh)]
+                    overflow-y-auto overflow-x-hidden
+                    rounded-xl border border-gray-100
+                    bg-white p-2 shadow-xl
+                  "
+                  role="listbox"
+                  aria-label="Lọc theo trạng thái đơn hàng"
+                >
+                  {STATUS_OPTIONS.map((option) => {
+                    const isSelected = option.value === statusFilter;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setStatusFilter(option.value);
+
+                          setStatusOpen(false);
+                        }}
+                        className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                          isSelected
+                            ? "bg-pink-50 font-semibold text-pink-600"
+                            : "text-gray-700 hover:bg-pink-50 hover:text-pink-600"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {option.label}
+                        </span>
+
+                        {isSelected && (
+                          <FiCheck
+                            size={17}
+                            className="shrink-0 text-pink-600"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* DANH SÁCH */}
+
         {filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-            <FiPackage size={50} className="mx-auto text-gray-300 mb-4" />
+          <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
+            <FiPackage size={50} className="mx-auto mb-4 text-gray-300" />
 
             <h2 className="text-xl font-semibold text-gray-800">
               Không có đơn hàng
             </h2>
 
-            <p className="text-gray-500 mt-2">
+            <p className="mt-2 text-gray-500">
               Không tìm thấy đơn hàng phù hợp.
             </p>
           </div>
@@ -352,59 +459,59 @@ const OrdersPage = () => {
               return (
                 <div
                   key={getOrderId(order)}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6"
+                  className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
                       <p className="text-sm text-gray-500">Mã đơn hàng</p>
 
-                      <h2 className="text-lg font-bold text-gray-900 mt-1">
+                      <h2 className="mt-1 text-lg font-bold text-gray-900">
                         #{getOrderId(order)}
                       </h2>
 
-                      <p className="text-sm text-gray-500 mt-2">
+                      <p className="mt-2 text-sm text-gray-500">
                         Thời gian đặt hàng: {formatDate(order?.createdAt)}
                       </p>
                     </div>
 
                     <span
-                      className={`inline-flex w-fit px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusClass(
+                      className={`inline-flex w-fit max-w-full shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${getStatusClass(
                         status
                       )}`}
                     >
-                      {getStatusLabel(status)}
+                      <span className="truncate">{getStatusLabel(status)}</span>
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-100">
-                    <div>
+                  <div className="mt-6 grid grid-cols-2 gap-4 border-t border-gray-100 pt-5 md:grid-cols-4">
+                    <div className="min-w-0">
                       <p className="text-xs text-gray-500">Người nhận</p>
 
-                      <p className="font-medium text-gray-800 mt-1 truncate">
+                      <p className="mt-1 truncate font-medium text-gray-800">
                         {getCustomerName(order)}
                       </p>
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs text-gray-500">Sản phẩm</p>
 
-                      <p className="font-medium text-gray-800 mt-1">
+                      <p className="mt-1 font-medium text-gray-800">
                         {getProductCount(order)}
                       </p>
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs text-gray-500">Thanh toán</p>
 
-                      <p className="font-medium text-gray-800 mt-1">
+                      <p className="mt-1 truncate font-medium text-gray-800">
                         {getPaymentMethod(order)}
                       </p>
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs text-gray-500">Tổng cộng</p>
 
-                      <p className="font-bold text-pink-600 mt-1">
+                      <p className="mt-1 truncate font-bold text-pink-600">
                         {formatCurrency(getOrderTotal(order))}
                       </p>
                     </div>
@@ -413,10 +520,11 @@ const OrdersPage = () => {
                   <div className="mt-5 flex justify-end">
                     <Link
                       to={`/orders/${getOrderId(order)}`}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 text-gray-700 hover:border-pink-300 hover:text-pink-600 transition"
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-gray-700 transition hover:border-pink-300 hover:text-pink-600"
                     >
                       <FiEye size={17} />
-                      Xem chi tiết
+
+                      <span>Xem chi tiết</span>
                     </Link>
                   </div>
                 </div>
