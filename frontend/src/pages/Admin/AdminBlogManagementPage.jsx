@@ -17,10 +17,13 @@ import {
 } from "react-icons/fi";
 
 import {
+  BLOG_POSTS_UPDATED_EVENT,
+  BLOG_POSTS_STORAGE_KEY,
   buildDefaultBlogShopInfoHtml,
   normalizeBlogPostContent,
+  readBlogPosts,
   readSiteSettings,
-  saveSiteSettings,
+  saveBlogPosts,
   SITE_SETTINGS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
@@ -129,6 +132,8 @@ const getBlogStyle = (settings) =>
 const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
+  const [blogPosts, setBlogPosts] = useState(() => readBlogPosts());
+
   const blogCategories = Array.isArray(settings.blogCategories)
     ? settings.blogCategories
     : [];
@@ -180,6 +185,28 @@ const AdminBlogManagementPage = () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
 
       window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    const refreshPosts = () => {
+      setBlogPosts(readBlogPosts());
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === BLOG_POSTS_STORAGE_KEY) {
+        refreshPosts();
+      }
+    };
+
+    window.addEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
+
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -613,7 +640,7 @@ const AdminBlogManagementPage = () => {
       time: form.time || "08:00",
     };
 
-    const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+    const posts = Array.isArray(blogPosts) ? blogPosts : [];
 
     const updatedPosts = editingPost
       ? posts.map((item) =>
@@ -622,12 +649,9 @@ const AdminBlogManagementPage = () => {
       : [...posts, post];
 
     try {
-      const saved = saveSiteSettings({
-        ...settings,
-        blogPosts: updatedPosts,
-      });
+      const savedPosts = saveBlogPosts(updatedPosts);
 
-      setSettings(saved);
+      setBlogPosts(savedPosts);
 
       notifySuccess(
         editingPost ? "Đã cập nhật bài viết." : "Đã thêm bài viết."
@@ -645,15 +669,11 @@ const AdminBlogManagementPage = () => {
     }
 
     try {
-      const saved = saveSiteSettings({
-        ...settings,
+      const savedPosts = saveBlogPosts(
+        blogPosts.filter((item) => String(item.id) !== String(confirmDelete.id))
+      );
 
-        blogPosts: (settings.blogPosts || []).filter(
-          (item) => String(item.id) !== String(confirmDelete.id)
-        ),
-      });
-
-      setSettings(saved);
+      setBlogPosts(savedPosts);
 
       setConfirmDelete(null);
 
@@ -665,7 +685,7 @@ const AdminBlogManagementPage = () => {
     }
   };
 
-  const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+  const posts = blogPosts;
 
   const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
 

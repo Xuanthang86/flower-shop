@@ -865,9 +865,7 @@ const mergeSettings = (input = {}) => {
     Array.isArray(source.blogCategories) ? source.blogCategories : []
   );
 
-  const normalizedBlogPosts = normalizeBlogPosts(
-    Array.isArray(source.blogPosts) ? source.blogPosts : []
-  );
+  const normalizedBlogPosts = [];
 
   return {
     ...defaults,
@@ -974,6 +972,78 @@ const mergeSettings = (input = {}) => {
       ),
     },
   };
+};
+
+export const readBlogPosts = () => {
+  try {
+    const raw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
+
+    if (raw) {
+      const parsed = JSON.parse(raw);
+
+      return normalizeBlogPosts(parsed);
+    }
+
+    /*
+     * Migration một lần từ cấu trúc cũ:
+     *
+     * flower-shop-site-settings.blogPosts
+     *
+     * sang:
+     *
+     * flower-shop-blog-posts
+     */
+    const settingsRaw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
+
+    if (!settingsRaw) {
+      return [];
+    }
+
+    const settings = JSON.parse(settingsRaw);
+
+    const legacyPosts = Array.isArray(settings?.blogPosts)
+      ? settings.blogPosts
+      : [];
+
+    const normalizedPosts = normalizeBlogPosts(legacyPosts);
+
+    if (normalizedPosts.length > 0) {
+      localStorage.setItem(
+        BLOG_POSTS_STORAGE_KEY,
+        JSON.stringify(normalizedPosts)
+      );
+    }
+
+    return normalizedPosts;
+  } catch (error) {
+    console.error("Không thể đọc danh sách bài viết:", error);
+
+    return [];
+  }
+};
+
+export const saveBlogPosts = (posts) => {
+  const normalizedPosts = normalizeBlogPosts(Array.isArray(posts) ? posts : []);
+
+  const serialized = JSON.stringify(normalizedPosts);
+
+  try {
+    localStorage.setItem(BLOG_POSTS_STORAGE_KEY, serialized);
+  } catch (error) {
+    console.error("Không thể lưu danh sách bài viết:", error);
+
+    if (error?.name === "QuotaExceededError") {
+      throw new Error(
+        "Không thể lưu bài viết vì bộ nhớ trình duyệt đã đạt giới hạn. Hãy kiểm tra lại hình ảnh trong bài viết."
+      );
+    }
+
+    throw new Error(error?.message || "Không thể lưu bài viết.");
+  }
+
+  window.dispatchEvent(new Event(BLOG_POSTS_UPDATED_EVENT));
+
+  return normalizedPosts;
 };
 
 export const readSiteSettings = () => {
