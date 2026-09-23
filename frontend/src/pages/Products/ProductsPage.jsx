@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   Link,
@@ -7,7 +13,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
-import { FiChevronDown } from "react-icons/fi";
+import { FiCheck, FiChevronDown } from "react-icons/fi";
 
 import {
   getProductsSnapshot,
@@ -105,6 +111,10 @@ const ProductsPage = () => {
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  const [categoryOpen, setCategoryOpen] = useState(false);
+
+  const categoryMenuRef = useRef(null);
+
   const keyword = searchParams.get("search") || "";
 
   const queryCategory = searchParams.get("category") || "";
@@ -144,9 +154,36 @@ const ProductsPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        categoryMenuRef.current &&
+        !categoryMenuRef.current.contains(event.target)
+      ) {
+        setCategoryOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
+  const activeCategories = useMemo(
+    () =>
+      categories
+        .filter((item) => item.active !== false)
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
+    [categories]
+  );
+
   const currentCategory = categories.find(
     (item) => String(item.slug) === String(category)
   );
+
+  const selectedCategoryLabel = currentCategory?.name || "Tất cả danh mục";
 
   const visibleFilteredProducts = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -323,8 +360,8 @@ const ProductsPage = () => {
     setSearchParams(params);
   };
 
-  const handleCategoryChange = (event) => {
-    const value = event.target.value;
+  const handleCategoryChange = (value) => {
+    setCategoryOpen(false);
 
     if (value) {
       navigate(`/products/category/${value}`);
@@ -479,38 +516,98 @@ const ProductsPage = () => {
               </p>
             </div>
 
-            <div className="w-full md:w-auto md:min-w-[220px]">
+            <div
+              ref={categoryMenuRef}
+              className="relative w-full min-w-0 md:w-[280px] md:max-w-full"
+            >
               <label htmlFor="product-category" className="sr-only">
                 Tất cả danh mục
               </label>
 
-              <select
+              <button
                 id="product-category"
-                value={routeCategorySlug ? routeCategorySlug : queryCategory}
-                onChange={handleCategoryChange}
-                className="w-full rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm outline-none transition focus:ring-2 focus:ring-pink-100 md:w-auto"
+                type="button"
+                onClick={() => setCategoryOpen((current) => !current)}
+                className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 shadow-sm outline-none transition hover:bg-gray-50 focus:ring-2 focus:ring-pink-100"
+                aria-haspopup="listbox"
+                aria-expanded={categoryOpen}
               >
-                <option value="">Tất cả danh mục</option>
+                <span className="min-w-0 flex-1 truncate">
+                  {selectedCategoryLabel}
+                </span>
 
-                {categories
-                  .filter((item) => item.active !== false)
-                  .sort(
-                    (a, b) =>
-                      Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
-                  )
-                  .map((item) => (
-                    <option key={item.id} value={item.slug}>
-                      {item.name}
-                    </option>
-                  ))}
-              </select>
+                <FiChevronDown
+                  size={18}
+                  className={`shrink-0 transition-transform ${
+                    categoryOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {categoryOpen && (
+                <div
+                  className="absolute left-0 right-0 top-full z-[80] mt-2 max-h-[60vh] overflow-y-auto overflow-x-hidden rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+                  role="listbox"
+                  aria-label="Danh mục sản phẩm"
+                >
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={!category}
+                    onClick={() => handleCategoryChange("")}
+                    className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                      !category
+                        ? "bg-pink-50 font-semibold text-pink-600"
+                        : "text-gray-700 hover:bg-pink-50 hover:text-pink-600"
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      Tất cả danh mục
+                    </span>
+
+                    {!category && (
+                      <FiCheck size={17} className="shrink-0 text-pink-600" />
+                    )}
+                  </button>
+
+                  {activeCategories.map((item) => {
+                    const isSelected = String(item.slug) === String(category);
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => handleCategoryChange(item.slug)}
+                        className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                          isSelected
+                            ? "bg-pink-50 font-semibold text-pink-600"
+                            : "text-gray-700 hover:bg-pink-50 hover:text-pink-600"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {item.name}
+                        </span>
+
+                        {isSelected && (
+                          <FiCheck
+                            size={17}
+                            className="shrink-0 text-pink-600"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-base font-semibold text-gray-900">
                 Lọc và sắp xếp
               </h2>
@@ -534,7 +631,7 @@ const ProductsPage = () => {
               <button
                 type="button"
                 onClick={() => setFiltersExpanded((current) => !current)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 sm:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 lg:hidden"
                 aria-label={
                   filtersExpanded ? "Thu gọn bộ lọc" : "Mở rộng bộ lọc"
                 }
@@ -550,120 +647,124 @@ const ProductsPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label
-                htmlFor="product-min-price"
-                className="mb-1.5 block text-xs font-semibold text-gray-600"
-              >
-                Giá từ
-              </label>
+          <div className={filtersExpanded ? "block" : "hidden lg:block"}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label
+                  htmlFor="product-min-price"
+                  className="mb-1.5 block text-xs font-semibold text-gray-600"
+                >
+                  Giá từ
+                </label>
 
-              <input
-                id="product-min-price"
-                type="number"
-                min="0"
-                step="1000"
-                value={minPrice === null ? "" : minPrice}
-                onChange={(event) =>
-                  handlePriceChange("minPrice", event.target.value)
-                }
-                placeholder="Ví dụ: 300000"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
-              />
+                <input
+                  id="product-min-price"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={minPrice === null ? "" : minPrice}
+                  onChange={(event) =>
+                    handlePriceChange("minPrice", event.target.value)
+                  }
+                  placeholder="Ví dụ: 300000"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="product-max-price"
+                  className="mb-1.5 block text-xs font-semibold text-gray-600"
+                >
+                  Giá đến
+                </label>
+
+                <input
+                  id="product-max-price"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={maxPrice === null ? "" : maxPrice}
+                  onChange={(event) =>
+                    handlePriceChange("maxPrice", event.target.value)
+                  }
+                  placeholder="Ví dụ: 1000000"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="product-sort"
+                  className="mb-1.5 block text-xs font-semibold text-gray-600"
+                >
+                  Sắp xếp
+                </label>
+
+                <select
+                  id="product-sort"
+                  value={sort}
+                  onChange={handleSortChange}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="product-stock"
+                  className="mb-1.5 block text-xs font-semibold text-gray-600"
+                >
+                  Tình trạng kho
+                </label>
+
+                <select
+                  id="product-stock"
+                  value={stockFilter}
+                  onChange={handleStockChange}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
+                >
+                  <option value="">Tất cả tình trạng</option>
+
+                  <option value="in">Còn hàng</option>
+
+                  <option value="out">Hết hàng</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="product-max-price"
-                className="mb-1.5 block text-xs font-semibold text-gray-600"
-              >
-                Giá đến
+            <div className="mt-4 flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-pink-200 hover:bg-pink-50">
+                <input
+                  type="checkbox"
+                  checked={newOnly}
+                  onChange={(event) =>
+                    handleToggleFilter("new", event.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                />
+
+                <span>Sản phẩm mới</span>
               </label>
 
-              <input
-                id="product-max-price"
-                type="number"
-                min="0"
-                step="1000"
-                value={maxPrice === null ? "" : maxPrice}
-                onChange={(event) =>
-                  handlePriceChange("maxPrice", event.target.value)
-                }
-                placeholder="Ví dụ: 1000000"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
-              />
-            </div>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-pink-200 hover:bg-pink-50">
+                <input
+                  type="checkbox"
+                  checked={saleOnly}
+                  onChange={(event) =>
+                    handleToggleFilter("sale", event.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                />
 
-            <div>
-              <label
-                htmlFor="product-sort"
-                className="mb-1.5 block text-xs font-semibold text-gray-600"
-              >
-                Sắp xếp
+                <span>Đang giảm giá</span>
               </label>
-
-              <select
-                id="product-sort"
-                value={sort}
-                onChange={handleSortChange}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </div>
-
-            <div>
-              <label
-                htmlFor="product-stock"
-                className="mb-1.5 block text-xs font-semibold text-gray-600"
-              >
-                Tình trạng kho
-              </label>
-
-              <select
-                id="product-stock"
-                value={stockFilter}
-                onChange={handleStockChange}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-pink-300 focus:bg-white focus:ring-2 focus:ring-pink-100"
-              >
-                <option value="">Tất cả tình trạng</option>
-                <option value="in">Còn hàng</option>
-                <option value="out">Hết hàng</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-pink-200 hover:bg-pink-50">
-              <input
-                type="checkbox"
-                checked={newOnly}
-                onChange={(event) =>
-                  handleToggleFilter("new", event.target.checked)
-                }
-                className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
-              />
-
-              <span>Sản phẩm mới</span>
-            </label>
-
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-pink-200 hover:bg-pink-50">
-              <input
-                type="checkbox"
-                checked={saleOnly}
-                onChange={(event) =>
-                  handleToggleFilter("sale", event.target.checked)
-                }
-                className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
-              />
-
-              <span>Đang giảm giá</span>
-            </label>
           </div>
         </div>
 

@@ -71,6 +71,7 @@ const UserMenu = () => {
       [ROLES.ADMIN, ROLES.MANAGER, ROLES.PRODUCT_MANAGER].includes(user.role)
     ) {
       navigate("/admin");
+
       return;
     }
 
@@ -88,11 +89,11 @@ const UserMenu = () => {
   };
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative min-w-0">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
+        className="flex h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-gray-700 transition hover:bg-pink-50 hover:text-pink-600"
         aria-expanded={open}
         aria-haspopup="menu"
         title="Thông tin tài khoản"
@@ -109,12 +110,12 @@ const UserMenu = () => {
           )}
         </div>
 
-        <div className="hidden min-w-0 flex-col text-left sm:flex sm:max-w-[140px]">
+        <div className="flex min-w-0 max-w-[105px] flex-col text-left sm:max-w-[140px]">
           <p className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
             {displayName}
           </p>
 
-          <p className="truncate text-[11px] text-gray-500 sm:text-xs">
+          <p className="truncate text-[10px] text-gray-500 sm:text-xs">
             {roleLabel}
           </p>
         </div>
@@ -127,10 +128,10 @@ const UserMenu = () => {
             max-h-[calc(100vh-80px)]
             overflow-y-auto overflow-x-hidden
             rounded-2xl bg-white shadow-2xl
-            sm:absolute sm:left-auto sm:right-0 sm:top-full
-            sm:mt-3 sm:max-h-none
-            sm:w-[320px] sm:max-w-[calc(100vw-2rem)]
-            sm:overflow-hidden
+            md:absolute md:left-auto md:right-0 md:top-full
+            md:mt-3 md:max-h-none
+            md:w-[320px] md:max-w-[calc(100vw-2rem)]
+            md:overflow-hidden
           "
         >
           <div className="bg-pink-50 px-4 py-4">
