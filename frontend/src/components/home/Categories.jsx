@@ -72,19 +72,17 @@ const Categories = () => {
           </p>
         </div>
 
-        <div className="overflow-x-auto pb-2 scrollbar-hide lg:overflow-visible">
+        <div className="overflow-x-auto pb-2 scrollbar-hide">
           <div
             className="
               grid
-              w-full
+              w-max
               grid-flow-col
-              auto-cols-[calc((100%_-_0.75rem)/2)]
+              auto-cols-[calc((100vw_-_2.75rem)/2)]
               gap-3
-              md:auto-cols-[calc((100%_-_2.25rem)/4)]
-              lg:grid-flow-row
-              lg:grid-cols-5
-              lg:auto-cols-auto
-              lg:gap-3
+              md:auto-cols-[calc((100vw_-_4.75rem)/4)]
+              lg:auto-cols-[calc((min(1280px,100vw_-_2rem)-2rem)/5)]
+              lg:gap-4
             "
           >
             {categories.map((category) => (

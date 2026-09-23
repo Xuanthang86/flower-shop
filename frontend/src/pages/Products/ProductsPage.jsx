@@ -7,6 +7,8 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
+import { FiChevronDown } from "react-icons/fi";
+
 import {
   getProductsSnapshot,
   readCategories,
@@ -100,6 +102,8 @@ const ProductsPage = () => {
   );
 
   const [categories, setCategories] = useState(() => readCategories());
+
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const keyword = searchParams.get("search") || "";
 
@@ -505,7 +509,7 @@ const ProductsPage = () => {
         </div>
 
         <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-gray-900">
                 Lọc và sắp xếp
@@ -516,15 +520,34 @@ const ProductsPage = () => {
               </p>
             </div>
 
-            {hasActiveFilters && (
+            <div className="flex shrink-0 items-center gap-2">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-sm font-semibold text-pink-600 transition hover:text-pink-700"
+                >
+                  Đặt lại
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={resetFilters}
-                className="self-start text-sm font-semibold text-pink-600 transition hover:text-pink-700 sm:self-auto"
+                onClick={() => setFiltersExpanded((current) => !current)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 sm:hidden"
+                aria-label={
+                  filtersExpanded ? "Thu gọn bộ lọc" : "Mở rộng bộ lọc"
+                }
+                aria-expanded={filtersExpanded}
               >
-                Đặt lại bộ lọc
+                <FiChevronDown
+                  size={18}
+                  className={`transition-transform ${
+                    filtersExpanded ? "rotate-180" : ""
+                  }`}
+                />
               </button>
-            )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -742,11 +765,12 @@ const ProductsPage = () => {
               >
                 <button
                   type="button"
-                  disabled={safePage <= 1}
                   onClick={() => goToPage(safePage - 1)}
-                  className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={safePage === 1}
+                  aria-label="Trang trước"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-semibold text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Trước
+                  &lt;
                 </button>
 
                 {pageNumbers.map((page) => (
@@ -767,11 +791,12 @@ const ProductsPage = () => {
 
                 <button
                   type="button"
-                  disabled={safePage >= totalPages}
                   onClick={() => goToPage(safePage + 1)}
-                  className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={safePage === totalPages}
+                  aria-label="Trang sau"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-semibold text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Sau
+                  &gt;
                 </button>
               </nav>
             )}

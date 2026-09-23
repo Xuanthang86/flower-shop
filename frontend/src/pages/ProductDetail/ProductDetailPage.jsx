@@ -566,7 +566,7 @@ const ProductDetailPage = () => {
         <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
           <div className="grid md:grid-cols-[0.9fr_1.1fr]">
             <div className="bg-gray-50 p-4 md:p-6">
-              <div className="mx-auto aspect-square max-w-md overflow-hidden rounded-2xl bg-white">
+              <div className="mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl bg-white sm:max-w-[320px] md:max-w-sm">
                 <img
                   src={product.image}
                   alt={product.name}

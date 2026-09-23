@@ -121,7 +121,10 @@ const UserMenu = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[120] mt-3 w-[320px] overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div
+          className="absolute right-0 top-full z-[120] mt-3 w-[min(320px,calc(100vw-2rem))]
+max-w-[calc(100vw-2rem)]overflow-hidden rounded-2xl bg-white shadow-2xl"
+        >
           <div className="bg-pink-50 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">

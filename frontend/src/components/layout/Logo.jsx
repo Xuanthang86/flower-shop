@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-const Logo = ({ settings, onClick }) => {
+const Logo = ({ settings, onClick, showMobileText = false }) => {
   const branding = settings?.branding || {};
 
   const image = branding.logoImage || branding.logo || "";
@@ -27,7 +27,11 @@ const Logo = ({ settings, onClick }) => {
             />
           </div>
 
-          <div className="hidden min-w-0 sm:block">
+          <div
+            className={
+              showMobileText ? "block min-w-0" : "hidden min-w-0 sm:block"
+            }
+          >
             <div className="truncate text-lg font-bold leading-tight text-gray-900">
               {siteName}
             </div>
@@ -48,7 +52,11 @@ const Logo = ({ settings, onClick }) => {
             🌸
           </div>
 
-          <div className="hidden min-w-0 sm:block">
+          <div
+            className={
+              showMobileText ? "block min-w-0" : "hidden min-w-0 sm:block"
+            }
+          >
             <div className="flex items-center gap-1.5">
               <span className="bg-gradient-to-r from-pink-600 via-rose-500 to-fuchsia-500 bg-clip-text text-lg font-extrabold leading-tight tracking-tight text-transparent">
                 {siteName}

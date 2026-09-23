@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
 
 import HeaderIcons from "./HeaderIcons";
@@ -30,6 +30,8 @@ const Header = () => {
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
 
   const productMenuRef = useRef(null);
+
+  const location = useLocation();
 
   useEffect(() => {
     const refreshCategories = () => setCategories(readCategories());
@@ -88,7 +90,11 @@ const Header = () => {
     <header className="sticky top-0 z-[100] w-full bg-[#fff9fb]/95 shadow-[0_2px_14px_rgba(190,24,93,0.06)] backdrop-blur">
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex min-h-[72px] items-center gap-4">
-          <Logo settings={settings} onClick={closeAll} />
+          <Logo
+            settings={settings}
+            onClick={closeAll}
+            showMobileText={location.pathname === "/"}
+          />
 
           <nav className="ml-[clamp(2rem,4vw,5rem)] hidden items-center gap-6 lg:flex">
             <NavLink
@@ -175,7 +181,7 @@ const Header = () => {
 
         {mobileOpen && (
           <div className="py-4 lg:hidden">
-            <div className="mb-4">
+            <div className="mb-4 md:hidden">
               <SearchBox />
             </div>
 
@@ -229,7 +235,7 @@ const Header = () => {
               </NavLink>
             </nav>
 
-            <div className="mt-4 pt-4">
+            <div className="mt-4 pt-4 md:hidden">
               <HeaderIcons />
             </div>
           </div>
