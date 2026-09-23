@@ -97,7 +97,7 @@ const UserMenu = () => {
         aria-haspopup="menu"
         title="Thông tin tài khoản"
       >
-        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-pink-100 font-semibold text-pink-600">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-100 font-semibold text-pink-600">
           {avatar ? (
             <img
               src={avatar}
@@ -109,7 +109,7 @@ const UserMenu = () => {
           )}
         </div>
 
-        <div className="flex min-w-0 max-w-[96px] flex-col text-left sm:max-w-[140px]">
+        <div className="hidden min-w-0 flex-col text-left sm:flex sm:max-w-[140px]">
           <p className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
             {displayName}
           </p>
@@ -121,9 +121,20 @@ const UserMenu = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[120] mt-3 w-[calc(100vw-2rem)] max-w-[320px] overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div
+          className="
+            fixed left-2 right-2 top-[68px] z-[120]
+            max-h-[calc(100vh-80px)]
+            overflow-y-auto overflow-x-hidden
+            rounded-2xl bg-white shadow-2xl
+            sm:absolute sm:left-auto sm:right-0 sm:top-full
+            sm:mt-3 sm:max-h-none
+            sm:w-[320px] sm:max-w-[calc(100vw-2rem)]
+            sm:overflow-hidden
+          "
+        >
           <div className="bg-pink-50 px-4 py-4">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-600 text-lg font-bold text-white">
                 {avatar ? (
                   <img
@@ -136,15 +147,15 @@ const UserMenu = () => {
                 )}
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-gray-800">
                   {displayName}
                 </p>
 
                 <p className="truncate text-sm text-gray-500">{user.email}</p>
 
-                <span className="mt-1 inline-flex rounded-full bg-pink-600 px-2.5 py-1 text-xs font-medium text-white">
-                  {roleLabel}
+                <span className="mt-1 inline-flex max-w-full rounded-full bg-pink-600 px-2.5 py-1 text-xs font-medium text-white">
+                  <span className="truncate">{roleLabel}</span>
                 </span>
               </div>
             </div>
@@ -153,7 +164,10 @@ const UserMenu = () => {
           <div className="p-2">
             <Link to="/profile" onClick={closeMenu} className={menuItemClass}>
               <FiUser size={18} />
-              <span>Thông tin tài khoản</span>
+
+              <span className="min-w-0 flex-1 truncate">
+                Thông tin tài khoản
+              </span>
             </Link>
 
             <Link
@@ -162,7 +176,8 @@ const UserMenu = () => {
               className={menuItemClass}
             >
               <FiKey size={18} />
-              <span>Đổi mật khẩu</span>
+
+              <span className="min-w-0 flex-1 truncate">Đổi mật khẩu</span>
             </Link>
 
             {isCustomer && (
@@ -173,7 +188,10 @@ const UserMenu = () => {
                   className={menuItemClass}
                 >
                   <FiPackage size={18} />
-                  <span>Đơn hàng của tôi</span>
+
+                  <span className="min-w-0 flex-1 truncate">
+                    Đơn hàng của tôi
+                  </span>
                 </Link>
 
                 <Link
@@ -182,7 +200,10 @@ const UserMenu = () => {
                   className={menuItemClass}
                 >
                   <FiHeart size={18} />
-                  <span>Sản phẩm yêu thích</span>
+
+                  <span className="min-w-0 flex-1 truncate">
+                    Sản phẩm yêu thích
+                  </span>
                 </Link>
               </>
             )}
@@ -194,7 +215,8 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-                <span>Quản lý</span>
+
+                <span className="min-w-0 flex-1 truncate">Quản lý</span>
               </button>
             )}
 
@@ -205,7 +227,10 @@ const UserMenu = () => {
                 className={menuItemClass}
               >
                 <FiSettings size={18} />
-                <span>Tùy chỉnh giao diện</span>
+
+                <span className="min-w-0 flex-1 truncate">
+                  Tùy chỉnh giao diện
+                </span>
               </Link>
             )}
 
@@ -218,7 +243,7 @@ const UserMenu = () => {
             >
               <FiLogOut size={18} />
 
-              <span>Đăng xuất</span>
+              <span className="min-w-0 flex-1 truncate">Đăng xuất</span>
             </button>
           </div>
         </div>
