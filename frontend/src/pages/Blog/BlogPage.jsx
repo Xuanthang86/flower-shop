@@ -5,9 +5,11 @@ import { Link, useParams } from "react-router-dom";
 import { FiArrowLeft, FiArrowRight, FiCalendar, FiClock } from "react-icons/fi";
 
 import {
+  BLOG_POSTS_UPDATED_EVENT,
   buildDefaultBlogShopInfoHtml,
   composeBlogPostContent,
   normalizeBlogPostContent,
+  readBlogPosts,
   readSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
   getSiteName,
@@ -88,11 +90,8 @@ const BlogPage = () => {
    * Không còn biến posts undefined.
    */
   const posts = useMemo(
-    () =>
-      Array.isArray(settings.blogPosts)
-        ? settings.blogPosts.filter((post) => post?.status !== "draft")
-        : [],
-    [settings.blogPosts]
+    () => readBlogPosts().filter((post) => post?.status !== "draft"),
+    [settings]
   );
 
   /*
@@ -130,10 +129,20 @@ const BlogPage = () => {
 
     window.addEventListener("storage", refresh);
 
+    const refreshPosts = () => {
+      setSettings((current) => ({
+        ...current,
+      }));
+    };
+
+    window.addEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
+
     return () => {
       window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, refresh);
 
       window.removeEventListener("storage", refresh);
+
+      window.removeEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
     };
   }, []);
 

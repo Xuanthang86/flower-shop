@@ -18,6 +18,8 @@ const couponRoutes = require("./routes/coupons");
 const orderRoutes = require("./routes/orders");
 const paymentRoutes = require("./routes/payments");
 const errorHandler = require("./middleware/errorHandler");
+const requireAuth = require("./middleware/auth");
+const authorize = require("./middleware/authorize");
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -210,34 +212,153 @@ app.get("/api/health", async (req, res) => {
 });
 
 /* Legacy snapshot API is retained for a controlled frontend migration period. */
+/* ============================================================
+ * LEGACY SHARED SNAPSHOT API
+ *
+ * Snapshot chỉ được giữ trong giai đoạn migration.
+ *
+ * GET:
+ *   public read
+ *
+ * PUT:
+ *   chỉ admin / manager được ghi
+ *
+ * Blog:
+ *   snapshot.blogPosts là nguồn mới.
+ *
+ *   root-level blogPosts vẫn được trả về để tương thích
+ *   với frontend/backend phiên bản cũ.
+ * ============================================================ */
+
 app.get("/api/data/snapshot", async (req, res, next) => {
   try {
-    if (!databaseReady)
-      return res
-        .status(503)
-        .json({ initialized: false, message: "MongoDB chưa kết nối." });
-
-    const document = await SharedSnapshot.findOne({ key: "main" }).lean();
-    if (!document) {
-      return res.json({ initialized: false, snapshot: null, updatedAt: null });
+    if (!databaseReady) {
+      return res.status(503).json({
+        initialized: false,
+        message: "MongoDB chưa kết nối.",
+      });
     }
+
+    const document = await SharedSnapshot.findOne({
+      key: "main",
+    }).lean();
+
+    if (!document) {
+      return res.json({
+        initialized: false,
+        snapshot: null,
+        blogPosts: [],
+        updatedAt: null,
+      });
+    }
+
+    const products = Array.isArray(document.products) ? document.products : [];
+
+    const categories = Array.isArray(document.categories)
+      ? document.categories
+      : [];
+
+    const settings =
+      document.settings && typeof document.settings === "object"
+        ? document.settings
+        : {};
+
+    const blogPosts = Array.isArray(document.blogPosts)
+      ? document.blogPosts
+      : [];
 
     return res.json({
       initialized: true,
+
       snapshot: {
-        products: Array.isArray(document.products) ? document.products : [],
-        categories: Array.isArray(document.categories)
-          ? document.categories
-          : [],
-        settings: document.settings || {},
+        products,
+
+        categories,
+
+        settings,
+
+        /*
+         * BLOG PHẢI nằm trong snapshot.
+         */
+        blogPosts,
       },
-      blogPosts: Array.isArray(document.blogPosts) ? document.blogPosts : [],
+
+      /*
+       * Giữ backward compatibility.
+       */
+      blogPosts,
+
       updatedAt: document.updatedAt || document.createdAt || null,
     });
   } catch (error) {
     next(error);
   }
 });
+
+app.put(
+  "/api/data/snapshot",
+  requireAuth,
+  authorize("admin", "manager"),
+  async (req, res, next) => {
+    try {
+      if (!databaseReady) {
+        return res.status(503).json({
+          success: false,
+          message: "MongoDB chưa kết nối.",
+        });
+      }
+
+      const body = req.body || {};
+
+      const update = {
+        products: Array.isArray(body.products) ? body.products : [],
+
+        categories: Array.isArray(body.categories) ? body.categories : [],
+
+        settings:
+          body.settings && typeof body.settings === "object"
+            ? body.settings
+            : {},
+      };
+
+      /*
+       * Blog chỉ được cập nhật nếu client thực sự gửi
+       * một array blogPosts.
+       *
+       * Không bao giờ tự biến blog thiếu thành [].
+       */
+      if (Array.isArray(body.blogPosts)) {
+        update.blogPosts = body.blogPosts;
+      }
+
+      const saved = await SharedSnapshot.findOneAndUpdate(
+        { key: "main" },
+
+        {
+          $set: update,
+
+          $setOnInsert: {
+            key: "main",
+          },
+        },
+
+        {
+          upsert: true,
+          new: true,
+          runValidators: false,
+        },
+      ).lean();
+
+      return res.json({
+        success: true,
+        updatedAt:
+          saved.updatedAt || saved.createdAt || new Date().toISOString(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 app.put("/api/data/snapshot", async (req, res, next) => {
   try {

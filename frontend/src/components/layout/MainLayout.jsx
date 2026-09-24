@@ -1,18 +1,45 @@
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 
+import AnnouncementBar from "@/components/layout/AnnouncementBar";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+
+import {
+  NotificationProvider,
+  NotificationToast,
+} from "@/context/NotificationProvider";
+
+import { startSharedDataSync } from "@/services/sharedDataSync";
+
 const MainLayout = () => {
+  useEffect(() => {
+    const stop = startSharedDataSync();
+
+    return () => {
+      stop?.();
+    };
+  }, []);
+
   return (
-    <>
-      <Header />
+    <NotificationProvider>
+      <div className="flex min-h-screen flex-col">
+        {/* Thanh thông báo chạy ngang */}
+        <AnnouncementBar />
 
-      <main className="min-h-screen">
-        <Outlet />
-      </main>
+        {/* Header duy nhất của website */}
+        <Header />
 
-      <Footer />
-    </>
+        <main className="flex-1">
+          <Outlet />
+        </main>
+
+        <Footer />
+      </div>
+
+      {/* NotificationToast nằm bên trong NotificationProvider */}
+      <NotificationToast />
+    </NotificationProvider>
   );
 };
 

@@ -640,7 +640,20 @@ const AdminBlogManagementPage = () => {
       time: form.time || "08:00",
     };
 
-    const posts = Array.isArray(blogPosts) ? blogPosts : [];
+    /*
+     * Đọc lại storage ngay tại thời điểm lưu.
+     *
+     * Không sử dụng state cũ vì sharedDataSync
+     * có thể vừa hydrate dữ liệu từ MongoDB.
+     */
+    const latestPosts = readBlogPosts();
+
+    const posts =
+      latestPosts.length > 0
+        ? latestPosts
+        : Array.isArray(blogPosts)
+          ? blogPosts
+          : [];
 
     const updatedPosts = editingPost
       ? posts.map((item) =>

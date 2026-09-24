@@ -54,15 +54,126 @@ const dispatch = (eventName) => {
   window.dispatchEvent(new Event(eventName));
 };
 
+const parseTimestamp = (value) => {
+  const timestamp = value ? new Date(value).getTime() : NaN;
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+/*
+ * ============================================================
+ * BLOG MERGE
+ * ============================================================
+ *
+ * Trong giai đoạn migration:
+ *
+ * local + remote phải được hợp nhất.
+ *
+ * Không được:
+ *
+ * remote → ghi đè local
+ *
+ * nếu hai phía đều có dữ liệu.
+ *
+ * Khi cùng một bài có cùng ID:
+ * ưu tiên bản có updatedAt mới hơn.
+ */
+const mergeBlogPosts = (localPosts, remotePosts) => {
+  const local = Array.isArray(localPosts) ? localPosts : [];
+
+  const remote = Array.isArray(remotePosts) ? remotePosts : [];
+
+  const result = [];
+
+  const indexByIdentity = new Map();
+
+  const getIdentity = (post) => {
+    const id = String(post?.id || "").trim();
+
+    if (id) {
+      return `id:${id}`;
+    }
+
+    const slug = String(post?.slug || "")
+      .trim()
+      .toLowerCase();
+
+    if (slug) {
+      return `slug:${slug}`;
+    }
+
+    const title = String(post?.title || "")
+      .trim()
+      .toLowerCase();
+
+    if (title) {
+      return `title:${title}`;
+    }
+
+    return "";
+  };
+
+  const addPost = (post, source) => {
+    if (!post || typeof post !== "object") {
+      return;
+    }
+
+    const identity = getIdentity(post);
+
+    if (!identity) {
+      result.push(post);
+
+      return;
+    }
+
+    const existingIndex = indexByIdentity.get(identity);
+
+    if (existingIndex === undefined) {
+      indexByIdentity.set(identity, result.length);
+
+      result.push(post);
+
+      return;
+    }
+
+    const existing = result[existingIndex];
+
+    const existingUpdatedAt = parseTimestamp(existing?.updatedAt);
+
+    const nextUpdatedAt = parseTimestamp(post?.updatedAt);
+
+    /*
+     * Nếu cùng bài:
+     * bản cập nhật mới hơn được giữ.
+     */
+    if (
+      nextUpdatedAt > existingUpdatedAt ||
+      (nextUpdatedAt === existingUpdatedAt && source === "remote")
+    ) {
+      result[existingIndex] = post;
+    }
+  };
+
+  /*
+   * Local trước để không làm mất dữ liệu
+   * đang có trên browser.
+   */
+  local.forEach((post) => addPost(post, "local"));
+
+  /*
+   * Sau đó merge remote.
+   */
+  remote.forEach((post) => addPost(post, "remote"));
+
+  return result;
+};
+
 /*
  * ============================================================
  * READ SNAPSHOT
  * ============================================================
- *
- * Blog được đọc từ kho riêng.
- *
- * Không đưa blogPosts vào settings.
  */
+
 const readSnapshot = async () => {
   await hydrateProducts();
 
@@ -130,18 +241,14 @@ const applySnapshot = async (snapshot, updatedAt) => {
 
   try {
     /*
-     * --------------------------------------------------------
      * PRODUCTS
-     * --------------------------------------------------------
      */
     if (Array.isArray(snapshot.products)) {
       await applyRemoteProducts(snapshot.products, updatedAt);
     }
 
     /*
-     * --------------------------------------------------------
      * CATEGORIES
-     * --------------------------------------------------------
      */
     if (Array.isArray(snapshot.categories)) {
       localStorage.setItem(
@@ -153,11 +260,7 @@ const applySnapshot = async (snapshot, updatedAt) => {
     }
 
     /*
-     * --------------------------------------------------------
      * SITE SETTINGS
-     * --------------------------------------------------------
-     *
-     * Tuyệt đối không để remote snapshot ghi đè blog.
      */
     if (snapshot.settings && typeof snapshot.settings === "object") {
       const currentSettings = readSiteSettings();
@@ -173,9 +276,6 @@ const applySnapshot = async (snapshot, updatedAt) => {
 
         ...remoteSettings,
 
-        /*
-         * Blog không thuộc site settings.
-         */
         blogPosts: [],
       };
 
@@ -188,66 +288,30 @@ const applySnapshot = async (snapshot, updatedAt) => {
     }
 
     /*
-     * --------------------------------------------------------
-     * BLOG POSTS
-     * --------------------------------------------------------
-     *
-     * Đây là phần sửa lỗi mất bài viết.
-     *
-     * Phiên bản backend mới trả:
-     *
-     * snapshot.blogPosts
-     *
-     * nhưng vẫn hỗ trợ phiên bản backend cũ:
-     *
-     * payload.blogPosts
+     * BLOG
      */
     const remoteBlogPosts = Array.isArray(snapshot.blogPosts)
       ? snapshot.blogPosts
       : null;
 
     /*
-     * Nếu snapshot không chứa blogPosts,
-     * không được hiểu là server đang có [].
-     *
-     * Điều này rất quan trọng để tránh xóa blog local.
+     * Không có blog trong response:
+     * không đụng vào local.
      */
     if (remoteBlogPosts !== null) {
       const currentBlogPosts = readBlogPosts();
 
-      /*
-       * Nếu server có bài viết:
-       * nhận dữ liệu server.
-       */
-      if (remoteBlogPosts.length > 0) {
-        try {
-          localStorage.setItem(
-            BLOG_POSTS_STORAGE_KEY,
-            JSON.stringify(remoteBlogPosts)
-          );
+      const mergedBlogPosts = mergeBlogPosts(currentBlogPosts, remoteBlogPosts);
 
-          dispatch(BLOG_POSTS_UPDATED_EVENT);
-        } catch (error) {
-          console.warn("[sharedDataSync] Không thể lưu blog snapshot:", error);
-        }
-      }
+      try {
+        localStorage.setItem(
+          BLOG_POSTS_STORAGE_KEY,
+          JSON.stringify(mergedBlogPosts)
+        );
 
-      /*
-       * Nếu server trả []:
-       *
-       * - local có bài -> KHÔNG xóa local.
-       * - local cũng không có -> giữ [].
-       *
-       * Mục đích:
-       * không để một snapshot server chưa có blog
-       * vô tình xóa bài viết đang có trên trình duyệt.
-       */
-      if (remoteBlogPosts.length === 0 && currentBlogPosts.length === 0) {
-        try {
-          localStorage.setItem(BLOG_POSTS_STORAGE_KEY, "[]");
-        } catch (error) {
-          console.warn("[sharedDataSync] Không thể khởi tạo blog rỗng:", error);
-        }
+        dispatch(BLOG_POSTS_UPDATED_EVENT);
+      } catch (error) {
+        console.warn("[sharedDataSync] Không thể lưu blog snapshot:", error);
       }
     }
 
@@ -266,6 +330,7 @@ const applySnapshot = async (snapshot, updatedAt) => {
 const fetchSnapshot = async () => {
   const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
     cache: "no-store",
+
     credentials: "include",
   });
 
@@ -362,8 +427,7 @@ const pullSnapshot = async () => {
       /*
        * Server chưa có snapshot.
        *
-       * Không xóa dữ liệu local.
-       * Đẩy local lên server.
+       * Không xóa local.
        */
       await pushSnapshot();
 
@@ -381,15 +445,7 @@ const pullSnapshot = async () => {
     const localTime = readLastSyncedAt();
 
     /*
-     * ========================================================
-     * BLOG BACKWARD COMPATIBILITY
-     * ========================================================
-     *
-     * Backend mới:
-     * payload.snapshot.blogPosts
-     *
-     * Backend cũ:
-     * payload.blogPosts
+     * BACKWARD COMPATIBILITY
      */
     const snapshot = {
       ...payload.snapshot,
@@ -402,55 +458,44 @@ const pullSnapshot = async () => {
     }
 
     /*
-     * Nếu server chưa có blog nhưng local đang có,
-     * giữ local và push ngược lên server.
+     * Nếu server không có blog field:
+     * không coi là [].
      */
-    const localBlogPostsBeforePull = readBlogPosts();
-
-    const remoteBlogPosts = Array.isArray(snapshot.blogPosts)
-      ? snapshot.blogPosts
-      : null;
-
-    const shouldRestoreLocalBlogToServer =
-      localBlogPostsBeforePull.length > 0 &&
-      remoteBlogPosts !== null &&
-      remoteBlogPosts.length === 0;
-
-    /*
-     * Nếu server chưa trả blogPosts:
-     * tuyệt đối không xem đó là [].
-     */
-    if (remoteBlogPosts === null) {
+    if (!Array.isArray(snapshot.blogPosts)) {
       delete snapshot.blogPosts;
     }
 
     /*
-     * Chỉ bỏ qua snapshot khi timestamp server cũ hơn
-     * timestamp local đã đồng bộ.
+     * Timestamp chỉ được dùng để bỏ qua
+     * snapshot thực sự cũ.
+     *
+     * Blog vẫn được bảo vệ bằng merge.
      */
-    if (
-      serverTime &&
-      localTime &&
-      serverTime <= localTime &&
-      !shouldRestoreLocalBlogToServer
-    ) {
+    if (serverTime && localTime && serverTime <= localTime) {
       return;
     }
 
     await applySnapshot(snapshot, payload.updatedAt);
 
     /*
-     * Nếu local có blog còn server chưa có:
-     * giữ local và đẩy lại lên server.
+     * Sau khi merge local + remote,
+     * push lại snapshot hợp nhất.
+     *
+     * Điều này bảo vệ các bài viết cũ
+     * chưa có trên server.
      */
-    if (shouldRestoreLocalBlogToServer) {
-      localChangeVersion += 1;
-    }
+    const localBlogPosts = readBlogPosts();
+
+    const remoteBlogPosts = Array.isArray(snapshot.blogPosts)
+      ? snapshot.blogPosts
+      : null;
 
     if (
-      shouldRestoreLocalBlogToServer ||
-      lastPushedChangeVersion !== localChangeVersion
+      remoteBlogPosts !== null &&
+      localBlogPosts.length > remoteBlogPosts.length
     ) {
+      localChangeVersion += 1;
+
       schedulePush();
     }
   } catch (error) {
@@ -480,7 +525,7 @@ const schedulePush = () => {
 
 /*
  * ============================================================
- * START SHARED DATA SYNC
+ * START
  * ============================================================
  */
 
@@ -506,11 +551,6 @@ export const startSharedDataSync = () => {
       localChangeVersion += 1;
     }
 
-    /*
-     * Blog, category và settings cũng phải tạo
-     * một phiên bản thay đổi mới để snapshot
-     * được push lên server.
-     */
     if (
       event?.type === CATEGORY_UPDATED_EVENT ||
       event?.type === SITE_SETTINGS_UPDATED_EVENT ||
@@ -530,10 +570,6 @@ export const startSharedDataSync = () => {
 
   window.addEventListener(BLOG_POSTS_UPDATED_EVENT, handleChange);
 
-  /*
-   * Đảm bảo Catalog hydrate trước khi remote snapshot
-   * có cơ hội push/pull dữ liệu.
-   */
   hydrateProducts().catch((error) => {
     console.warn(
       "[sharedDataSync] Catalog hydration:",
@@ -541,14 +577,8 @@ export const startSharedDataSync = () => {
     );
   });
 
-  /*
-   * Pull dữ liệu ngay khi app khởi động.
-   */
   pullSnapshot();
 
-  /*
-   * Sau đó kiểm tra định kỳ.
-   */
   refreshTimer = window.setInterval(pullSnapshot, POLL_INTERVAL);
 
   return () => {
