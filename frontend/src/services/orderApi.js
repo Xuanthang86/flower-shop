@@ -1,43 +1,21 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+import api from "./api";
 
-const request = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Không thể thực hiện yêu cầu đơn hàng.");
-  }
-
+export const createOrder = async (payload) => {
+  const { data } = await api.post("/orders", payload);
   return data;
 };
 
-export const getOrders = (params = {}) => {
-  const query = new URLSearchParams(params);
-
-  return request(`/orders?${query.toString()}`);
+export const listOrders = async (params = {}) => {
+  const { data } = await api.get("/orders", { params });
+  return data;
 };
 
-export const getOrderById = (id) =>
-  request(`/orders/${encodeURIComponent(id)}`);
+export const getOrder = async (id) => {
+  const { data } = await api.get(`/orders/${encodeURIComponent(id)}`);
+  return data?.item;
+};
 
-export const createOrder = (payload) =>
-  request("/orders", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-export const updateOrderStatus = (id, status) =>
-  request(`/orders/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-
-export const cancelOrder = (id) => updateOrderStatus(id, "cancelled");
+export const updateOrderStatus = async (id, payload) => {
+  const { data } = await api.patch(`/orders/${encodeURIComponent(id)}/status`, payload);
+  return data?.item;
+};

@@ -1096,11 +1096,10 @@ export const saveSiteSettings = (settings) => {
     }
   } catch (error) {
     const storageError = new Error(
-      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy.",
-      {
-        cause: error,
-      }
+      "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy."
     );
+
+    storageError.storageError = error;
 
     console.error("Không thể lưu site settings:", storageError);
 
