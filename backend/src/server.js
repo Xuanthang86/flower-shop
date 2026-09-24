@@ -28,12 +28,40 @@ let cloudinaryVerified = false;
 
 const SharedSnapshotSchema = new mongoose.Schema(
   {
-    key: { type: String, unique: true, index: true },
-    products: { type: [mongoose.Schema.Types.Mixed], default: [] },
-    categories: { type: [mongoose.Schema.Types.Mixed], default: [] },
-    settings: { type: mongoose.Schema.Types.Mixed, default: {} },
+    key: {
+      type: String,
+      unique: true,
+      index: true,
+    },
+
+    products: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+
+    categories: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+
+    settings: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    /*
+     * Blog là domain dữ liệu riêng.
+     * Không còn phụ thuộc vào settings.blogPosts.
+     */
+    blogPosts: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
   },
-  { timestamps: true, minimize: false },
+  {
+    timestamps: true,
+    minimize: false,
+  },
 );
 
 const SharedSnapshot =
@@ -48,7 +76,11 @@ const PaymentIntentLegacySchema = new mongoose.Schema(
     amount: Number,
     currency: { type: String, default: "VND" },
     paymentMethod: String,
-    status: { type: String, enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"], default: "pending" },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"],
+      default: "pending",
+    },
     expiresAt: Date,
     paidAt: Date,
     paymentAttemptedAt: Date,
@@ -122,21 +154,25 @@ const connectDatabase = async () => {
 app.use(helmet());
 app.use(cookieParser());
 
-app.use(cors({
-  origin: (origin, callback) => {
-    const configured = String(process.env.FRONTEND_URL || "http://localhost:5173")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const configured = String(
+        process.env.FRONTEND_URL || "http://localhost:5173",
+      )
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-    if (!origin || configured.includes("*") || configured.includes(origin)) {
-      return callback(null, true);
-    }
+      if (!origin || configured.includes("*") || configured.includes(origin)) {
+        return callback(null, true);
+      }
 
-    return callback(new Error("Origin không được phép bởi CORS."));
-  },
-  credentials: true,
-}));
+      return callback(new Error("Origin không được phép bởi CORS."));
+    },
+    credentials: true,
+  }),
+);
 
 app.use(morgan("dev"));
 
@@ -144,7 +180,10 @@ app.use(morgan("dev"));
  * Webhook SePay cần raw body để xác thực chữ ký.
  * Các route JSON thông thường dùng express.json bên dưới.
  */
-app.use("/api/payments/webhooks/sepay", express.raw({ type: "*/*", limit: "2mb" }));
+app.use(
+  "/api/payments/webhooks/sepay",
+  express.raw({ type: "*/*", limit: "2mb" }),
+);
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
@@ -173,7 +212,10 @@ app.get("/api/health", async (req, res) => {
 /* Legacy snapshot API is retained for a controlled frontend migration period. */
 app.get("/api/data/snapshot", async (req, res, next) => {
   try {
-    if (!databaseReady) return res.status(503).json({ initialized: false, message: "MongoDB chưa kết nối." });
+    if (!databaseReady)
+      return res
+        .status(503)
+        .json({ initialized: false, message: "MongoDB chưa kết nối." });
 
     const document = await SharedSnapshot.findOne({ key: "main" }).lean();
     if (!document) {
@@ -184,33 +226,61 @@ app.get("/api/data/snapshot", async (req, res, next) => {
       initialized: true,
       snapshot: {
         products: Array.isArray(document.products) ? document.products : [],
-        categories: Array.isArray(document.categories) ? document.categories : [],
+        categories: Array.isArray(document.categories)
+          ? document.categories
+          : [],
         settings: document.settings || {},
       },
+      blogPosts: Array.isArray(document.blogPosts) ? document.blogPosts : [],
       updatedAt: document.updatedAt || document.createdAt || null,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.put("/api/data/snapshot", async (req, res, next) => {
   try {
-    if (!databaseReady) return res.status(503).json({ message: "MongoDB chưa kết nối." });
+    if (!databaseReady)
+      return res.status(503).json({ message: "MongoDB chưa kết nối." });
 
     const saved = await SharedSnapshot.findOneAndUpdate(
       { key: "main" },
       {
         $set: {
           products: Array.isArray(req.body?.products) ? req.body.products : [],
-          categories: Array.isArray(req.body?.categories) ? req.body.categories : [],
-          settings: req.body?.settings && typeof req.body.settings === "object" ? req.body.settings : {},
+
+          categories: Array.isArray(req.body?.categories)
+            ? req.body.categories
+            : [],
+
+          settings:
+            req.body?.settings && typeof req.body.settings === "object"
+              ? req.body.settings
+              : {},
+
+          /*
+           * Chỉ cập nhật blog nếu client thực sự gửi mảng.
+           * Nếu client cũ chưa hỗ trợ blog, giữ dữ liệu server.
+           */
+          ...(Array.isArray(req.body?.blogPosts)
+            ? {
+                blogPosts: req.body.blogPosts,
+              }
+            : {}),
         },
         $setOnInsert: { key: "main" },
       },
       { upsert: true, new: true, runValidators: false },
     ).lean();
 
-    res.json({ success: true, updatedAt: saved.updatedAt || new Date().toISOString() });
-  } catch (error) { next(error); }
+    res.json({
+      success: true,
+      updatedAt: saved.updatedAt || new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /*
@@ -255,14 +325,21 @@ app.use("/api/payments", paymentRoutes);
 app.post("/api/media/upload", async (req, res) => {
   try {
     const { dataUri, folder } = req.body || {};
-    if (!dataUri || typeof dataUri !== "string" || !dataUri.startsWith("data:image/")) {
-      return res.status(400).json({ message: "Thiếu hoặc sai định dạng Data URI hình ảnh." });
+    if (
+      !dataUri ||
+      typeof dataUri !== "string" ||
+      !dataUri.startsWith("data:image/")
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Thiếu hoặc sai định dạng Data URI hình ảnh." });
     }
 
     cloudinaryConfigured = configureCloudinary();
     if (!cloudinaryConfigured) {
       return res.status(503).json({
-        message: "Cloudinary chưa được cấu hình. Kiểm tra CLOUDINARY_URL hoặc bộ CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET.",
+        message:
+          "Cloudinary chưa được cấu hình. Kiểm tra CLOUDINARY_URL hoặc bộ CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET.",
       });
     }
 
