@@ -184,6 +184,36 @@ const LEGACY_DEFAULT_BLOG_SHOP_INFO_HTML = `
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
+const isStorageQuotaError = (error) => {
+  if (!error) {
+    return false;
+  }
+
+  const name = String(error?.name || "").trim();
+
+  const code = Number(error?.code);
+
+  if (
+    name === "QuotaExceededError" ||
+    name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    name === "QUOTA_EXCEEDED_ERR" ||
+    code === 22 ||
+    code === 1014
+  ) {
+    return true;
+  }
+
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    message.includes("quota") ||
+    (message.includes("storage") &&
+      (message.includes("full") ||
+        message.includes("exceed") ||
+        message.includes("limit")))
+  );
+};
+
 const normalizeHtmlForComparison = (value) =>
   String(value || "")
     .replace(/\s+/g, " ")
@@ -865,7 +895,9 @@ const mergeSettings = (input = {}) => {
     Array.isArray(source.blogCategories) ? source.blogCategories : []
   );
 
-  const normalizedBlogPosts = [];
+  const normalizedBlogPosts = normalizeBlogPosts(
+    Array.isArray(source.blogPosts) ? source.blogPosts : []
+  );
 
   return {
     ...defaults,
@@ -975,24 +1007,42 @@ const mergeSettings = (input = {}) => {
 };
 
 export const readBlogPosts = () => {
+  let dedicatedPosts = [];
+  let legacyPosts = [];
+
   try {
     const raw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
 
     if (raw) {
       const parsed = JSON.parse(raw);
 
-      return normalizeBlogPosts(parsed);
+      if (Array.isArray(parsed)) {
+        dedicatedPosts = normalizeBlogPosts(parsed);
+      }
     }
+  } catch (error) {
+    console.error("Không thể đọc danh sách bài viết:", error);
+  }
 
-    /*
-     * Migration một lần từ cấu trúc cũ:
-     *
-     * flower-shop-site-settings.blogPosts
-     *
-     * sang:
-     *
-     * flower-shop-blog-posts
-     */
+  /*
+   * Ưu tiên kho bài viết riêng.
+   *
+   * Nếu kho riêng tồn tại và có dữ liệu thì không đọc dữ liệu cũ
+   * để tránh ghi đè hoặc làm thay đổi danh sách bài viết hiện tại.
+   */
+  if (dedicatedPosts.length > 0) {
+    return dedicatedPosts;
+  }
+
+  /*
+   * Fallback cho dữ liệu cũ:
+   *
+   * flower-shop-site-settings.blogPosts
+   *
+   * Đây là bước quan trọng để tránh mất bài viết khi nâng cấp
+   * cấu trúc lưu trữ.
+   */
+  try {
     const settingsRaw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
 
     if (!settingsRaw) {
@@ -1001,25 +1051,36 @@ export const readBlogPosts = () => {
 
     const settings = JSON.parse(settingsRaw);
 
-    const legacyPosts = Array.isArray(settings?.blogPosts)
-      ? settings.blogPosts
-      : [];
-
-    const normalizedPosts = normalizeBlogPosts(legacyPosts);
-
-    if (normalizedPosts.length > 0) {
-      localStorage.setItem(
-        BLOG_POSTS_STORAGE_KEY,
-        JSON.stringify(normalizedPosts)
-      );
+    if (Array.isArray(settings?.blogPosts)) {
+      legacyPosts = normalizeBlogPosts(settings.blogPosts);
     }
-
-    return normalizedPosts;
   } catch (error) {
-    console.error("Không thể đọc danh sách bài viết:", error);
+    console.error("Không thể khôi phục bài viết từ site settings:", error);
+  }
 
+  if (legacyPosts.length === 0) {
     return [];
   }
+
+  /*
+   * Thử đưa dữ liệu cũ sang kho riêng.
+   *
+   * Nếu browser hết quota, KHÔNG được làm mất dữ liệu vừa đọc.
+   * Hàm vẫn trả về legacyPosts.
+   */
+  try {
+    localStorage.setItem(BLOG_POSTS_STORAGE_KEY, JSON.stringify(legacyPosts));
+  } catch (error) {
+    if (isStorageQuotaError(error)) {
+      console.warn(
+        "Không đủ dung lượng để tạo kho bài viết mới. Giữ dữ liệu bài viết trong bộ nhớ hiện tại."
+      );
+    } else {
+      console.warn("Không thể migration bài viết sang kho riêng:", error);
+    }
+  }
+
+  return legacyPosts;
 };
 
 export const saveBlogPosts = (posts) => {
@@ -1028,17 +1089,35 @@ export const saveBlogPosts = (posts) => {
   const serialized = JSON.stringify(normalizedPosts);
 
   try {
-    localStorage.setItem(BLOG_POSTS_STORAGE_KEY, serialized);
+    const currentRaw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
+
+    if (currentRaw !== serialized) {
+      localStorage.setItem(BLOG_POSTS_STORAGE_KEY, serialized);
+    }
   } catch (error) {
     console.error("Không thể lưu danh sách bài viết:", error);
 
-    if (error?.name === "QuotaExceededError") {
-      throw new Error(
-        "Không thể lưu bài viết vì bộ nhớ trình duyệt đã đạt giới hạn. Hãy kiểm tra lại hình ảnh trong bài viết."
+    if (isStorageQuotaError(error)) {
+      const storageError = new Error(
+        "Không thể lưu bài viết vì bộ nhớ trình duyệt đã đạt giới hạn. Hãy kiểm tra lại hình ảnh trong bài viết hoặc xóa dữ liệu tạm không cần thiết."
       );
+
+      /*
+       * Giữ nguyên lỗi gốc làm cause.
+       *
+       * Đây là phần sửa trực tiếp cho cảnh báo:
+       * “There is no 'cause' attached to the symptom...”
+       */
+      storageError.cause = error;
+
+      throw storageError;
     }
 
-    throw new Error(error?.message || "Không thể lưu bài viết.");
+    const storageError = new Error(error?.message || "Không thể lưu bài viết.");
+
+    storageError.cause = error;
+
+    throw storageError;
   }
 
   window.dispatchEvent(new Event(BLOG_POSTS_UPDATED_EVENT));
