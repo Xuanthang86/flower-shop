@@ -91,6 +91,40 @@ const orderSchema = new mongoose.Schema(
         default: "",
       },
 
+      provinceCode: {
+        type: String,
+        default: "",
+      },
+
+      provinceName: {
+        type: String,
+        default: "",
+      },
+
+      wardCode: {
+        type: String,
+        default: "",
+      },
+
+      wardName: {
+        type: String,
+        default: "",
+      },
+
+      houseNumber: {
+        type: String,
+        default: "",
+      },
+
+      street: {
+        type: String,
+        default: "",
+      },
+
+      note: {
+        type: String,
+        default: "",
+      },
       address: {
         type: String,
         default: "",

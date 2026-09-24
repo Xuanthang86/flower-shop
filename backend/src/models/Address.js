@@ -13,33 +13,55 @@ const addressSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 150,
     },
 
     phone: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 30,
     },
 
-    addressLine: {
+    email: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
+      lowercase: true,
+      maxlength: 200,
     },
 
-    ward: {
+    provinceCode: {
       type: String,
       default: "",
       trim: true,
     },
 
-    district: {
+    provinceName: {
       type: String,
       default: "",
       trim: true,
     },
 
-    province: {
+    wardCode: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    wardName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    houseNumber: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    street: {
       type: String,
       default: "",
       trim: true,
@@ -59,6 +81,7 @@ const addressSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    minimize: false,
   },
 );
 
