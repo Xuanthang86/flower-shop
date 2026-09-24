@@ -269,14 +269,32 @@ const pullSnapshot = async () => {
       return;
     }
 
+    const localBlogPostsBeforePull = readBlogPosts();
+
+    const remoteBlogPosts = Array.isArray(payload?.snapshot?.blogPosts)
+      ? payload.snapshot.blogPosts
+      : [];
+
+    const shouldRestoreLocalBlogToServer =
+      localBlogPostsBeforePull.length > 0 && remoteBlogPosts.length === 0;
+
     await applySnapshot(payload.snapshot, payload.updatedAt);
 
     /*
-     * Nếu trong lúc pull local đã phát sinh mutation mới, không để remote
-     * snapshot trở thành điểm kết thúc của chuỗi đồng bộ. Push lại catalog
-     * mới sau khi merge conflict tại Catalog.
+     * Nếu server chưa có blog nhưng local đang có dữ liệu,
+     * local được ưu tiên để tránh mất bài.
+     *
+     * Sau khi giữ local, phải push ngược lên server để
+     * hai nguồn dữ liệu trở lại cùng trạng thái.
      */
-    if (lastPushedChangeVersion !== localChangeVersion) {
+    if (shouldRestoreLocalBlogToServer) {
+      localChangeVersion += 1;
+    }
+
+    if (
+      shouldRestoreLocalBlogToServer ||
+      lastPushedChangeVersion !== localChangeVersion
+    ) {
       schedulePush();
     }
   } catch (error) {

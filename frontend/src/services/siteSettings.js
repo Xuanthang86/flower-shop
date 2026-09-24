@@ -884,6 +884,21 @@ const readLegacyBlogPostsFromSettingsStorage = () => {
 };
 
 const getSafeBlogPosts = (source = {}) => {
+  /*
+   * BLOG_POSTS_STORAGE_KEY là nguồn dữ liệu chính.
+   *
+   * Không được ưu tiên source.blogPosts trước kho riêng,
+   * vì source có thể là dữ liệu settings cũ hoặc snapshot cũ.
+   */
+  const dedicatedPosts = readRawBlogPostsStorage();
+
+  if (dedicatedPosts.length > 0) {
+    return dedicatedPosts;
+  }
+
+  /*
+   * Chỉ dùng source.blogPosts khi kho riêng chưa có dữ liệu.
+   */
   const sourcePosts = Array.isArray(source?.blogPosts)
     ? normalizeBlogPosts(source.blogPosts)
     : [];
@@ -892,12 +907,9 @@ const getSafeBlogPosts = (source = {}) => {
     return sourcePosts;
   }
 
-  const dedicatedPosts = readRawBlogPostsStorage();
-
-  if (dedicatedPosts.length > 0) {
-    return dedicatedPosts;
-  }
-
+  /*
+   * Cuối cùng mới đọc dữ liệu legacy.
+   */
   return readLegacyBlogPostsFromSettingsStorage();
 };
 
@@ -1216,11 +1228,28 @@ export const readSiteSettings = () => {
 export const saveSiteSettings = (settings) => {
   const normalized = mergeSettings(settings);
 
-  const serialized = JSON.stringify(normalized);
+  /*
+   * BLOG KHÔNG được lưu trong site settings.
+   *
+   * normalized vẫn giữ blogPosts để các component hiện tại
+   * có thể tiếp tục đọc dữ liệu theo cấu trúc cũ.
+   *
+   * Nhưng dữ liệu ghi xuống localStorage phải loại bỏ blogPosts.
+   */
+  const normalizedForStorage = {
+    ...normalized,
+
+    blogPosts: [],
+  };
+
+  const serialized = JSON.stringify(normalizedForStorage);
 
   try {
     const currentRaw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
 
+    /*
+     * Không ghi lại nếu site settings thực tế không thay đổi.
+     */
     if (currentRaw !== serialized) {
       localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, serialized);
     }
@@ -1229,7 +1258,10 @@ export const saveSiteSettings = (settings) => {
       "Không thể lưu cấu hình website. Bộ nhớ trình duyệt có thể đã đầy."
     );
 
-    storageError.storageError = error;
+    /*
+     * Giữ nguyên lỗi gốc để DevTools có thể truy vết.
+     */
+    storageError.cause = error;
 
     console.error("Không thể lưu site settings:", storageError);
 
@@ -1238,6 +1270,10 @@ export const saveSiteSettings = (settings) => {
 
   window.dispatchEvent(new Event(SITE_SETTINGS_UPDATED_EVENT));
 
+  /*
+   * Trả về normalized có blogPosts để không phá vỡ
+   * các component hiện tại đang sử dụng read/save settings.
+   */
   return normalized;
 };
 
