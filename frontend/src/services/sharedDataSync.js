@@ -266,6 +266,7 @@ const applySnapshot = async (snapshot, updatedAt) => {
 const fetchSnapshot = async () => {
   const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
     cache: "no-store",
+    credentials: "include",
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -305,6 +306,8 @@ const pushSnapshot = async () => {
 
     const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
       method: "PUT",
+
+      credentials: "include",
 
       headers: {
         "Content-Type": "application/json",
