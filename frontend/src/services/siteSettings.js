@@ -842,6 +842,65 @@ const normalizeBlogPosts = (posts) => {
   return posts.map((post, index) => normalizeBlogPost(post, index));
 };
 
+const readRawBlogPostsStorage = () => {
+  try {
+    const raw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+
+    return Array.isArray(parsed) ? normalizeBlogPosts(parsed) : [];
+  } catch (error) {
+    console.error("Không thể đọc kho bài viết riêng:", error?.message || error);
+
+    return [];
+  }
+};
+
+const readLegacyBlogPostsFromSettingsStorage = () => {
+  try {
+    const raw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+
+    return Array.isArray(parsed?.blogPosts)
+      ? normalizeBlogPosts(parsed.blogPosts)
+      : [];
+  } catch (error) {
+    console.error(
+      "Không thể đọc bài viết từ site settings cũ:",
+      error?.message || error
+    );
+
+    return [];
+  }
+};
+
+const getSafeBlogPosts = (source = {}) => {
+  const sourcePosts = Array.isArray(source?.blogPosts)
+    ? normalizeBlogPosts(source.blogPosts)
+    : [];
+
+  if (sourcePosts.length > 0) {
+    return sourcePosts;
+  }
+
+  const dedicatedPosts = readRawBlogPostsStorage();
+
+  if (dedicatedPosts.length > 0) {
+    return dedicatedPosts;
+  }
+
+  return readLegacyBlogPostsFromSettingsStorage();
+};
+
 const mergeSettings = (input = {}) => {
   const source = input && typeof input === "object" ? input : {};
 
@@ -895,9 +954,7 @@ const mergeSettings = (input = {}) => {
     Array.isArray(source.blogCategories) ? source.blogCategories : []
   );
 
-  const normalizedBlogPosts = normalizeBlogPosts(
-    Array.isArray(source.blogPosts) ? source.blogPosts : []
-  );
+  const normalizedBlogPosts = getSafeBlogPosts(source);
 
   return {
     ...defaults,
@@ -1007,76 +1064,45 @@ const mergeSettings = (input = {}) => {
 };
 
 export const readBlogPosts = () => {
-  let dedicatedPosts = [];
-  let legacyPosts = [];
-
-  try {
-    const raw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
-
-    if (raw) {
-      const parsed = JSON.parse(raw);
-
-      if (Array.isArray(parsed)) {
-        dedicatedPosts = normalizeBlogPosts(parsed);
-      }
-    }
-  } catch (error) {
-    console.error("Không thể đọc danh sách bài viết:", error);
-  }
-
   /*
-   * Ưu tiên kho bài viết riêng.
-   *
-   * Nếu kho riêng tồn tại và có dữ liệu thì không đọc dữ liệu cũ
-   * để tránh ghi đè hoặc làm thay đổi danh sách bài viết hiện tại.
+   * ƯU TIÊN 1:
+   * Kho bài viết riêng.
    */
+  const dedicatedPosts = readRawBlogPostsStorage();
+
   if (dedicatedPosts.length > 0) {
     return dedicatedPosts;
   }
 
   /*
-   * Fallback cho dữ liệu cũ:
-   *
-   * flower-shop-site-settings.blogPosts
-   *
-   * Đây là bước quan trọng để tránh mất bài viết khi nâng cấp
-   * cấu trúc lưu trữ.
+   * ƯU TIÊN 2:
+   * Dữ liệu blogPosts nằm trong site settings.
    */
-  try {
-    const settingsRaw = localStorage.getItem(SITE_SETTINGS_STORAGE_KEY);
-
-    if (!settingsRaw) {
-      return [];
-    }
-
-    const settings = JSON.parse(settingsRaw);
-
-    if (Array.isArray(settings?.blogPosts)) {
-      legacyPosts = normalizeBlogPosts(settings.blogPosts);
-    }
-  } catch (error) {
-    console.error("Không thể khôi phục bài viết từ site settings:", error);
-  }
+  const legacyPosts = readLegacyBlogPostsFromSettingsStorage();
 
   if (legacyPosts.length === 0) {
     return [];
   }
 
   /*
-   * Thử đưa dữ liệu cũ sang kho riêng.
+   * Migration sang kho riêng.
    *
-   * Nếu browser hết quota, KHÔNG được làm mất dữ liệu vừa đọc.
-   * Hàm vẫn trả về legacyPosts.
+   * Nếu browser hết quota:
+   * KHÔNG được xóa dữ liệu cũ,
+   * KHÔNG được trả về [].
    */
   try {
-    localStorage.setItem(BLOG_POSTS_STORAGE_KEY, JSON.stringify(legacyPosts));
+    const serialized = JSON.stringify(legacyPosts);
+
+    localStorage.setItem(BLOG_POSTS_STORAGE_KEY, serialized);
   } catch (error) {
     if (isStorageQuotaError(error)) {
       console.warn(
-        "Không đủ dung lượng để tạo kho bài viết mới. Giữ dữ liệu bài viết trong bộ nhớ hiện tại."
+        "[Blog] Không đủ dung lượng để migration sang kho riêng. " +
+          "Dữ liệu cũ vẫn được giữ nguyên."
       );
     } else {
-      console.warn("Không thể migration bài viết sang kho riêng:", error);
+      console.warn("[Blog] Không thể migration sang kho riêng:", error);
     }
   }
 
@@ -1091,22 +1117,29 @@ export const saveBlogPosts = (posts) => {
   try {
     const currentRaw = localStorage.getItem(BLOG_POSTS_STORAGE_KEY);
 
+    /*
+     * Không ghi lại nếu dữ liệu không thay đổi.
+     */
     if (currentRaw !== serialized) {
       localStorage.setItem(BLOG_POSTS_STORAGE_KEY, serialized);
     }
   } catch (error) {
-    console.error("Không thể lưu danh sách bài viết:", error);
+    console.error("[Blog] Không thể lưu bài viết:", error);
 
     if (isStorageQuotaError(error)) {
       const storageError = new Error(
-        "Không thể lưu bài viết vì bộ nhớ trình duyệt đã đạt giới hạn. Hãy kiểm tra lại hình ảnh trong bài viết hoặc xóa dữ liệu tạm không cần thiết."
+        "Không thể lưu bài viết vì bộ nhớ trình duyệt đã đạt giới hạn. " +
+          "Hãy kiểm tra lại hình ảnh trong bài viết hoặc xóa dữ liệu website " +
+          "không cần thiết."
       );
 
       /*
-       * Giữ nguyên lỗi gốc làm cause.
+       * Giữ lỗi gốc.
        *
-       * Đây là phần sửa trực tiếp cho cảnh báo:
-       * “There is no 'cause' attached to the symptom...”
+       * Không sử dụng:
+       * throw new Error(message)
+       *
+       * vì cách đó làm mất nguyên nhân gốc.
        */
       storageError.cause = error;
 
@@ -1120,6 +1153,9 @@ export const saveBlogPosts = (posts) => {
     throw storageError;
   }
 
+  /*
+   * Chỉ phát event SAU KHI localStorage ghi thành công.
+   */
   window.dispatchEvent(new Event(BLOG_POSTS_UPDATED_EVENT));
 
   return normalizedPosts;
@@ -1141,7 +1177,22 @@ export const readSiteSettings = () => {
 
     const normalized = mergeSettings(parsed);
 
-    const normalizedRaw = JSON.stringify(normalized);
+    const normalizedForStorage = {
+      ...normalized,
+
+      /*
+       * Blog có kho dữ liệu riêng.
+       *
+       * Không lưu toàn bộ bài viết vào site settings.
+       * Điều này tránh:
+       * - QuotaExceededError
+       * - settings quá lớn
+       * - remote snapshot ghi đè blog
+       */
+      blogPosts: [],
+    };
+
+    const normalizedRaw = JSON.stringify(normalizedForStorage);
 
     if (normalizedRaw !== raw) {
       try {

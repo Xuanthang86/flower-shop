@@ -10,7 +10,10 @@ import {
 import {
   SITE_SETTINGS_STORAGE_KEY,
   SITE_SETTINGS_UPDATED_EVENT,
+  BLOG_POSTS_STORAGE_KEY,
+  BLOG_POSTS_UPDATED_EVENT,
   readSiteSettings,
+  readBlogPosts,
 } from "@/services/siteSettings";
 
 import { PRODUCT_CATEGORIES_STORAGE_KEY } from "@/constants/productCategories";
@@ -48,8 +51,22 @@ const readSnapshot = async () => {
 
   return {
     products: readProducts(),
+
     categories: readCategories(),
-    settings: readSiteSettings(),
+
+    settings: {
+      ...readSiteSettings(),
+
+      /*
+       * Không nhúng blog vào site settings.
+       */
+      blogPosts: [],
+    },
+
+    /*
+     * Blog là domain dữ liệu riêng.
+     */
+    blogPosts: readBlogPosts(),
   };
 };
 
@@ -95,12 +112,59 @@ const applySnapshot = async (snapshot, updatedAt) => {
     }
 
     if (snapshot.settings && typeof snapshot.settings === "object") {
+      /*
+       * Không cho snapshot remote ghi đè blog local.
+       */
+      const currentSettings = readSiteSettings();
+
+      const remoteSettings = {
+        ...snapshot.settings,
+      };
+
+      delete remoteSettings.blogPosts;
+
+      const mergedSettings = {
+        ...currentSettings,
+        ...remoteSettings,
+
+        /*
+         * Blog không thuộc site settings.
+         */
+        blogPosts: [],
+      };
+
       localStorage.setItem(
         SITE_SETTINGS_STORAGE_KEY,
-        JSON.stringify(snapshot.settings)
+        JSON.stringify(mergedSettings)
       );
 
       dispatch(SITE_SETTINGS_UPDATED_EVENT);
+    }
+
+    /*
+     * BLOG POSTS là dữ liệu riêng.
+     *
+     * Chỉ áp dụng khi server thực sự trả về blogPosts.
+     */
+    if (Array.isArray(snapshot.blogPosts)) {
+      const currentBlogPosts = readBlogPosts();
+
+      /*
+       * Nếu server chưa có bài viết,
+       * KHÔNG được dùng [] để xóa local.
+       */
+      if (snapshot.blogPosts.length > 0 || currentBlogPosts.length === 0) {
+        try {
+          localStorage.setItem(
+            BLOG_POSTS_STORAGE_KEY,
+            JSON.stringify(snapshot.blogPosts)
+          );
+
+          dispatch(BLOG_POSTS_UPDATED_EVENT);
+        } catch (error) {
+          console.warn("[sharedDataSync] Không thể lưu blog snapshot:", error);
+        }
+      }
     }
 
     writeLastSyncedAt(updatedAt);
@@ -265,6 +329,8 @@ export const startSharedDataSync = () => {
 
   window.addEventListener(SITE_SETTINGS_UPDATED_EVENT, handleChange);
 
+  window.addEventListener(BLOG_POSTS_UPDATED_EVENT, handleChange);
+
   /*
    * Đảm bảo Catalog hydrate trước khi remote snapshot có cơ hội push/pull
    * dữ liệu, tránh seed/default memory trở thành snapshot remote ngoài ý muốn.
@@ -290,6 +356,8 @@ export const startSharedDataSync = () => {
     window.removeEventListener(CATEGORY_UPDATED_EVENT, handleChange);
 
     window.removeEventListener(SITE_SETTINGS_UPDATED_EVENT, handleChange);
+
+    window.removeEventListener(BLOG_POSTS_UPDATED_EVENT, handleChange);
 
     started = false;
   };
