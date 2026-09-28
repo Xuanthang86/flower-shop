@@ -41,6 +41,7 @@ import AuthProvider from "./context/AuthProvider";
 import OrderProvider from "./context/OrderProvider";
 import CartProvider from "./context/CartProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
+import NotificationProvider from "./context/NotificationProvider.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -51,7 +52,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <OrderProvider>
             <CartProvider>
-              <App />
+              <NotificationProvider>
+                <App />
+              </NotificationProvider>
             </CartProvider>
           </OrderProvider>
         </AuthProvider>

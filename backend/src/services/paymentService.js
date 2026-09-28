@@ -37,36 +37,76 @@ const PaymentIntent =
   mongoose.models.PaymentIntent ||
   mongoose.model("PaymentIntent", paymentIntentSchema);
 
-const createIntent = async ({ amount }) => {
+const createIntent = async ({ orderId, amount }) => {
   const numericAmount = Math.round(Number(amount) || 0);
-  if (numericAmount <= 0)
+
+  if (!orderId) {
+    throw Object.assign(
+      new Error("Payment Intent phải được liên kết với đơn hàng."),
+      { status: 400 },
+    );
+  }
+
+  if (numericAmount <= 0) {
     throw Object.assign(new Error("Số tiền thanh toán không hợp lệ."), {
       status: 400,
     });
-
-  const date = new Date();
-  const prefix = `FS-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-  let orderCode = "";
-  for (let i = 0; i < 20; i += 1) {
-    const candidate = `${prefix}-${String(crypto.randomInt(0, 10000)).padStart(4, "0")}`;
-    if (!(await PaymentIntent.exists({ orderCode: candidate }))) {
-      orderCode = candidate;
-      break;
-    }
   }
-  if (!orderCode) throw new Error("Không thể tạo mã thanh toán duy nhất.");
 
-  const paymentIntent = await PaymentIntent.create({
-    intentId: crypto.randomUUID(),
-    orderCode,
-    reference: orderCode,
-    amount: numericAmount,
-    currency: "VND",
-    paymentMethod: "bank_transfer",
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    throw Object.assign(
+      new Error("Không tìm thấy đơn hàng để tạo Payment Intent."),
+      { status: 404 },
+    );
+  }
+
+  if (Number(order.grandTotal) !== numericAmount) {
+    throw Object.assign(
+      new Error("Số tiền Payment Intent không khớp với đơn hàng."),
+      { status: 400 },
+    );
+  }
+
+  const existingPaymentIntent = await PaymentIntent.findOne({
+    orderId: order._id,
   });
 
-  return paymentIntent.toObject();
+  if (existingPaymentIntent) {
+    return existingPaymentIntent.toObject();
+  }
+
+  const intent = await PaymentIntent.create({
+    intentId: crypto.randomUUID(),
+
+    orderId: order._id,
+
+    orderCode: order.orderCode,
+
+    reference: order.orderCode,
+
+    amount: numericAmount,
+
+    currency: "VND",
+
+    paymentMethod: order.paymentMethod || "bank_transfer",
+
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+
+    status: "pending",
+  });
+
+  await Payment.updateOne(
+    { orderId: order._id },
+    {
+      $set: {
+        paymentIntentId: intent.intentId,
+      },
+    },
+  );
+
+  return intent.toObject();
 };
 
 const serializeIntent = (intent) => ({
