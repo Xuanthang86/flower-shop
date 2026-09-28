@@ -53,6 +53,11 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    paymentIntentId: {
+      type: String,
+      default: "",
+      index: true,
+    },
   },
   {
     timestamps: true,

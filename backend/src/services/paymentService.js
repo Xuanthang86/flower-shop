@@ -4,27 +4,45 @@ const Payment = require("../models/Payment");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Order = require("../models/Order");
 
-const paymentIntentSchema = new mongoose.Schema({
-  intentId: { type: String, required: true, unique: true, index: true },
-  orderCode: { type: String, required: true, unique: true, index: true },
-  reference: { type: String, default: "" },
-  amount: { type: Number, required: true, min: 0 },
-  currency: { type: String, default: "VND" },
-  paymentMethod: { type: String, default: "bank_transfer" },
-  status: { type: String, enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"], default: "pending", index: true },
-  expiresAt: { type: Date, required: true },
-  paidAt: { type: Date, default: null },
-  paymentAttemptedAt: { type: Date, default: null },
-  transactionId: { type: String, default: "" },
-  transaction: { type: mongoose.Schema.Types.Mixed, default: null },
-}, { timestamps: true });
+const paymentIntentSchema = new mongoose.Schema(
+  {
+    intentId: { type: String, required: true, unique: true, index: true },
+    orderCode: { type: String, required: true, unique: true, index: true },
+    reference: { type: String, default: "" },
+    amount: { type: Number, required: true, min: 0 },
+    currency: { type: String, default: "VND" },
+    paymentMethod: { type: String, default: "bank_transfer" },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"],
+      default: "pending",
+      index: true,
+    },
+    expiresAt: { type: Date, required: true },
+    paidAt: { type: Date, default: null },
+    paymentAttemptedAt: { type: Date, default: null },
+    transactionId: { type: String, default: "" },
+    transaction: { type: mongoose.Schema.Types.Mixed, default: null },
+    orderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+      index: true,
+    },
+  },
+  { timestamps: true },
+);
 
-const PaymentIntent = mongoose.models.PaymentIntent ||
+const PaymentIntent =
+  mongoose.models.PaymentIntent ||
   mongoose.model("PaymentIntent", paymentIntentSchema);
 
 const createIntent = async ({ amount }) => {
   const numericAmount = Math.round(Number(amount) || 0);
-  if (numericAmount <= 0) throw Object.assign(new Error("Số tiền thanh toán không hợp lệ."), { status: 400 });
+  if (numericAmount <= 0)
+    throw Object.assign(new Error("Số tiền thanh toán không hợp lệ."), {
+      status: 400,
+    });
 
   const date = new Date();
   const prefix = `FS-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
@@ -67,9 +85,15 @@ const serializeIntent = (intent) => ({
 
 const getIntent = async (intentId) => {
   const intent = await PaymentIntent.findOne({ intentId });
-  if (!intent) throw Object.assign(new Error("Không tìm thấy Payment Intent."), { status: 404 });
+  if (!intent)
+    throw Object.assign(new Error("Không tìm thấy Payment Intent."), {
+      status: 404,
+    });
 
-  if (intent.status === "pending" && new Date(intent.expiresAt).getTime() < Date.now()) {
+  if (
+    intent.status === "pending" &&
+    new Date(intent.expiresAt).getTime() < Date.now()
+  ) {
     intent.status = "expired";
     await intent.save();
   }
@@ -78,7 +102,10 @@ const getIntent = async (intentId) => {
 
 const markStarted = async (intentId) => {
   const intent = await PaymentIntent.findOne({ intentId });
-  if (!intent) throw Object.assign(new Error("Không tìm thấy Payment Intent."), { status: 404 });
+  if (!intent)
+    throw Object.assign(new Error("Không tìm thấy Payment Intent."), {
+      status: 404,
+    });
   if (intent.status !== "pending") return serializeIntent(intent);
   intent.paymentAttemptedAt = new Date();
   await intent.save();
@@ -87,7 +114,10 @@ const markStarted = async (intentId) => {
 
 const applySePayWebhook = async (payload) => {
   const providerTransactionId = String(
-    payload?.id ?? payload?.transactionId ?? payload?.referenceCode ?? crypto.randomUUID(),
+    payload?.id ??
+      payload?.transactionId ??
+      payload?.referenceCode ??
+      crypto.randomUUID(),
   ).trim();
 
   const exists = await PaymentTransaction.findOne({ providerTransactionId });
@@ -101,7 +131,12 @@ const applySePayWebhook = async (payload) => {
   const orderCode = match?.[0] || String(payload?.code || "").trim();
 
   const intent = orderCode
-    ? await PaymentIntent.findOne({ orderCode: new RegExp(`^${orderCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") })
+    ? await PaymentIntent.findOne({
+        orderCode: new RegExp(
+          `^${orderCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+          "i",
+        ),
+      })
     : null;
 
   const transaction = await PaymentTransaction.create({
@@ -111,7 +146,9 @@ const applySePayWebhook = async (payload) => {
     amount,
     content,
     referenceCode: String(payload?.referenceCode || ""),
-    transactionDate: payload?.transactionDate ? new Date(payload.transactionDate) : null,
+    transactionDate: payload?.transactionDate
+      ? new Date(payload.transactionDate)
+      : null,
     rawPayload: payload,
     matched: false,
   });
@@ -120,12 +157,17 @@ const applySePayWebhook = async (payload) => {
     return { duplicate: false, matched: false, transactionId: transaction._id };
   }
 
-  if (amount < intent.amount || (intent.expiresAt && new Date(intent.expiresAt) < new Date())) {
+  if (
+    amount < intent.amount ||
+    (intent.expiresAt && new Date(intent.expiresAt) < new Date())
+  ) {
     return { duplicate: false, matched: false, transactionId: transaction._id };
   }
 
   const normalizedContent = content.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const normalizedOrderCode = intent.orderCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const normalizedOrderCode = intent.orderCode
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
   if (!normalizedContent.includes(normalizedOrderCode)) {
     return { duplicate: false, matched: false, transactionId: transaction._id };
   }
@@ -155,11 +197,20 @@ const applySePayWebhook = async (payload) => {
     await order.save();
     await Payment.updateOne(
       { orderId: order._id },
-      { $set: { status: "paid", transactionId: providerTransactionId, paidAt } },
+      {
+        $set: { status: "paid", transactionId: providerTransactionId, paidAt },
+      },
     );
   }
 
   return { duplicate: false, matched: true, transactionId: transaction._id };
 };
 
-module.exports = { PaymentIntent, createIntent, getIntent, markStarted, applySePayWebhook, serializeIntent };
+module.exports = {
+  PaymentIntent,
+  createIntent,
+  getIntent,
+  markStarted,
+  applySePayWebhook,
+  serializeIntent,
+};
