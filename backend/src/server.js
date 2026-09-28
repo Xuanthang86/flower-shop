@@ -360,50 +360,6 @@ app.put(
   },
 );
 
-app.put("/api/data/snapshot", async (req, res, next) => {
-  try {
-    if (!databaseReady)
-      return res.status(503).json({ message: "MongoDB chưa kết nối." });
-
-    const saved = await SharedSnapshot.findOneAndUpdate(
-      { key: "main" },
-      {
-        $set: {
-          products: Array.isArray(req.body?.products) ? req.body.products : [],
-
-          categories: Array.isArray(req.body?.categories)
-            ? req.body.categories
-            : [],
-
-          settings:
-            req.body?.settings && typeof req.body.settings === "object"
-              ? req.body.settings
-              : {},
-
-          /*
-           * Chỉ cập nhật blog nếu client thực sự gửi mảng.
-           * Nếu client cũ chưa hỗ trợ blog, giữ dữ liệu server.
-           */
-          ...(Array.isArray(req.body?.blogPosts)
-            ? {
-                blogPosts: req.body.blogPosts,
-              }
-            : {}),
-        },
-        $setOnInsert: { key: "main" },
-      },
-      { upsert: true, new: true, runValidators: false },
-    ).lean();
-
-    res.json({
-      success: true,
-      updatedAt: saved.updatedAt || new Date().toISOString(),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 /*
  * Authentication is mounted before protected domain routes.
  * Orders POST remains public to support guest checkout; when a valid JWT
