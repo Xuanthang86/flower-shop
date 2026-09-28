@@ -234,11 +234,23 @@ const applySePayWebhook = async (payload) => {
   const order = await Order.findOne({ orderCode: intent.orderCode });
   if (order) {
     order.paymentStatus = "paid";
+
+    order.paymentIntentId = intent.intentId;
+
     await order.save();
+
     await Payment.updateOne(
       { orderId: order._id },
       {
-        $set: { status: "paid", transactionId: providerTransactionId, paidAt },
+        $set: {
+          status: "paid",
+
+          paymentIntentId: intent.intentId,
+
+          transactionId: providerTransactionId,
+
+          paidAt,
+        },
       },
     );
   }

@@ -94,6 +94,13 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    priceType: {
+      type: String,
+      enum: ["fixed", "contact"],
+      default: "fixed",
+      index: true,
+    },
   },
   {
     timestamps: true,

@@ -11,23 +11,38 @@ const slugify = (value) =>
 
 const normalizeCreatePayload = (payload = {}) => ({
   name: String(payload.name || "").trim(),
+
   slug: slugify(payload.slug || payload.name),
+
   categoryId: payload.categoryId || undefined,
+
   categorySlug: String(payload.categorySlug || "").trim(),
+
   price: Math.max(0, Number(payload.price) || 0),
+
   oldPrice: Math.max(0, Number(payload.oldPrice) || 0),
+
   badge: String(payload.badge || "").trim(),
+
   image: String(payload.image || payload.imageUrl || "").trim(),
+
   description: String(payload.description || "").trim(),
+
   salesCount: Math.max(0, Number(payload.salesCount || payload.sold || 0)),
+
   stockQuantity: Math.max(
     0,
     Math.floor(Number(payload.stockQuantity ?? payload.stock ?? 0) || 0),
   ),
+
   isNew: Boolean(payload.isNew),
+
   active: payload.active !== false && payload.disabled !== true,
+
   seoTitle: String(payload.seoTitle || "").trim(),
+
   seoDescription: String(payload.seoDescription || "").trim(),
+
   imageAlt: String(payload.imageAlt || "").trim(),
 });
 
@@ -59,13 +74,25 @@ const normalizePatchPayload = (payload = {}) => {
     }
 
     switch (field) {
-      case "name":
-        update.name = String(payload.name).trim();
-        break;
+      case "name": {
+        const value = String(payload.name || "").trim();
 
-      case "slug":
-        update.slug = slugify(payload.slug);
+        if (value) {
+          update.name = value;
+        }
+
         break;
+      }
+
+      case "slug": {
+        const value = slugify(payload.slug);
+
+        if (value) {
+          update.slug = value;
+        }
+
+        break;
+      }
 
       case "categoryId":
         update.categoryId = payload.categoryId || null;
@@ -116,57 +143,113 @@ const normalizePatchPayload = (payload = {}) => {
 
 const list = async ({ page = 1, limit = 50, includeInactive = false } = {}) => {
   const safePage = Math.max(1, Number(page) || 1);
+
   const safeLimit = Math.min(200, Math.max(1, Number(limit) || 50));
+
   const filter = includeInactive ? {} : { active: true };
 
   const [items, total] = await Promise.all([
     Product.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({
+        createdAt: -1,
+      })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
       .lean(),
+
     Product.countDocuments(filter),
   ]);
 
-  return { items, total, page: safePage, limit: safeLimit };
+  return {
+    items,
+    total,
+    page: safePage,
+    limit: safeLimit,
+  };
 };
 
 const getById = async (id) => {
   const item = await Product.findById(id).lean();
-  if (!item)
-    throw Object.assign(new Error("Không tìm thấy sản phẩm."), { status: 404 });
+
+  if (!item) {
+    throw Object.assign(new Error("Không tìm thấy sản phẩm."), {
+      status: 404,
+    });
+  }
+
   return item;
 };
 
-const create = async (payload) => Product.create(normalizePayload(payload));
+const create = async (payload = {}) => {
+  const normalized = normalizeCreatePayload(payload);
 
-const update = async (id, payload) => {
+  if (!normalized.name) {
+    throw Object.assign(new Error("Tên sản phẩm là bắt buộc."), {
+      status: 400,
+    });
+  }
+
+  return Product.create(normalized);
+};
+
+const update = async (id, payload = {}) => {
+  const updatePayload = normalizePatchPayload(payload);
+
+  if (!Object.keys(updatePayload).length) {
+    throw Object.assign(
+      new Error("Không có trường hợp lệ để cập nhật sản phẩm."),
+      {
+        status: 400,
+      },
+    );
+  }
+
   const updated = await Product.findByIdAndUpdate(
     id,
-    { $set: normalizePayload(payload) },
-    { new: true, runValidators: true },
+    {
+      $set: updatePayload,
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
   ).lean();
 
-  if (!updated)
-    throw Object.assign(new Error("Không tìm thấy sản phẩm."), { status: 404 });
+  if (!updated) {
+    throw Object.assign(new Error("Không tìm thấy sản phẩm."), {
+      status: 404,
+    });
+  }
+
   return updated;
 };
 
 const remove = async (id) => {
   const updated = await Product.findByIdAndUpdate(
     id,
-    { $set: { active: false } },
-    { new: true },
+    {
+      $set: {
+        active: false,
+      },
+    },
+    {
+      new: true,
+    },
   ).lean();
 
-  if (!updated)
-    throw Object.assign(new Error("Không tìm thấy sản phẩm."), { status: 404 });
+  if (!updated) {
+    throw Object.assign(new Error("Không tìm thấy sản phẩm."), {
+      status: 404,
+    });
+  }
+
   return updated;
 };
 
 module.exports = {
   slugify,
-  normalizePayload,
+  normalizeCreatePayload,
+  normalizePatchPayload,
   list,
   getById,
   create,

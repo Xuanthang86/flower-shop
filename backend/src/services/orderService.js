@@ -18,7 +18,9 @@ const generateOrderCode = async () => {
 
 const normalizeItems = (items) => {
   if (!Array.isArray(items) || !items.length) {
-    throw Object.assign(new Error("Đơn hàng phải có ít nhất một sản phẩm."), { status: 400 });
+    throw Object.assign(new Error("Đơn hàng phải có ít nhất một sản phẩm."), {
+      status: 400,
+    });
   }
   return items.map((item) => ({
     productId: item.productId || item.id || null,
@@ -29,14 +31,23 @@ const normalizeItems = (items) => {
 const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
   const requested = normalizeItems(items);
   const ids = requested.map((x) => x.productId).filter(Boolean);
-  const products = await Product.find({ _id: { $in: ids }, active: true }).lean();
+  const products = await Product.find({
+    _id: { $in: ids },
+    active: true,
+  }).lean();
   const byId = new Map(products.map((p) => [String(p._id), p]));
 
   const normalizedItems = requested.map((item) => {
     const product = byId.get(String(item.productId));
-    if (!product) throw Object.assign(new Error("Một sản phẩm không còn tồn tại."), { status: 400 });
+    if (!product)
+      throw Object.assign(new Error("Một sản phẩm không còn tồn tại."), {
+        status: 400,
+      });
     if (Number(product.stockQuantity) < item.quantity) {
-      throw Object.assign(new Error(`Sản phẩm "${product.name}" không đủ tồn kho.`), { status: 400 });
+      throw Object.assign(
+        new Error(`Sản phẩm "${product.name}" không đủ tồn kho.`),
+        { status: 400 },
+      );
     }
     const unitPrice = Number(product.price) || 0;
     return {
@@ -49,7 +60,10 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
     };
   });
 
-  const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotal = normalizedItems.reduce(
+    (sum, item) => sum + item.subtotal,
+    0,
+  );
   let discount = 0;
   let coupon = null;
 
@@ -59,21 +73,31 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
       active: true,
     }).lean();
 
-    if (!coupon) throw Object.assign(new Error("Mã giảm giá không hợp lệ."), { status: 400 });
+    if (!coupon)
+      throw Object.assign(new Error("Mã giảm giá không hợp lệ."), {
+        status: 400,
+      });
 
     const now = new Date();
-    if ((coupon.startsAt && now < new Date(coupon.startsAt)) ||
-        (coupon.expiresAt && now > new Date(coupon.expiresAt)) ||
-        (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) ||
-        subtotal < Number(coupon.minOrderValue || 0)) {
-      throw Object.assign(new Error("Mã giảm giá không đủ điều kiện áp dụng."), { status: 400 });
+    if (
+      (coupon.startsAt && now < new Date(coupon.startsAt)) ||
+      (coupon.expiresAt && now > new Date(coupon.expiresAt)) ||
+      (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) ||
+      subtotal < Number(coupon.minOrderValue || 0)
+    ) {
+      throw Object.assign(
+        new Error("Mã giảm giá không đủ điều kiện áp dụng."),
+        { status: 400 },
+      );
     }
 
-    discount = coupon.discountType === "percentage"
-      ? Math.round(subtotal * Number(coupon.discountValue || 0) / 100)
-      : Math.max(0, Number(coupon.discountValue || 0));
+    discount =
+      coupon.discountType === "percentage"
+        ? Math.round((subtotal * Number(coupon.discountValue || 0)) / 100)
+        : Math.max(0, Number(coupon.discountValue || 0));
 
-    if (coupon.maxDiscount > 0) discount = Math.min(discount, coupon.maxDiscount);
+    if (coupon.maxDiscount > 0)
+      discount = Math.min(discount, coupon.maxDiscount);
     discount = Math.min(discount, subtotal);
   }
 
@@ -91,9 +115,7 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
 const create = async ({ payload, user }) => {
   const calculation = await calculateOrder(payload);
   const orderCode = await generateOrderCode();
-  const customer = user
-    ? await User.findById(user._id).lean()
-    : null;
+  const customer = user ? await User.findById(user._id).lean() : null;
 
   const recipient = payload.recipient || payload.address || {};
   const order = await Order.create({
@@ -105,10 +127,14 @@ const create = async ({ payload, user }) => {
       email: customer?.email || user?.email || "",
     },
     recipientSnapshot: {
-      fullName: String(recipient.fullName || recipient.recipientName || payload.fullName || "").trim(),
+      fullName: String(
+        recipient.fullName || recipient.recipientName || payload.fullName || "",
+      ).trim(),
       phone: String(recipient.phone || payload.phone || "").trim(),
       email: String(recipient.email || payload.email || "").trim(),
-      address: String(recipient.addressLine || recipient.address || payload.addressLine || "").trim(),
+      address: String(
+        recipient.addressLine || recipient.address || payload.addressLine || "",
+      ).trim(),
     },
     items: calculation.items,
     subtotal: calculation.subtotal,
@@ -126,7 +152,10 @@ const create = async ({ payload, user }) => {
   });
 
   if (calculation.coupon) {
-    await Coupon.updateOne({ _id: calculation.coupon._id }, { $inc: { usedCount: 1 } });
+    await Coupon.updateOne(
+      { _id: calculation.coupon._id },
+      { $inc: { usedCount: 1 } },
+    );
   }
 
   for (const item of calculation.items) {
@@ -145,14 +174,29 @@ const create = async ({ payload, user }) => {
     status: "pending",
   });
 
-  return { order: order.toObject(), payment: payment.toObject() };
+  await Order.updateOne(
+    { _id: order._id },
+    {
+      $set: {
+        paymentId: payment._id,
+      },
+    },
+  );
+
+  const finalOrder = await Order.findById(order._id).lean();
+
+  return {
+    order: finalOrder,
+    payment: payment.toObject(),
+  };
 };
 
 const getById = async (id, user) => {
   const filter = { _id: id };
   if (user?.role === "customer") filter.customerId = user._id;
   const order = await Order.findOne(filter).lean();
-  if (!order) throw Object.assign(new Error("Không tìm thấy đơn hàng."), { status: 404 });
+  if (!order)
+    throw Object.assign(new Error("Không tìm thấy đơn hàng."), { status: 404 });
   return order;
 };
 
@@ -164,24 +208,50 @@ const list = async ({ user, page = 1, limit = 50, status = "" }) => {
   if (status) filter.status = status;
 
   const [items, total] = await Promise.all([
-    Order.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
+    Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
     Order.countDocuments(filter),
   ]);
   return { items, total, page: safePage, limit: safeLimit };
 };
 
 const updateStatus = async (id, status, paymentStatus) => {
-  const allowed = ["pending", "confirmed", "processing", "shipping", "delivered", "cancelled"];
-  if (!allowed.includes(status)) throw Object.assign(new Error("Trạng thái đơn hàng không hợp lệ."), { status: 400 });
+  const allowed = [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipping",
+    "delivered",
+    "cancelled",
+  ];
+  if (!allowed.includes(status))
+    throw Object.assign(new Error("Trạng thái đơn hàng không hợp lệ."), {
+      status: 400,
+    });
 
   const update = { status };
   if (status === "delivered") update.deliveredAt = new Date();
   if (status === "cancelled") update.cancelledAt = new Date();
   if (paymentStatus) update.paymentStatus = paymentStatus;
 
-  const order = await Order.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
-  if (!order) throw Object.assign(new Error("Không tìm thấy đơn hàng."), { status: 404 });
+  const order = await Order.findByIdAndUpdate(
+    id,
+    { $set: update },
+    { new: true },
+  ).lean();
+  if (!order)
+    throw Object.assign(new Error("Không tìm thấy đơn hàng."), { status: 404 });
   return order;
 };
 
-module.exports = { generateOrderCode, calculateOrder, create, getById, list, updateStatus };
+module.exports = {
+  generateOrderCode,
+  calculateOrder,
+  create,
+  getById,
+  list,
+  updateStatus,
+};

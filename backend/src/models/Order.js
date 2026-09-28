@@ -179,6 +179,19 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    paymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      default: null,
+      index: true,
+    },
+
+    paymentIntentId: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
     status: {
       type: String,
       enum: [
