@@ -55,6 +55,12 @@ const createIntent = async ({ orderId, amount }) => {
 
   const order = await Order.findById(orderId);
 
+  const payment = await Payment.findOne({ orderId: order?._id });
+
+  if (order && payment) {
+    order.paymentId = payment._id;
+  }
+
   if (!order) {
     throw Object.assign(
       new Error("Không tìm thấy đơn hàng để tạo Payment Intent."),

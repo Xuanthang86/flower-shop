@@ -20,6 +20,8 @@ const normalizeCreatePayload = (payload = {}) => ({
 
   price: Math.max(0, Number(payload.price) || 0),
 
+  priceType: payload.priceType === "contact" ? "contact" : "fixed",
+
   oldPrice: Math.max(0, Number(payload.oldPrice) || 0),
 
   badge: String(payload.badge || "").trim(),
@@ -52,6 +54,7 @@ const PRODUCT_PATCH_FIELDS = [
   "categoryId",
   "categorySlug",
   "price",
+  "priceType",
   "oldPrice",
   "badge",
   "image",
@@ -111,6 +114,11 @@ const normalizePatchPayload = (payload = {}) => {
       case "oldPrice":
       case "salesCount":
         update[field] = Math.max(0, Number(payload[field]) || 0);
+        break;
+
+      case "priceType":
+        update.priceType =
+          payload.priceType === "contact" ? "contact" : "fixed";
         break;
 
       case "stockQuantity":

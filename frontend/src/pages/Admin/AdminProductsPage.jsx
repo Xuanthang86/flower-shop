@@ -41,6 +41,7 @@ const PRODUCTS_PER_PAGE = 20;
 const EMPTY_PRODUCT = {
   name: "",
   price: "",
+  priceType: "fixed",
   oldPrice: "",
   category: "",
   description: "",
@@ -276,6 +277,7 @@ const AdminProductsPage = () => {
     setProductForm({
       name: product.name || "",
       price: product.price ?? "",
+      priceType: product.priceType || "fixed",
       oldPrice: product.oldPrice ?? "",
       category: product.category || "",
       description: product.description || "",
@@ -343,7 +345,9 @@ const AdminProductsPage = () => {
 
     const name = productForm.name.trim();
 
-    const price = Number(productForm.price);
+    const priceType = productForm.priceType === "contact" ? "contact" : "fixed";
+
+    const price = priceType === "contact" ? 0 : Number(productForm.price);
 
     const oldPrice =
       productForm.oldPrice === "" ? null : Number(productForm.oldPrice);
@@ -359,7 +363,7 @@ const AdminProductsPage = () => {
       return;
     }
 
-    if (!Number.isFinite(price) || price <= 0) {
+    if (priceType === "fixed" && (!Number.isFinite(price) || price <= 0)) {
       setError("Giá phải lớn hơn 0.");
       return;
     }
@@ -404,6 +408,8 @@ const AdminProductsPage = () => {
       name,
 
       price,
+
+      priceType,
 
       oldPrice,
 
@@ -948,6 +954,26 @@ const AdminProductsPage = () => {
                   }
                   className={inputClass}
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Loại giá
+                </label>
+
+                <select
+                  value={productForm.priceType || "fixed"}
+                  onChange={(event) =>
+                    setProductForm((current) => ({
+                      ...current,
+                      priceType: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                >
+                  <option value="fixed">Giá cố định</option>
+                  <option value="contact">Liên hệ báo giá</option>
+                </select>
               </div>
 
               <div>
