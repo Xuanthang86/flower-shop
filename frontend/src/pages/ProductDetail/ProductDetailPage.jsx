@@ -388,6 +388,12 @@ const ProductDetailPage = () => {
       return;
     }
 
+    if (product.priceType === "contact") {
+      notifyInfo("Sản phẩm này cần liên hệ để báo giá.");
+
+      return;
+    }
+
     if (isStaff) {
       notifyError(
         "Tài khoản quản trị không có quyền mua hàng. Vui lòng sử dụng tài khoản khách hàng."
@@ -601,10 +607,12 @@ const ProductDetailPage = () => {
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <span className="text-2xl font-bold text-pink-600 md:text-3xl">
-                  {formatPrice(product.price)}
+                  {product.priceType === "contact"
+                    ? "Liên hệ báo giá"
+                    : formatPrice(product.price)}
                 </span>
 
-                {product.oldPrice && (
+                {product.priceType !== "contact" && product.oldPrice && (
                   <span className="text-base text-gray-400 line-through">
                     {formatPrice(product.oldPrice)}
                   </span>

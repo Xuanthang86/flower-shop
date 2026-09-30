@@ -55,12 +55,6 @@ const createIntent = async ({ orderId, amount }) => {
 
   const order = await Order.findById(orderId);
 
-  const payment = await Payment.findOne({ orderId: order?._id });
-
-  if (order && payment) {
-    order.paymentId = payment._id;
-  }
-
   if (!order) {
     throw Object.assign(
       new Error("Không tìm thấy đơn hàng để tạo Payment Intent."),
@@ -75,42 +69,62 @@ const createIntent = async ({ orderId, amount }) => {
     );
   }
 
-  const existingPaymentIntent = await PaymentIntent.findOne({
+  let payment = await Payment.findOne({
     orderId: order._id,
   });
 
-  if (existingPaymentIntent) {
-    return existingPaymentIntent.toObject();
+  if (!payment) {
+    payment = await Payment.create({
+      orderId: order._id,
+      provider: "",
+      method: order.paymentMethod || "bank_transfer",
+      amount: numericAmount,
+      currency: "VND",
+      status: "pending",
+    });
   }
 
-  const intent = await PaymentIntent.create({
-    intentId: crypto.randomUUID(),
-
+  let intent = await PaymentIntent.findOne({
     orderId: order._id,
+  });
 
+  if (intent) {
+    if (String(order.paymentId || "") !== String(payment._id)) {
+      order.paymentId = payment._id;
+    }
+
+    if (order.paymentIntentId !== intent.intentId) {
+      order.paymentIntentId = intent.intentId;
+    }
+
+    await order.save();
+
+    if (payment.paymentIntentId !== intent.intentId) {
+      payment.paymentIntentId = intent.intentId;
+      await payment.save();
+    }
+
+    return intent.toObject();
+  }
+
+  intent = await PaymentIntent.create({
+    intentId: crypto.randomUUID(),
+    orderId: order._id,
     orderCode: order.orderCode,
-
     reference: order.orderCode,
-
     amount: numericAmount,
-
     currency: "VND",
-
     paymentMethod: order.paymentMethod || "bank_transfer",
-
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-
     status: "pending",
   });
 
-  await Payment.updateOne(
-    { orderId: order._id },
-    {
-      $set: {
-        paymentIntentId: intent.intentId,
-      },
-    },
-  );
+  order.paymentId = payment._id;
+  order.paymentIntentId = intent.intentId;
+  await order.save();
+
+  payment.paymentIntentId = intent.intentId;
+  await payment.save();
 
   return intent.toObject();
 };
@@ -240,25 +254,41 @@ const applySePayWebhook = async (payload) => {
   const order = await Order.findOne({ orderCode: intent.orderCode });
   if (order) {
     order.paymentStatus = "paid";
-
     order.paymentIntentId = intent.intentId;
 
-    await order.save();
+    const payment = await Payment.findOne({
+      orderId: order._id,
+    });
 
-    await Payment.updateOne(
-      { orderId: order._id },
-      {
-        $set: {
-          status: "paid",
+    if (payment) {
+      order.paymentId = payment._id;
+      await order.save();
 
-          paymentIntentId: intent.intentId,
+      payment.paymentIntentId = intent.intentId;
+      payment.status = "paid";
+      payment.transactionId = providerTransactionId;
+      payment.paidAt = paidAt;
+      payment.rawResponse = payload;
 
-          transactionId: providerTransactionId,
+      await payment.save();
+    } else {
+      const createdPayment = await Payment.create({
+        orderId: order._id,
+        provider: "sepay",
+        method: order.paymentMethod || "bank_transfer",
+        amount: intent.amount,
+        currency: "VND",
+        status: "paid",
+        paymentIntentId: intent.intentId,
+        transactionId: providerTransactionId,
+        paidAt,
+        rawResponse: payload,
+      });
 
-          paidAt,
-        },
-      },
-    );
+      order.paymentId = createdPayment._id;
+
+      await order.save();
+    }
   }
 
   return { duplicate: false, matched: true, transactionId: transaction._id };

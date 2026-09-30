@@ -81,7 +81,7 @@ const Categories = () => {
               auto-cols-[calc((100vw_-_2.75rem)/2)]
               gap-3
               md:auto-cols-[calc((100vw_-_4.75rem)/4)]
-              lg:auto-cols-[calc((min(1280px,100vw_-_2rem)-5rem)/5)]
+              lg:auto-cols-[calc((min(1280px,100vw_-_2rem)-6rem)/5)]
               lg:gap-4
             "
           >

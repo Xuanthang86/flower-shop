@@ -146,6 +146,7 @@ const run = async () => {
           seoTitle: String(raw.seoTitle || ""),
           seoDescription: String(raw.seoDescription || ""),
           imageAlt: String(raw.imageAlt || ""),
+          priceType: raw.priceType === "contact" ? "contact" : "fixed",
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },

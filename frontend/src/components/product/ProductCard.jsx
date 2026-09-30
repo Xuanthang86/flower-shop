@@ -60,7 +60,9 @@ const ProductCard = ({ product }) => {
 
   const stockStatusLabel = getStockStatusLabel(product);
 
-  const sellable = isProductSellable(product);
+  const isContactPrice = product?.priceType === "contact";
+
+  const sellable = !isContactPrice && isProductSellable(product);
 
   const showAddToCart = !isStaff;
 
@@ -171,10 +173,12 @@ const ProductCard = ({ product }) => {
 
           <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-sm font-bold text-pink-600">
-              {money(product.price)}
+              {product.priceType === "contact"
+                ? "Liên hệ báo giá"
+                : money(product.price)}
             </span>
 
-            {product.oldPrice && (
+            {product.priceType !== "contact" && product.oldPrice && (
               <span className="text-[11px] text-gray-400 line-through">
                 {money(product.oldPrice)}
               </span>
