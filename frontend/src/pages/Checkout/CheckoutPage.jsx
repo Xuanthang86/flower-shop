@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
-import { FiCheck, FiCopy, FiDownload } from "react-icons/fi";
+import { FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 
 import { formatCouponDiscount, validateCoupon } from "@/services/coupon";
@@ -32,7 +32,6 @@ import {
 
 import {
   readPaymentSettings,
-  buildTransferContent,
   buildVietQrUrl,
   resolvePaymentBank,
 } from "@/services/paymentSettings";
@@ -220,6 +219,19 @@ const CheckoutPage = () => {
     useState(false);
 
   const [paymentIntent, setPaymentIntent] = useState(EMPTY_PAYMENT_INTENT);
+
+  const [paymentDepositPercent, setPaymentDepositPercent] = useState(100);
+
+  const paymentDepositAmount = Math.round(
+    ((Number(grandTotal) || 0) *
+      (Number(paymentDepositPercent) === 50 ? 50 : 100)) /
+      100
+  );
+
+  const paymentRemainingAmount = Math.max(
+    0,
+    Math.round(Number(grandTotal) || 0) - paymentDepositAmount
+  );
 
   const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
@@ -894,10 +906,9 @@ const CheckoutPage = () => {
     };
   }, [formData.paymentMethod, paymentIntent?.id]);
 
-  const transferContent = buildTransferContent(
-    paymentIntent?.orderCode,
-    paymentSettings?.bankTransfer
-  );
+  const transferContent = paymentIntent?.orderCode
+    ? paymentIntent.orderCode
+    : "";
 
   const paymentIntentAmount = Math.round(Number(paymentIntent?.amount) || 0);
 
@@ -2047,11 +2058,99 @@ const CheckoutPage = () => {
                               </span>
                             </div>
 
+                            <div className="space-y-2">
+                              <p className="text-sm font-semibold text-gray-700">
+                                Hình thức thanh toán
+                              </p>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label
+                                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                                    paymentDepositPercent === 50
+                                      ? "border-pink-500 bg-pink-50"
+                                      : "border-gray-200 bg-white hover:border-pink-300"
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="paymentDepositPercent"
+                                    value="50"
+                                    checked={paymentDepositPercent === 50}
+                                    onChange={() => {
+                                      setPaymentDepositPercent(50);
+                                      resetPaymentIntentForAmountChange();
+                                    }}
+                                    className="mt-1"
+                                  />
+
+                                  <span>
+                                    <span className="block font-semibold text-gray-800">
+                                      Thanh toán trước 50%
+                                    </span>
+
+                                    <span className="mt-1 block text-sm text-gray-500">
+                                      Còn lại thanh toán khi nhận hoa.
+                                    </span>
+                                  </span>
+                                </label>
+
+                                <label
+                                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                                    paymentDepositPercent === 100
+                                      ? "border-pink-500 bg-pink-50"
+                                      : "border-gray-200 bg-white hover:border-pink-300"
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="paymentDepositPercent"
+                                    value="100"
+                                    checked={paymentDepositPercent === 100}
+                                    onChange={() => {
+                                      setPaymentDepositPercent(100);
+                                      resetPaymentIntentForAmountChange();
+                                    }}
+                                    className="mt-1"
+                                  />
+
+                                  <span>
+                                    <span className="block font-semibold text-gray-800">
+                                      Thanh toán 100%
+                                    </span>
+
+                                    <span className="mt-1 block text-sm text-gray-500">
+                                      Thanh toán đủ một lần.
+                                    </span>
+                                  </span>
+                                </label>
+                              </div>
+                            </div>
+
                             <div className="flex justify-between gap-4">
                               <span className="text-gray-600">Số tiền</span>
 
                               <span className="text-right font-semibold text-pink-600">
-                                {formatShippingMoney(grandTotal)}
+                                {formatShippingMoney(paymentDepositAmount)}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">
+                                Đã thanh toán
+                              </span>
+
+                              <span className="text-right font-semibold text-green-600">
+                                {formatShippingMoney(paymentDepositAmount)}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-600">
+                                Còn lại khi nhận hoa
+                              </span>
+
+                              <span className="text-right font-semibold text-gray-800">
+                                {formatShippingMoney(paymentRemainingAmount)}
                               </span>
                             </div>
 

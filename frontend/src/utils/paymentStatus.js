@@ -1,5 +1,6 @@
 export const PAYMENT_STATUS = {
   PENDING: "pending",
+  PARTIALLY_PAID: "partially_paid",
   PAID: "paid",
   FAILED: "failed",
   REFUNDED: "refunded",
@@ -9,6 +10,10 @@ export const PAYMENT_STATUS_OPTIONS = [
   {
     value: PAYMENT_STATUS.PENDING,
     label: "Chờ thanh toán",
+  },
+  {
+    value: PAYMENT_STATUS.PARTIALLY_PAID,
+    label: "Đã thanh toán 50%",
   },
   {
     value: PAYMENT_STATUS.PAID,
@@ -41,6 +46,10 @@ export const normalizePaymentStatus = (status) => {
     canceled: PAYMENT_STATUS.FAILED,
 
     "chờ thanh toán": PAYMENT_STATUS.PENDING,
+
+    partially_paid: PAYMENT_STATUS.PARTIALLY_PAID,
+
+    "đã thanh toán 50%": PAYMENT_STATUS.PARTIALLY_PAID,
 
     paid: PAYMENT_STATUS.PAID,
     success: PAYMENT_STATUS.PAID,
@@ -90,6 +99,8 @@ export const getPaymentStatusClass = (status) => {
 
     default:
       return "bg-gray-100 text-gray-700";
+    case PAYMENT_STATUS.PARTIALLY_PAID:
+      return "bg-blue-100 text-blue-700";
   }
 };
 

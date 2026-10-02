@@ -31,7 +31,7 @@ import {
   updateUserApi,
   deleteUserApi,
   resetUserPasswordApi,
-} from "@/services/auth";
+} from "@/services/authApi";
 
 const normalizeUser = (user) => {
   if (!user) {

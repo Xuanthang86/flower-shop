@@ -165,12 +165,7 @@ const create = async ({ payload, user }) => {
   const paymentIsBankTransfer =
     String(payload.paymentMethod || "") === "bank_transfer";
 
-  const requestedPaymentStatus =
-    paymentIsBankTransfer && paymentDepositPercent === 50
-      ? "partially_paid"
-      : paymentIsBankTransfer
-        ? "paid"
-        : "pending";
+  const requestedPaymentStatus = "pending";
   const order = await Order.create({
     orderCode,
     customerId: user?._id || null,
@@ -238,7 +233,7 @@ const create = async ({ payload, user }) => {
 
     currency: "VND",
 
-    status: paymentIsBankTransfer ? "paid" : "pending",
+    status: "pending",
 
     transactionId: String(payload.paymentTransactionId || "").trim(),
 

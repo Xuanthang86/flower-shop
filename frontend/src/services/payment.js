@@ -39,10 +39,19 @@ const request = async (path, options = {}) => {
 };
 
 export const createBankTransferPaymentIntent = async ({
+  orderId,
   amount,
   depositPercent = 100,
 }) => {
-  const numericAmount = Number(amount) || 0;
+  const normalizedOrderId = String(orderId || "").trim();
+
+  const numericAmount = Math.round(Number(amount) || 0);
+
+  const normalizedDepositPercent = Number(depositPercent) === 50 ? 50 : 100;
+
+  if (!normalizedOrderId) {
+    throw new Error("Thiếu mã Order ID để tạo Payment Intent.");
+  }
 
   if (numericAmount <= 0) {
     throw new Error("Số tiền thanh toán không hợp lệ.");
@@ -52,9 +61,9 @@ export const createBankTransferPaymentIntent = async ({
     method: "POST",
 
     body: JSON.stringify({
-      amount: Math.round(Number(amount) || 0),
-
-      depositPercent: Number(depositPercent) === 50 ? 50 : 100,
+      orderId: normalizedOrderId,
+      amount: numericAmount,
+      depositPercent: normalizedDepositPercent,
     }),
   });
 };

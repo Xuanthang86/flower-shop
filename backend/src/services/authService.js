@@ -326,4 +326,7 @@ module.exports = {
   register,
   login,
   upsertGoogleUser,
+  changePassword,
+  requestPasswordReset,
+  resetPassword,
 };

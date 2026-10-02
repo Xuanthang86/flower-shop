@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import PasswordInput from "@/components/auth/PasswordInput";
 
-import { requestPasswordResetApi, resetPasswordApi } from "@/services/auth";
+import { requestPasswordResetApi, resetPasswordApi } from "@/services/authApi";
 
 import { useAuth } from "@/context/AuthContext";
 

@@ -12,11 +12,14 @@ Mục đích:
 
 import { lazy, Suspense } from "react";
 
+import { getSiteName, readSiteSettings } from "@/services/siteSettings";
+
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
 const AppRoutes = lazy(() => import("./routes/AppRoutes"));
 
 const App = () => {
+  const siteName = getSiteName(readSiteSettings());
   return (
     <ErrorBoundary>
       <Suspense
@@ -25,7 +28,7 @@ const App = () => {
             <div className="text-center">
               <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-pink-200 border-t-pink-600" />
 
-              <p className="text-gray-500">Đang tải Flower Shop...</p>
+              <p className="text-gray-500">Đang tải {siteName}...</p>
             </div>
           </div>
         }
