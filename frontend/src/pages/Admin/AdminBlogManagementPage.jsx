@@ -114,6 +114,45 @@ const formatPostDate = (value) => {
   return `${day}/${month}/${year}`;
 };
 
+const isDeletedBlogPost = (post) =>
+  Boolean(
+    post?.isDeleted === true || post?.deletedAt || post?.status === "deleted"
+  );
+
+const getPostTimestamp = (post) => {
+  const publishedAt = String(post?.publishedAt || "").trim();
+
+  if (publishedAt) {
+    const publishedTimestamp = new Date(publishedAt).getTime();
+
+    if (Number.isFinite(publishedTimestamp)) {
+      return publishedTimestamp;
+    }
+  }
+
+  const date = String(post?.date || "").trim();
+
+  const time = String(post?.time || "00:00").trim();
+
+  if (date) {
+    const dateTime = new Date(`${date}T${time || "00:00"}:00`).getTime();
+
+    if (Number.isFinite(dateTime)) {
+      return dateTime;
+    }
+
+    const fallbackDate = new Date(date).getTime();
+
+    if (Number.isFinite(fallbackDate)) {
+      return fallbackDate;
+    }
+  }
+
+  const updatedAt = new Date(String(post?.updatedAt || "")).getTime();
+
+  return Number.isFinite(updatedAt) ? updatedAt : 0;
+};
+
 const getBlogStyle = (settings) =>
   settings?.blog?.defaultShopInfoStyle || {
     backgroundColor: "#fff7fb",
@@ -133,6 +172,10 @@ const AdminBlogManagementPage = () => {
   const [settings, setSettings] = useState(() => readSiteSettings());
 
   const [blogPosts, setBlogPosts] = useState(() => readBlogPosts());
+
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const POSTS_PER_PAGE = 9;
 
   const blogCategories = Array.isArray(settings.blogCategories)
     ? settings.blogCategories
@@ -191,6 +234,8 @@ const AdminBlogManagementPage = () => {
   useEffect(() => {
     const refreshPosts = () => {
       setBlogPosts(readBlogPosts());
+
+      setCurrentPage(1);
     };
 
     const handleStorage = (event) => {
@@ -682,11 +727,52 @@ const AdminBlogManagementPage = () => {
     }
 
     try {
-      const savedPosts = saveBlogPosts(
-        blogPosts.filter((item) => String(item.id) !== String(confirmDelete.id))
-      );
+      /*
+       * Đọc lại dữ liệu mới nhất từ localStorage.
+       *
+       * Không dùng blogPosts state cũ vì sharedDataSync
+       * có thể vừa đồng bộ dữ liệu từ MongoDB.
+       */
+      const latestPosts = readBlogPosts();
+
+      const posts =
+        Array.isArray(latestPosts) && latestPosts.length > 0
+          ? latestPosts
+          : Array.isArray(blogPosts)
+            ? blogPosts
+            : [];
+
+      const now = new Date().toISOString();
+
+      /*
+       * KHÔNG xóa vật lý khỏi mảng.
+       *
+       * Đánh dấu deleted để browser khác nhận được
+       * trạng thái xóa thông qua MongoDB.
+       */
+      const updatedPosts = posts.map((item) => {
+        if (String(item.id) !== String(confirmDelete.id)) {
+          return item;
+        }
+
+        return {
+          ...item,
+
+          isDeleted: true,
+
+          deletedAt: now,
+
+          status: "deleted",
+
+          updatedAt: now,
+        };
+      });
+
+      const savedPosts = saveBlogPosts(updatedPosts);
 
       setBlogPosts(savedPosts);
+
+      setCurrentPage(1);
 
       setConfirmDelete(null);
 
@@ -698,7 +784,28 @@ const AdminBlogManagementPage = () => {
     }
   };
 
-  const posts = blogPosts;
+  const allPosts = Array.isArray(blogPosts) ? blogPosts : [];
+
+  const visiblePosts = allPosts
+    .filter((post) => !isDeletedBlogPost(post))
+    .sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
+
+  const totalPosts = visiblePosts.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalPosts / POSTS_PER_PAGE));
+
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedPosts = visiblePosts.slice(
+    (safeCurrentPage - 1) * POSTS_PER_PAGE,
+    safeCurrentPage * POSTS_PER_PAGE
+  );
 
   const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
 
@@ -746,7 +853,7 @@ const AdminBlogManagementPage = () => {
             </p>
 
             <p className="mt-2 text-sm font-semibold text-pink-600">
-              Tổng số bài viết: {posts.length}
+              Tổng số bài viết: {totalPosts}
             </p>
           </div>
 
@@ -760,7 +867,7 @@ const AdminBlogManagementPage = () => {
         </header>
 
         <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {posts.map((post) => (
+          {paginatedPosts.map((post) => (
             <article
               key={post.id}
               className="overflow-hidden rounded-2xl bg-white shadow-sm"
@@ -815,6 +922,62 @@ const AdminBlogManagementPage = () => {
             </article>
           ))}
         </section>
+
+        {totalPages > 1 && (
+          <nav
+            aria-label="Phân trang bài viết"
+            className="mt-8 flex flex-wrap items-center justify-center gap-2"
+          >
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safeCurrentPage === 1}
+              aria-label="Trang trước"
+              className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              &lt;
+            </button>
+
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+              (page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => {
+                    setCurrentPage(page);
+
+                    window.scrollTo({
+                      top: 0,
+                      left: 0,
+                      behavior: "smooth",
+                    });
+                  }}
+                  aria-label={`Trang ${page}`}
+                  aria-current={page === safeCurrentPage ? "page" : undefined}
+                  className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-semibold transition ${
+                    page === safeCurrentPage
+                      ? "bg-pink-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                  }`}
+                >
+                  {page}
+                </button>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
+              }
+              disabled={safeCurrentPage === totalPages}
+              aria-label="Trang sau"
+              className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              &gt;
+            </button>
+          </nav>
+        )}
       </div>
 
       {editorOpen && (

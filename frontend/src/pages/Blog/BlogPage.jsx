@@ -90,7 +90,14 @@ const BlogPage = () => {
    * Không còn biến posts undefined.
    */
   const posts = useMemo(
-    () => readBlogPosts().filter((post) => post?.status !== "draft"),
+    () =>
+      readBlogPosts().filter(
+        (post) =>
+          post?.status !== "draft" &&
+          post?.status !== "deleted" &&
+          post?.isDeleted !== true &&
+          !post?.deletedAt
+      ),
     [settings]
   );
 

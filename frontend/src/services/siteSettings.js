@@ -795,6 +795,18 @@ const normalizeBlogPost = (post, index = 0) => {
 
   const slug = String(source.slug || "").trim() || createBlogSlug(title);
 
+  const isDeleted =
+    source.isDeleted === true ||
+    source.status === "deleted" ||
+    Boolean(source.deletedAt);
+
+  const normalizedDeletedAt = isDeleted
+    ? source.deletedAt ||
+      source.updatedAt ||
+      source.publishedAt ||
+      new Date().toISOString()
+    : "";
+
   return {
     id: String(source.id || "").trim() || `blog-post-${Date.now()}-${index}`,
 
@@ -816,7 +828,15 @@ const normalizeBlogPost = (post, index = 0) => {
 
     author: String(source.author || "").trim() || "HTH Flower Shop",
 
-    status: source.status === "draft" ? "draft" : "published",
+    status: isDeleted
+      ? "deleted"
+      : source.status === "draft"
+        ? "draft"
+        : "published",
+
+    isDeleted,
+
+    deletedAt: normalizedDeletedAt,
 
     publishedAt: source.publishedAt || source.date || new Date().toISOString(),
 
@@ -827,7 +847,7 @@ const normalizeBlogPost = (post, index = 0) => {
     seoDescription: String(source.seoDescription || "").trim(),
 
     /*
-     * Giữ lại dữ liệu cũ để tương thích.
+     * Giữ dữ liệu cũ để tương thích.
      */
     date: source.date || "",
 
