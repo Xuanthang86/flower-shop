@@ -7,7 +7,7 @@ const User = require("../src/models/User");
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@flowershop.vn";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@hthflowershop.vn";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@12345";
 

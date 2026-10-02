@@ -10,15 +10,24 @@ Mục đích:
 ============================================================
 */
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import { getSiteName, readSiteSettings } from "@/services/siteSettings";
+
+import { startSharedDataSync } from "@/services/sharedDataSync";
 
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
 const AppRoutes = lazy(() => import("./routes/AppRoutes"));
 
 const App = () => {
+  useEffect(() => {
+    const stopSharedDataSync = startSharedDataSync();
+
+    return () => {
+      stopSharedDataSync?.();
+    };
+  }, []);
   const siteName = getSiteName(readSiteSettings());
   return (
     <ErrorBoundary>

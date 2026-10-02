@@ -1,5 +1,5 @@
 export const PASSWORD_RULES = {
-  minLength: 12,
+  minLength: 8,
   maxLength: 64,
 };
 
@@ -45,7 +45,7 @@ export const getPasswordStrength = (password) => {
 
   let score = 0;
 
-  if (value.length >= 12) score++;
+  if (value.length >= 8) score++;
   if (/[A-Z]/.test(value)) score++;
   if (/[a-z]/.test(value)) score++;
   if (/[0-9]/.test(value)) score++;

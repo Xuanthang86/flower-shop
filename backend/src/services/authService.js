@@ -47,6 +47,20 @@ const normalizeEmail = (email) =>
   String(email || "")
     .trim()
     .toLowerCase();
+const MIN_PASSWORD_LENGTH = 8;
+
+const assertValidPassword = (password) => {
+  const value = String(password || "");
+
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    throw Object.assign(
+      new Error(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`),
+      { status: 400 },
+    );
+  }
+
+  return value;
+};
 
 const register = async ({ name, fullName, email, phone, password }) => {
   const normalizedEmail = normalizeEmail(email);
@@ -61,7 +75,9 @@ const register = async ({ name, fullName, email, phone, password }) => {
     throw Object.assign(new Error("Email đã được sử dụng."), { status: 409 });
   }
 
-  const passwordHash = await bcrypt.hash(String(password), 12);
+  const passwordValue = assertValidPassword(password);
+
+  const passwordHash = await bcrypt.hash(passwordValue, 12);
   const user = await User.create({
     name: String(name || fullName || "").trim(),
     email: normalizedEmail,
@@ -243,7 +259,9 @@ const requestPasswordReset = async ({ identifier }) => {
 const resetPassword = async ({ identifier, code, newPassword }) => {
   const user = await resolveRecoveryUser(identifier);
 
-  const passwordHash = await bcrypt.hash(String(newPassword), 12);
+  const passwordValue = assertValidPassword(newPassword);
+
+  const passwordHash = await bcrypt.hash(passwordValue, 12);
 
   const normalizedCode = String(code || "").trim();
 
@@ -311,7 +329,9 @@ const changePassword = async ({ userId, currentPassword, newPassword }) => {
     });
   }
 
-  user.passwordHash = await bcrypt.hash(String(newPassword), 12);
+  const passwordValue = assertValidPassword(newPassword);
+
+  user.passwordHash = await bcrypt.hash(passwordValue, 12);
 
   await user.save();
 

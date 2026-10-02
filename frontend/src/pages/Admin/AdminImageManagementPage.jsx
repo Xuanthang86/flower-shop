@@ -19,6 +19,8 @@ import {
 import { readProducts, PRODUCT_UPDATED_EVENT } from "@/services/catalog";
 
 import { getImageDimensions, uploadImageFile } from "@/services/media";
+import { updateProduct } from "@/services/productApi";
+import { saveProductsAsync } from "@/services/catalog";
 
 import { getPageTitle } from "@/services/siteSettings";
 
@@ -344,6 +346,103 @@ const AdminImageManagementPage = () => {
     }
   };
 
+  const handleReplaceProductImage = async (product, event) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setBusy(true);
+    closeMessage();
+
+    try {
+      const imageUrl = await uploadImageFile(file, {
+        folder: "flower-shop/products",
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.9,
+      });
+
+      const updatedProduct = await updateProduct(product.id, {
+        image: imageUrl,
+      });
+
+      if (!updatedProduct) {
+        throw new Error("Không nhận được sản phẩm sau khi cập nhật.");
+      }
+
+      const currentProducts = readProducts();
+
+      const nextProducts = currentProducts.map((item) =>
+        String(item.id) === String(product.id)
+          ? {
+              ...item,
+              image: imageUrl,
+              updatedAt: updatedProduct.updatedAt || new Date().toISOString(),
+            }
+          : item
+      );
+
+      await saveProductsAsync(nextProducts);
+
+      setProducts(nextProducts);
+
+      setMessage(`Đã thay ảnh cho "${product.name}".`);
+    } catch (replaceError) {
+      setError(replaceError?.message || "Không thể thay hình ảnh sản phẩm.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveProductImage = async (product) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa hình ảnh của "${product.name}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    closeMessage();
+
+    try {
+      const updatedProduct = await updateProduct(product.id, {
+        image: "",
+      });
+
+      if (!updatedProduct) {
+        throw new Error("Không nhận được sản phẩm sau khi cập nhật.");
+      }
+
+      const currentProducts = readProducts();
+
+      const nextProducts = currentProducts.map((item) =>
+        String(item.id) === String(product.id)
+          ? {
+              ...item,
+              image: "",
+              updatedAt: updatedProduct.updatedAt || new Date().toISOString(),
+            }
+          : item
+      );
+
+      await saveProductsAsync(nextProducts);
+
+      setProducts(nextProducts);
+
+      setMessage(`Đã xóa hình ảnh của "${product.name}".`);
+    } catch (removeError) {
+      setError(removeError?.message || "Không thể xóa hình ảnh sản phẩm.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleCopyProductImage = async (product) => {
     try {
       await copyTextToClipboard(product.image);
@@ -618,6 +717,33 @@ const AdminImageManagementPage = () => {
                         >
                           <FiExternalLink />
                         </a>
+
+                        <label
+                          className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                          title="Đổi ảnh sản phẩm"
+                        >
+                          <FiUpload />
+
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={busy}
+                            onChange={(event) =>
+                              handleReplaceProductImage(product, event)
+                            }
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductImage(product)}
+                          disabled={busy}
+                          className="inline-flex items-center justify-center rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Xóa ảnh sản phẩm"
+                        >
+                          <FiTrash2 />
+                        </button>
                       </div>
 
                       <p className="mt-2 break-all text-[10px] leading-4 text-gray-400">

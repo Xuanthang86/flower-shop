@@ -16,7 +16,7 @@ export const getSiteTagline = (settings) =>
   String(settings?.branding?.tagline || "Fresh Flower Everyday").trim();
 
 export const getEmailDomain = (settings) =>
-  String(settings?.branding?.emailDomain || "hth.flowershop.vn")
+  String(settings?.branding?.emailDomain || "hthflowershop.vn")
     .trim()
     .replace(/^@+/, "");
 
@@ -943,6 +943,22 @@ const mergeSettings = (input = {}) => {
     ...defaults.branding,
     ...(source.branding || {}),
   };
+
+  const normalizedEmailDomain = String(
+    branding.emailDomain || defaults.branding.emailDomain
+  )
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
+
+  if (
+    normalizedEmailDomain === "flowershop.vn" ||
+    normalizedEmailDomain === "hth.flowershop.vn"
+  ) {
+    branding.emailDomain = defaults.branding.emailDomain;
+  } else {
+    branding.emailDomain = normalizedEmailDomain;
+  }
 
   const seo = {
     ...defaults.seo,

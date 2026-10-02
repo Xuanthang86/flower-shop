@@ -18,8 +18,8 @@ router.post(
   "/register",
   body("email").isEmail().withMessage("Email không hợp lệ."),
   body("password")
-    .isLength({ min: 6 })
-    .withMessage("Mật khẩu tối thiểu 6 ký tự."),
+    .isLength({ min: 8 })
+    .withMessage("Mật khẩu tối thiểu 8 ký tự."),
   validate,
   async (req, res, next) => {
     try {
