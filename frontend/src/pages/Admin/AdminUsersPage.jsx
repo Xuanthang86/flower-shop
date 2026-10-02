@@ -27,7 +27,7 @@ import {
   useAuth,
 } from "@/context/AuthContext";
 
-const EMAIL_DOMAIN = "@flowershop.vn";
+const EMAIL_DOMAIN = "@hthflowershop.vn";
 
 const EMPTY_FORM = {
   name: "",

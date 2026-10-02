@@ -416,6 +416,32 @@ const AdminOrderDetailPage = () => {
                 >
                   {getPaymentStatusLabel(paymentStatus)}
                 </span>
+
+                {Number(order.paymentDepositPercent) === 50 && (
+                  <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-sm text-gray-600">
+                          Đã thanh toán
+                        </span>
+
+                        <span className="text-sm font-semibold text-green-600">
+                          {formatCurrency(order.paymentDepositAmount)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-sm text-gray-600">
+                          Còn lại khi nhận hoa
+                        </span>
+
+                        <span className="text-sm font-semibold text-gray-800">
+                          {formatCurrency(order.paymentRemainingAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

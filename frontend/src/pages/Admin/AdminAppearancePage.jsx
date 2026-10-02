@@ -169,6 +169,17 @@ const AdminAppearancePage = () => {
     }));
   };
 
+  const updateFooter = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+
+      footer: {
+        ...(current.footer || {}),
+        [field]: value,
+      },
+    }));
+  };
+
   const handleSave = () => {
     if (
       !isHex(draftTheme.primaryColor) ||
@@ -936,6 +947,80 @@ const AdminAppearancePage = () => {
               Lưu thiết lập giao diện
             </button>
           </div>
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold">Footer</h2>
+
+            <p className="mt-2 text-sm text-gray-500">
+              Cấu hình thông tin bản quyền hiển thị ở cuối website. Năm hiện tại
+              sẽ tự động cập nhật.
+            </p>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Năm bắt đầu bản quyền
+                </label>
+
+                <input
+                  type="number"
+                  min="1900"
+                  max="9999"
+                  value={settings.footer?.copyrightStartYear ?? 2026}
+                  onChange={(event) =>
+                    updateFooter(
+                      "copyrightStartYear",
+                      Number(event.target.value)
+                    )
+                  }
+                  className={inputClass}
+                />
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Ví dụ: nhập năm 2026. Khi sang năm mới website sẽ tự hiển thị
+                  2026 - năm hiện tại.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Nội dung bản quyền
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    settings.footer?.copyrightText || "All Rights Reserved."
+                  }
+                  onChange={(event) =>
+                    updateFooter("copyrightText", event.target.value)
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Xem trước</p>
+
+              <p className="mt-2 text-sm font-semibold text-gray-800">
+                ©{" "}
+                {(() => {
+                  const currentYear = new Date().getFullYear();
+
+                  const startYear = Math.max(
+                    1900,
+                    Number(settings.footer?.copyrightStartYear) || currentYear
+                  );
+
+                  return startYear < currentYear
+                    ? `${startYear} - ${currentYear}`
+                    : String(currentYear);
+                })()}{" "}
+                {settings.name || settings.shopName || "HTH Flower Shop"}.{" "}
+                {settings.footer?.copyrightText || "All Rights Reserved."}
+              </p>
+            </div>
+          </section>
         </div>
       </div>
     </main>
