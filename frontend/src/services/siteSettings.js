@@ -528,7 +528,8 @@ export const DEFAULT_SITE_SETTINGS = {
   customerLogos: [],
 
   footer: {
-    copyright: "© 2026 HTH Flower Shop. All Rights Reserved.",
+    copyrightStartYear: 2026,
+    copyrightText: "All Rights Reserved.",
   },
 
   shipping: {

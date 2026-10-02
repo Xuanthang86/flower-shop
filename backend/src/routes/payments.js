@@ -38,6 +38,7 @@ router.post("/intents", async (req, res, next) => {
     const intent = await createIntent({
       orderId: req.body.orderId,
       amount: req.body.amount,
+      depositPercent: req.body.depositPercent,
     });
     res.status(201).json({
       success: true,
@@ -47,6 +48,7 @@ router.post("/intents", async (req, res, next) => {
         amount: intent.amount,
         currency: intent.currency,
         status: intent.status,
+        depositPercent: intent.depositPercent,
         expiresAt: intent.expiresAt,
       },
     });

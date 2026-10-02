@@ -12,6 +12,11 @@ const paymentIntentSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     currency: { type: String, default: "VND" },
     paymentMethod: { type: String, default: "bank_transfer" },
+    depositPercent: {
+      type: Number,
+      enum: [50, 100],
+      default: 100,
+    },
     status: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"],
@@ -37,15 +42,10 @@ const PaymentIntent =
   mongoose.models.PaymentIntent ||
   mongoose.model("PaymentIntent", paymentIntentSchema);
 
-const createIntent = async ({ orderId, amount }) => {
+const createIntent = async ({ orderId, amount, depositPercent = 100 }) => {
   const numericAmount = Math.round(Number(amount) || 0);
 
-  if (!orderId) {
-    throw Object.assign(
-      new Error("Payment Intent phải được liên kết với đơn hàng."),
-      { status: 400 },
-    );
-  }
+  const normalizedDepositPercent = Number(depositPercent) === 50 ? 50 : 100;
 
   if (numericAmount <= 0) {
     throw Object.assign(new Error("Số tiền thanh toán không hợp lệ."), {
@@ -53,78 +53,75 @@ const createIntent = async ({ orderId, amount }) => {
     });
   }
 
-  const order = await Order.findById(orderId);
+  const existingIntent = await PaymentIntent.findOne({
+    orderCode: {
+      $regex: /^HTH\d{6}-\d{4}$/,
+      $options: "i",
+    },
+  }).sort({ createdAt: -1 });
 
-  if (!order) {
-    throw Object.assign(
-      new Error("Không tìm thấy đơn hàng để tạo Payment Intent."),
-      { status: 404 },
-    );
-  }
+  let orderCode;
 
-  if (Number(order.grandTotal) !== numericAmount) {
-    throw Object.assign(
-      new Error("Số tiền Payment Intent không khớp với đơn hàng."),
-      { status: 400 },
-    );
-  }
+  if (orderId) {
+    const order = await Order.findById(orderId);
 
-  let payment = await Payment.findOne({
-    orderId: order._id,
-  });
-
-  if (!payment) {
-    payment = await Payment.create({
-      orderId: order._id,
-      provider: "",
-      method: order.paymentMethod || "bank_transfer",
-      amount: numericAmount,
-      currency: "VND",
-      status: "pending",
-    });
-  }
-
-  let intent = await PaymentIntent.findOne({
-    orderId: order._id,
-  });
-
-  if (intent) {
-    if (String(order.paymentId || "") !== String(payment._id)) {
-      order.paymentId = payment._id;
+    if (!order) {
+      throw Object.assign(new Error("Không tìm thấy đơn hàng."), {
+        status: 404,
+      });
     }
 
-    if (order.paymentIntentId !== intent.intentId) {
-      order.paymentIntentId = intent.intentId;
-    }
-
-    await order.save();
-
-    if (payment.paymentIntentId !== intent.intentId) {
-      payment.paymentIntentId = intent.intentId;
-      await payment.save();
-    }
-
-    return intent.toObject();
+    orderCode = order.orderCode;
   }
 
-  intent = await PaymentIntent.create({
+  if (!orderCode) {
+    const d = new Date();
+
+    const prefix = `HTH${String(d.getFullYear()).slice(-2)}${String(
+      d.getMonth() + 1,
+    ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+
+    for (let i = 0; i < 100; i += 1) {
+      const candidate = `${prefix}-${String(
+        crypto.randomInt(0, 10000),
+      ).padStart(4, "0")}`;
+
+      const exists = await PaymentIntent.exists({
+        orderCode: candidate,
+      });
+
+      if (!exists) {
+        orderCode = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!orderCode) {
+    throw new Error("Không thể tạo mã thanh toán.");
+  }
+
+  const intent = await PaymentIntent.create({
     intentId: crypto.randomUUID(),
-    orderId: order._id,
-    orderCode: order.orderCode,
-    reference: order.orderCode,
+
+    orderCode,
+
+    reference: orderCode,
+
     amount: numericAmount,
+
     currency: "VND",
-    paymentMethod: order.paymentMethod || "bank_transfer",
+
+    paymentMethod: "bank_transfer",
+
+    depositPercent: normalizedDepositPercent,
+
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+
     status: "pending",
+
+    orderId: orderId || null,
   });
-
-  order.paymentId = payment._id;
-  order.paymentIntentId = intent.intentId;
-  await order.save();
-
-  payment.paymentIntentId = intent.intentId;
-  await payment.save();
 
   return intent.toObject();
 };
@@ -136,6 +133,7 @@ const serializeIntent = (intent) => ({
   amount: intent.amount,
   currency: intent.currency,
   status: intent.status,
+  depositPercent: Number(intent.depositPercent) === 50 ? 50 : 100,
   expiresAt: intent.expiresAt,
   paidAt: intent.paidAt || null,
   paymentAttemptedAt: intent.paymentAttemptedAt || null,
@@ -187,7 +185,7 @@ const applySePayWebhook = async (payload) => {
   const amount = Number(payload?.transferAmount ?? payload?.amount ?? 0);
   const transferType = String(payload?.transferType || "").toLowerCase();
 
-  const match = content.match(/FS-\d{8}-\d{4,12}/i);
+  const match = content.match(/HTH\d{6}-\d{4}/i);
   const orderCode = match?.[0] || String(payload?.code || "").trim();
 
   const intent = orderCode
@@ -253,7 +251,8 @@ const applySePayWebhook = async (payload) => {
 
   const order = await Order.findOne({ orderCode: intent.orderCode });
   if (order) {
-    order.paymentStatus = "paid";
+    order.paymentStatus =
+      Number(intent.depositPercent) === 50 ? "partially_paid" : "paid";
     order.paymentIntentId = intent.intentId;
 
     const payment = await Payment.findOne({

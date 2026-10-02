@@ -33,7 +33,7 @@ const RegisterPage = () => {
     setSuccess("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError("");
@@ -54,7 +54,7 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const result = register({
+      const result = await register({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,

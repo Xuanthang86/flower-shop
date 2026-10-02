@@ -161,6 +161,24 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    paymentDepositPercent: {
+      type: Number,
+      enum: [50, 100],
+      default: 100,
+    },
+
+    paymentDepositAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    paymentRemainingAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     couponCode: {
       type: String,
       default: "",
@@ -174,7 +192,14 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "refunded", "cancelled"],
+      enum: [
+        "pending",
+        "partially_paid",
+        "paid",
+        "failed",
+        "refunded",
+        "cancelled",
+      ],
       default: "pending",
       index: true,
     },

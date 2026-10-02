@@ -250,7 +250,7 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleCreate = (event) => {
+  const handleCreate = async (event) => {
     event.preventDefault();
 
     clearMessages();
@@ -292,7 +292,7 @@ const AdminUsersPage = () => {
     setSubmitting(true);
 
     try {
-      const result = createUser({
+      const result = await createUser({
         name: formData.name.trim(),
         email: `${formData.emailPrefix.trim().toLowerCase()}${EMAIL_DOMAIN}`,
         phone: formData.phone.trim(),
@@ -339,7 +339,7 @@ const AdminUsersPage = () => {
     setEditForm(EMPTY_FORM);
   };
 
-  const handleUpdate = (event) => {
+  const handleUpdate = async (event) => {
     event.preventDefault();
 
     clearMessages();
@@ -361,7 +361,7 @@ const AdminUsersPage = () => {
     setSubmitting(true);
 
     try {
-      const result = updateUser(editingUser.id, {
+      const result = await updateUser(editingUser.id, {
         name: editForm.name.trim(),
         phone: editForm.phone.trim(),
         role: editingUser.role === ROLES.ADMIN ? ROLES.ADMIN : editForm.role,
@@ -380,7 +380,7 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleDelete = (account) => {
+  const handleDelete = async (account) => {
     clearMessages();
 
     if (account.id === user.id) {
@@ -403,7 +403,7 @@ const AdminUsersPage = () => {
       return;
     }
 
-    const result = deleteUser(account.id);
+    const result = await deleteUser(account.id);
 
     if (!result.success) {
       setError(result.message);
@@ -412,7 +412,7 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleToggle = (account) => {
+  const handleToggle = async (account) => {
     clearMessages();
 
     if (account.id === user.id) {
@@ -425,7 +425,7 @@ const AdminUsersPage = () => {
       return;
     }
 
-    const result = toggleUserDisabled(account.id);
+    const result = await toggleUserDisabled(account.id);
 
     if (!result.success) {
       setError(result.message);
@@ -457,7 +457,7 @@ const AdminUsersPage = () => {
     setShowResetPassword(false);
   };
 
-  const handleReset = (event) => {
+  const handleReset = async (event) => {
     event.preventDefault();
 
     clearMessages();
@@ -473,7 +473,7 @@ const AdminUsersPage = () => {
       return;
     }
 
-    const result = resetUserPassword(resetPasswordUser.id, resetPassword);
+    const result = await resetUserPassword(resetPasswordUser.id, resetPassword);
 
     if (!result.success) {
       setError(result.message);

@@ -38,7 +38,10 @@ const request = async (path, options = {}) => {
   return payload;
 };
 
-export const createBankTransferPaymentIntent = async ({ amount }) => {
+export const createBankTransferPaymentIntent = async ({
+  amount,
+  depositPercent = 100,
+}) => {
   const numericAmount = Number(amount) || 0;
 
   if (numericAmount <= 0) {
@@ -49,7 +52,9 @@ export const createBankTransferPaymentIntent = async ({ amount }) => {
     method: "POST",
 
     body: JSON.stringify({
-      amount: Math.round(numericAmount),
+      amount: Math.round(Number(amount) || 0),
+
+      depositPercent: Number(depositPercent) === 50 ? 50 : 100,
     }),
   });
 };

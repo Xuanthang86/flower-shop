@@ -295,6 +295,21 @@ const AdminContentManagementPage = () => {
     saveSettings(settings, "Đã lưu nội dung trang chủ.");
   };
 
+  const updateFooter = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+
+      footer: {
+        ...(current.footer || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveFooter = () => {
+    saveSettings(settings, "Đã lưu thông tin Footer.");
+  };
+
   const getBlogEditorHtml = () => {
     const editor = blogEditorRef.current;
 
@@ -841,6 +856,102 @@ const AdminContentManagementPage = () => {
               >
                 <FiSave />
                 Lưu nội dung trang chủ
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Footer website
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                Thiết lập năm bắt đầu bản quyền và nội dung hiển thị ở Footer.
+                Năm hiện tại sẽ được hệ thống tự động cập nhật.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="footer-copyright-start-year"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Năm bắt đầu bản quyền
+                </label>
+
+                <input
+                  id="footer-copyright-start-year"
+                  type="number"
+                  min="1900"
+                  max="2100"
+                  value={settings.footer?.copyrightStartYear || 2026}
+                  onChange={(event) =>
+                    updateFooter(
+                      "copyrightStartYear",
+                      Number(event.target.value) || 2026
+                    )
+                  }
+                  className={inputClass}
+                />
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Ví dụ: nhập 2026. Năm 2026 hiển thị © 2026, năm 2027 tự động
+                  hiển thị © 2026 - 2027.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="footer-copyright-text"
+                  className="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Nội dung sau tên thương hiệu
+                </label>
+
+                <input
+                  id="footer-copyright-text"
+                  type="text"
+                  value={
+                    settings.footer?.copyrightText || "All Rights Reserved."
+                  }
+                  onChange={(event) =>
+                    updateFooter("copyrightText", event.target.value)
+                  }
+                  className={inputClass}
+                  placeholder="All Rights Reserved."
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-700">Xem trước</p>
+
+              <p className="mt-2 text-sm text-gray-600">
+                ©{" "}
+                {(() => {
+                  const currentYear = new Date().getFullYear();
+                  const startYear =
+                    Number(settings.footer?.copyrightStartYear) || 2026;
+
+                  return startYear < currentYear
+                    ? `${startYear} - ${currentYear}`
+                    : currentYear;
+                })()}{" "}
+                {settings.branding?.siteName || "HTH Flower Shop"}.{" "}
+                {settings.footer?.copyrightText || "All Rights Reserved."}
+              </p>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={saveFooter}
+                className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-7 py-3 font-semibold text-white shadow-sm transition hover:bg-pink-700"
+              >
+                <FiSave />
+                Lưu Footer
               </button>
             </div>
           </section>

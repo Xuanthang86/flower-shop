@@ -62,6 +62,21 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    resetCodeHash: {
+      type: String,
+      default: "",
+    },
+
+    resetCodeExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    resetRequestedAt: {
+      type: Date,
+      default: null,
+    },
+
     lastLoginAt: {
       type: Date,
       default: null,

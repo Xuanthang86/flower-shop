@@ -15,6 +15,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const GOOGLE_SCRIPT_URL = "https://accounts.google.com/gsi/client";
 
+const REMEMBER_EMAIL_KEY = "flower-shop-remember-email";
+
 const LoginPage = () => {
   const navigate = useNavigate();
 
@@ -23,9 +25,13 @@ const LoginPage = () => {
   const { login, loginWithGoogle } = useAuth();
 
   const [formData, setFormData] = useState({
-    email: "",
+    email: localStorage.getItem(REMEMBER_EMAIL_KEY) || "",
     password: "",
   });
+
+  const [rememberAccount, setRememberAccount] = useState(
+    Boolean(localStorage.getItem(REMEMBER_EMAIL_KEY))
+  );
 
   const [error, setError] = useState("");
 
@@ -191,6 +197,12 @@ const LoginPage = () => {
     try {
       const result = await login(email, password);
 
+      if (rememberAccount) {
+        localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+      } else {
+        localStorage.removeItem(REMEMBER_EMAIL_KEY);
+      }
+
       if (!result || result.success !== true) {
         setError(
           result?.message ||
@@ -285,6 +297,27 @@ const LoginPage = () => {
                 disabled={loading}
               />
             </div>
+
+            <div className="mb-5 text-right">
+              <Link
+                to="/forgot-password"
+                className="text-sm font-semibold text-pink-600 hover:text-pink-700"
+              >
+                Quên mật khẩu?
+              </Link>
+            </div>
+
+            <label className="mb-5 flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={rememberAccount}
+                onChange={(event) => setRememberAccount(event.target.checked)}
+                disabled={loading}
+                className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+              />
+
+              <span>Ghi nhớ tài khoản</span>
+            </label>
 
             <button
               type="submit"

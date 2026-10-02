@@ -5,6 +5,9 @@ const {
   login,
   upsertGoogleUser,
   sanitizeUser,
+  changePassword,
+  requestPasswordReset,
+  resetPassword,
 } = require("../services/authService");
 const requireAuth = require("../middleware/auth");
 const validate = require("../middleware/validate");
@@ -103,6 +106,55 @@ router.post("/google", async (req, res, next) => {
     res.json({
       success: true,
       user: result.user,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/password", requireAuth, async (req, res, next) => {
+  try {
+    const result = await changePassword({
+      userId: req.user._id,
+      currentPassword: req.body?.currentPassword,
+      newPassword: req.body?.newPassword,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password/request", async (req, res, next) => {
+  try {
+    const result = await requestPasswordReset({
+      identifier: req.body?.identifier,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password/reset", async (req, res, next) => {
+  try {
+    const result = await resetPassword({
+      identifier: req.body?.identifier,
+      code: req.body?.code,
+      newPassword: req.body?.newPassword,
+    });
+
+    res.json({
+      success: true,
+      ...result,
     });
   } catch (error) {
     next(error);

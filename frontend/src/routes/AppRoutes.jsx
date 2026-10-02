@@ -18,6 +18,7 @@ import ContactPage from "@/pages/Contact/ContactPage";
 
 import LoginPage from "@/components/auth/LoginPage";
 import RegisterPage from "@/components/auth/RegisterPage";
+import ForgotPasswordPage from "@/pages/Login/ForgotPasswordPage";
 
 import CheckoutPage from "@/pages/Checkout/CheckoutPage";
 import OrderSuccessPage from "@/pages/OrderSuccess/OrderSuccessPage";
@@ -188,6 +189,8 @@ const AppRoutes = () => {
           <Route path="/login" element={<LoginPage />} />
 
           <Route path="/register" element={<RegisterPage />} />
+
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           <Route
             path="/checkout"

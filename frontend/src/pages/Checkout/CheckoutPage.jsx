@@ -1,4 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+
+import { FiCheck, FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 
 import { formatCouponDiscount, validateCoupon } from "@/services/coupon";
@@ -83,6 +85,59 @@ const formatDeliveryDateDisplay = (dateKey) => {
 };
 
 const CheckoutPage = () => {
+  const copyPaymentValue = async (value, label) => {
+    const text = String(value || "").trim();
+
+    if (!text) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+
+      setPaymentError(`Đã sao chép ${label}.`);
+
+      window.setTimeout(() => {
+        setPaymentError("");
+      }, 1800);
+    } catch {
+      setPaymentError(`Không thể sao chép ${label}.`);
+    }
+  };
+
+  const downloadQrCode = async () => {
+    if (!qrCodeUrl) {
+      return;
+    }
+
+    try {
+      const response = await fetch(qrCodeUrl);
+
+      if (!response.ok) {
+        throw new Error("Không thể tải mã QR.");
+      }
+
+      const blob = await response.blob();
+
+      const objectUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+
+      link.href = objectUrl;
+
+      link.download = `${paymentIntent?.orderCode || "HTH"}-QR.png`;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(qrCodeUrl, "_blank", "noopener,noreferrer");
+    }
+  };
   const navigate = useNavigate();
 
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -1954,14 +2009,32 @@ const CheckoutPage = () => {
                               </span>
                             </div>
 
-                            <div className="flex justify-between gap-4">
+                            <div className="flex items-center justify-between gap-4">
                               <span className="text-gray-600">
                                 Số tài khoản
                               </span>
 
-                              <span className="text-right font-medium text-gray-800">
-                                {paymentSettings?.bankTransfer?.accountNumber}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-right font-medium text-gray-800">
+                                  {paymentSettings?.bankTransfer?.accountNumber}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    copyPaymentValue(
+                                      paymentSettings?.bankTransfer
+                                        ?.accountNumber,
+                                      "số tài khoản"
+                                    )
+                                  }
+                                  className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-pink-300 hover:text-pink-600"
+                                  title="Sao chép số tài khoản"
+                                  aria-label="Sao chép số tài khoản"
+                                >
+                                  <FiCopy />
+                                </button>
+                              </div>
                             </div>
 
                             <div className="flex justify-between gap-4">
@@ -1990,14 +2063,31 @@ const CheckoutPage = () => {
                               </span>
                             </div>
 
-                            <div className="flex justify-between gap-4">
+                            <div className="flex items-start justify-between gap-4">
                               <span className="text-gray-600">
                                 Nội dung chuyển khoản
                               </span>
 
-                              <span className="text-right font-semibold text-gray-800">
-                                {transferContent}
-                              </span>
+                              <div className="flex items-start gap-2">
+                                <span className="break-all text-right font-semibold text-gray-800">
+                                  {transferContent}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    copyPaymentValue(
+                                      transferContent,
+                                      "nội dung chuyển khoản"
+                                    )
+                                  }
+                                  className="shrink-0 rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-pink-300 hover:text-pink-600"
+                                  title="Sao chép nội dung chuyển khoản"
+                                  aria-label="Sao chép nội dung chuyển khoản"
+                                >
+                                  <FiCopy />
+                                </button>
+                              </div>
                             </div>
 
                             <div className="rounded-lg border border-blue-200 bg-white p-3 text-sm leading-6 text-gray-700">
@@ -2012,6 +2102,15 @@ const CheckoutPage = () => {
                                 alt="Mã QR thanh toán"
                                 className="h-64 w-64 object-contain"
                               />
+                              <button
+                                type="button"
+                                onClick={downloadQrCode}
+                                disabled={!qrCodeUrl}
+                                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-pink-200 bg-white px-4 py-2 text-sm font-semibold text-pink-600 transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <FiDownload />
+                                Tải mã QR về máy
+                              </button>
 
                               <p className="mt-2 text-center text-xs text-gray-500">
                                 Quét mã QR để thanh toán

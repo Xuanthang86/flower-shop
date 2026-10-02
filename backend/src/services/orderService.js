@@ -6,13 +6,44 @@ const Coupon = require("../models/Coupon");
 const Payment = require("../models/Payment");
 const User = require("../models/User");
 
-const generateOrderCode = async () => {
-  const d = new Date();
-  const prefix = `FS-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  for (let i = 0; i < 30; i += 1) {
-    const code = `${prefix}-${String(crypto.randomInt(0, 1000000)).padStart(6, "0")}`;
-    if (!(await Order.exists({ orderCode: code }))) return code;
+const generateOrderCode = async (preferredCode = "") => {
+  const normalizedPreferred = String(preferredCode || "")
+    .trim()
+    .toUpperCase();
+
+  if (normalizedPreferred) {
+    const exists = await Order.exists({
+      orderCode: normalizedPreferred,
+    });
+
+    if (!exists) {
+      return normalizedPreferred;
+    }
+
+    throw Object.assign(new Error("Mã đơn hàng đã tồn tại."), { status: 409 });
   }
+
+  const d = new Date();
+
+  const prefix = `HTH${String(d.getFullYear()).slice(-2)}${String(
+    d.getMonth() + 1,
+  ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+
+  for (let i = 0; i < 100; i += 1) {
+    const code = `${prefix}-${String(crypto.randomInt(0, 10000)).padStart(
+      4,
+      "0",
+    )}`;
+
+    if (
+      !(await Order.exists({
+        orderCode: code,
+      }))
+    ) {
+      return code;
+    }
+  }
+
   throw new Error("Không thể tạo mã đơn hàng duy nhất.");
 };
 
@@ -114,10 +145,32 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
 
 const create = async ({ payload, user }) => {
   const calculation = await calculateOrder(payload);
-  const orderCode = await generateOrderCode();
+  const orderCode = await generateOrderCode(payload.orderCode);
   const customer = user ? await User.findById(user._id).lean() : null;
 
   const recipient = payload.recipient || payload.address || {};
+  const paymentDepositPercent =
+    Number(payload.paymentDepositPercent) === 50 ? 50 : 100;
+
+  const paymentDepositAmount = Math.round(
+    Number(payload.paymentDepositAmount) ||
+      (calculation.grandTotal * paymentDepositPercent) / 100,
+  );
+
+  const paymentRemainingAmount = Math.max(
+    0,
+    calculation.grandTotal - paymentDepositAmount,
+  );
+
+  const paymentIsBankTransfer =
+    String(payload.paymentMethod || "") === "bank_transfer";
+
+  const requestedPaymentStatus =
+    paymentIsBankTransfer && paymentDepositPercent === 50
+      ? "partially_paid"
+      : paymentIsBankTransfer
+        ? "paid"
+        : "pending";
   const order = await Order.create({
     orderCode,
     customerId: user?._id || null,
@@ -149,6 +202,15 @@ const create = async ({ payload, user }) => {
     deliveryDate: payload.deliveryDate || null,
     deliveryTimeSlot: String(payload.deliveryTimeSlot || "").trim(),
     notes: String(payload.notes || "").trim(),
+    paymentStatus: requestedPaymentStatus,
+
+    paymentDepositPercent,
+
+    paymentDepositAmount,
+
+    paymentRemainingAmount,
+
+    paymentIntentId: String(payload.paymentIntentId || "").trim(),
   });
 
   if (calculation.coupon) {
@@ -167,11 +229,22 @@ const create = async ({ payload, user }) => {
 
   const payment = await Payment.create({
     orderId: order._id,
+
     provider: String(payload.paymentProvider || "").trim(),
+
     method: String(payload.paymentMethod || "").trim(),
-    amount: calculation.grandTotal,
+
+    amount: paymentDepositAmount,
+
     currency: "VND",
-    status: "pending",
+
+    status: paymentIsBankTransfer ? "paid" : "pending",
+
+    transactionId: String(payload.paymentTransactionId || "").trim(),
+
+    paidAt: paymentIsBankTransfer ? new Date() : null,
+
+    paymentIntentId: String(payload.paymentIntentId || "").trim(),
   });
 
   await Order.updateOne(
