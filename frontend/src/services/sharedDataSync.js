@@ -433,10 +433,11 @@ const pullSnapshot = async () => {
       ? new Date(payload.updatedAt).getTime()
       : 0;
 
-    const localTime = readLastSyncedAt();
-
     /*
      * BACKWARD COMPATIBILITY
+     *
+     * Một số phiên bản backend cũ có thể trả blogPosts
+     * ở root-level thay vì snapshot.blogPosts.
      */
     const snapshot = {
       ...payload.snapshot,
@@ -450,50 +451,186 @@ const pullSnapshot = async () => {
 
     /*
      * Nếu server không có blog field:
-     * không coi là [].
+     * tuyệt đối không coi là [].
+     *
+     * Điều này tránh việc backend cũ làm mất
+     * dữ liệu blog hiện tại của browser.
      */
     if (!Array.isArray(snapshot.blogPosts)) {
       delete snapshot.blogPosts;
     }
 
     /*
-     * Timestamp chỉ được dùng để bỏ qua
-     * snapshot thực sự cũ.
+     * ========================================================
+     * BLOG ĐƯỢC ĐỒNG BỘ ĐỘC LẬP VỚI SNAPSHOT TIMESTAMP
+     * ========================================================
      *
-     * Blog vẫn được bảo vệ bằng merge.
-     */
-    if (serverTime && localTime && serverTime <= localTime) {
-      return;
-    }
-
-    await applySnapshot(snapshot, payload.updatedAt);
-
-    /*
-     * Sau khi merge local + remote,
-     * push lại snapshot hợp nhất.
+     * Đây là điểm sửa quan trọng.
      *
-     * Điều này bảo vệ các bài viết cũ
-     * chưa có trên server.
+     * Không được dùng:
+     *
+     *   serverTime <= localTime
+     *
+     * để bỏ qua toàn bộ snapshot vì Blog có thể chứa
+     * tombstone (status: deleted).
+     *
+     * Browser khác phải luôn có cơ hội merge trạng thái
+     * xóa từ MongoDB.
      */
-    const localBlogPosts = readBlogPosts();
-
     const remoteBlogPosts = Array.isArray(snapshot.blogPosts)
       ? snapshot.blogPosts
       : null;
 
-    if (
-      remoteBlogPosts !== null &&
-      localBlogPosts.length > remoteBlogPosts.length
-    ) {
-      localChangeVersion += 1;
+    /*
+     * Chụp dữ liệu blog hiện tại trước khi merge.
+     */
+    const currentBlogPosts = readBlogPosts();
 
-      schedulePush();
+    /*
+     * Merge local + remote.
+     *
+     * mergeBlogPosts() đã có quy tắc:
+     *
+     * deleted > active
+     *
+     * nên tombstone từ MongoDB không bị bài viết cũ
+     * ở browser khác ghi đè lại.
+     */
+    let mergedBlogPosts = currentBlogPosts;
+
+    if (remoteBlogPosts !== null) {
+      mergedBlogPosts = mergeBlogPosts(currentBlogPosts, remoteBlogPosts);
+    }
+
+    /*
+     * ========================================================
+     * CÁC DOMAIN KHÁC
+     * ========================================================
+     *
+     * Products / Categories / Settings vẫn sử dụng
+     * timestamp để tránh nhận snapshot cũ.
+     *
+     * Blog đã được xử lý riêng ở trên.
+     */
+    const localTime = readLastSyncedAt();
+
+    const shouldApplyGeneralSnapshot =
+      !serverTime || !localTime || serverTime > localTime;
+
+    if (shouldApplyGeneralSnapshot) {
+      await applySnapshot(snapshot, payload.updatedAt);
+    } else if (remoteBlogPosts !== null) {
+      /*
+       * Snapshot tổng thể không mới hơn,
+       * nhưng Blog vẫn phải được merge.
+       *
+       * applySnapshot() không được gọi ở đây vì nếu gọi,
+       * các domain khác có thể bị ghi lại từ snapshot cũ.
+       */
+      applyingRemote = true;
+
+      try {
+        localStorage.setItem(
+          BLOG_POSTS_STORAGE_KEY,
+          JSON.stringify(mergedBlogPosts)
+        );
+
+        dispatch(BLOG_POSTS_UPDATED_EVENT);
+
+        writeLastSyncedAt(payload.updatedAt || new Date().toISOString());
+      } catch (error) {
+        console.warn("[sharedDataSync] Không thể lưu blog snapshot:", error);
+      } finally {
+        applyingRemote = false;
+      }
+    }
+
+    /*
+     * ========================================================
+     * XÁC ĐỊNH BLOG CÓ CẦN PUSH LẠI KHÔNG
+     * ========================================================
+     *
+     * Không chỉ kiểm tra length.
+     *
+     * Ví dụ:
+     *
+     * local:
+     *   [A deleted]
+     *
+     * remote:
+     *   [A active]
+     *
+     * length vẫn bằng nhau,
+     * nhưng dữ liệu hoàn toàn khác.
+     *
+     * Vì vậy phải so sánh nội dung.
+     */
+
+    if (remoteBlogPosts !== null) {
+      const normalizeForComparison = (posts) =>
+        (Array.isArray(posts) ? posts : [])
+          .map((post) => ({
+            id: String(post?.id || ""),
+            slug: String(post?.slug || ""),
+            status: String(post?.status || ""),
+            isDeleted: post?.isDeleted === true,
+            deletedAt: String(post?.deletedAt || ""),
+            updatedAt: String(post?.updatedAt || ""),
+            title: String(post?.title || ""),
+            content: String(post?.content || ""),
+            image: String(post?.image || ""),
+            categoryId: String(post?.categoryId || ""),
+            publishedAt: String(post?.publishedAt || ""),
+            date: String(post?.date || ""),
+            time: String(post?.time || ""),
+          }))
+          .sort((a, b) => {
+            const identityA = `${a.id}|${a.slug}`;
+            const identityB = `${b.id}|${b.slug}`;
+
+            return identityA.localeCompare(identityB);
+          });
+
+      const mergedComparable = JSON.stringify(
+        normalizeForComparison(mergedBlogPosts)
+      );
+
+      const remoteComparable = JSON.stringify(
+        normalizeForComparison(remoteBlogPosts)
+      );
+
+      /*
+       * Nếu merge tạo ra dữ liệu khác server,
+       * browser này đang có thông tin mà server chưa có
+       * hoặc đang cần cập nhật tombstone.
+       *
+       * Push snapshot hợp nhất trở lại MongoDB.
+       */
+      if (mergedComparable !== remoteComparable) {
+        localChangeVersion += 1;
+
+        schedulePush();
+      }
+    }
+
+    /*
+     * Nếu snapshot tổng thể mới hơn,
+     * applySnapshot() đã ghi sync timestamp.
+     *
+     * Nếu snapshot tổng thể cũ nhưng Blog vẫn được xử lý,
+     * timestamp cũng được cập nhật để tránh vòng lặp pull vô hạn.
+     */
+    if (shouldApplyGeneralSnapshot) {
+      /*
+       * applySnapshot() đã xử lý timestamp.
+       */
+    } else if (remoteBlogPosts !== null && payload.updatedAt) {
+      writeLastSyncedAt(payload.updatedAt);
     }
   } catch (error) {
     console.warn("[sharedDataSync] Pull:", error?.message || error);
   }
 };
-
 /*
  * ============================================================
  * SCHEDULE PUSH
