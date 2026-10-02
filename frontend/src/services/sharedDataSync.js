@@ -54,11 +54,11 @@ const dispatch = (eventName) => {
   window.dispatchEvent(new Event(eventName));
 };
 
-const parseTimestamp = (value) => {
-  const timestamp = value ? new Date(value).getTime() : NaN;
+// const parseTimestamp = (value) => {
+//   const timestamp = value ? new Date(value).getTime() : NaN;
 
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
+//   return Number.isFinite(timestamp) ? timestamp : 0;
+// };
 
 /*
  * ============================================================
@@ -78,94 +78,85 @@ const parseTimestamp = (value) => {
  * Khi cùng một bài có cùng ID:
  * ưu tiên bản có updatedAt mới hơn.
  */
+const getBlogPostIdentity = (post) => {
+  const id = String(post?.id || "").trim();
+
+  if (id) {
+    return `id:${id}`;
+  }
+
+  const slug = String(post?.slug || "")
+    .trim()
+    .toLowerCase();
+
+  if (slug) {
+    return `slug:${slug}`;
+  }
+
+  return "";
+};
+
+const parseTimestamp = (value) => {
+  const timestamp = value ? new Date(value).getTime() : NaN;
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const isDeletedBlogPost = (post) =>
+  Boolean(
+    post?.deletedAt || post?.isDeleted === true || post?.status === "deleted"
+  );
+
 const mergeBlogPosts = (localPosts, remotePosts) => {
   const local = Array.isArray(localPosts) ? localPosts : [];
 
   const remote = Array.isArray(remotePosts) ? remotePosts : [];
 
-  const result = [];
+  const map = new Map();
 
-  const indexByIdentity = new Map();
-
-  const getIdentity = (post) => {
-    const id = String(post?.id || "").trim();
-
-    if (id) {
-      return `id:${id}`;
-    }
-
-    const slug = String(post?.slug || "")
-      .trim()
-      .toLowerCase();
-
-    if (slug) {
-      return `slug:${slug}`;
-    }
-
-    const title = String(post?.title || "")
-      .trim()
-      .toLowerCase();
-
-    if (title) {
-      return `title:${title}`;
-    }
-
-    return "";
-  };
-
-  const addPost = (post, source) => {
+  const addPost = (post) => {
     if (!post || typeof post !== "object") {
       return;
     }
 
-    const identity = getIdentity(post);
+    const identity = getBlogPostIdentity(post);
 
     if (!identity) {
-      result.push(post);
-
       return;
     }
 
-    const existingIndex = indexByIdentity.get(identity);
+    const existing = map.get(identity);
 
-    if (existingIndex === undefined) {
-      indexByIdentity.set(identity, result.length);
-
-      result.push(post);
-
+    if (!existing) {
+      map.set(identity, post);
       return;
     }
 
-    const existing = result[existingIndex];
-
-    const existingUpdatedAt = parseTimestamp(existing?.updatedAt);
-
-    const nextUpdatedAt = parseTimestamp(post?.updatedAt);
+    const existingUpdatedAt = parseTimestamp(existing.updatedAt);
+    const nextUpdatedAt = parseTimestamp(post.updatedAt);
 
     /*
-     * Nếu cùng bài:
-     * bản cập nhật mới hơn được giữ.
+     * deletedAt là trạng thái ưu tiên cao hơn
+     * nội dung bài viết.
      */
-    if (
-      nextUpdatedAt > existingUpdatedAt ||
-      (nextUpdatedAt === existingUpdatedAt && source === "remote")
-    ) {
-      result[existingIndex] = post;
+    if (isDeletedBlogPost(post) && !isDeletedBlogPost(existing)) {
+      map.set(identity, post);
+      return;
+    }
+
+    if (isDeletedBlogPost(existing) && !isDeletedBlogPost(post)) {
+      return;
+    }
+
+    if (nextUpdatedAt >= existingUpdatedAt) {
+      map.set(identity, post);
     }
   };
 
-  /*
-   * Local trước để không làm mất dữ liệu
-   * đang có trên browser.
-   */
-  local.forEach((post) => addPost(post, "local"));
+  local.forEach(addPost);
+  remote.forEach(addPost);
 
-  /*
-   * Sau đó merge remote.
-   */
-  remote.forEach((post) => addPost(post, "remote"));
-
-  return result;
+  return Array.from(map.values());
 };
 
 /*

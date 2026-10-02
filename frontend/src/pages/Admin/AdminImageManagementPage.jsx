@@ -696,15 +696,15 @@ const AdminImageManagementPage = () => {
                         )}
                       </p>
 
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2">
                         <button
                           type="button"
                           onClick={() => handleCopyProductImage(product)}
-                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-pink-100 bg-pink-50 px-2.5 py-2 text-xs font-semibold text-pink-700 hover:bg-pink-100"
+                          className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-pink-100 bg-pink-50 px-2 py-2 text-[11px] font-semibold leading-none text-pink-700 hover:bg-pink-100"
                           title="Sao chép URL ảnh"
                         >
-                          <FiCopy />
-                          Sao chép URL
+                          <FiCopy className="shrink-0" />
+                          <span className="truncate">Sao chép URL</span>
                         </button>
 
                         <a

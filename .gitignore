@@ -20,3 +20,14 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# MongoDB Compass saved connections
+mongodb/*.json
+
+# Bulk staff credentials
+backend/scripts/bulk-staff.json
+
+# Local environment files
+backend/.env
+frontend/.env
+frontend/.env.local
