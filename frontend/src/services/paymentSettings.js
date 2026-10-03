@@ -39,16 +39,6 @@ const normalizeSettings = (value = {}) => ({
   },
 });
 
-const normalizeApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-  const base = String(configured).replace(/\/+$/, "");
-
-  return base.endsWith("/api") ? base : `${base}/api`;
-};
-
-const API_BASE_URL = normalizeApiBaseUrl();
-
 const readStoredPaymentSettings = () => {
   try {
     const raw = localStorage.getItem(PAYMENT_SETTINGS_STORAGE_KEY);
@@ -101,7 +91,11 @@ const syncPaymentSettingsToBackend = async (paymentSettings) => {
   } catch (error) {
     throw new Error(
       error?.response?.data?.message ||
-        "Không thể đọc cấu hình website từ backend."
+        error?.message ||
+        "Không thể đọc cấu hình website từ backend.",
+      {
+        cause: error,
+      }
     );
   }
 
@@ -147,7 +141,10 @@ const syncPaymentSettingsToBackend = async (paymentSettings) => {
     throw new Error(
       error?.response?.data?.message ||
         error?.message ||
-        "Không thể đồng bộ cấu hình thanh toán với backend."
+        "Không thể đồng bộ cấu hình thanh toán với backend.",
+      {
+        cause: error,
+      }
     );
   }
 
