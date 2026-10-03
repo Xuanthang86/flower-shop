@@ -13,6 +13,61 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({ success: true, user: sanitizeUser(req.user) });
 });
 
+router.get("/me/cart", requireAuth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select("cart").lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy tài khoản.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      cart: Array.isArray(user.cart) ? user.cart : [],
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/me/cart", requireAuth, async (req, res, next) => {
+  try {
+    const cart = Array.isArray(req.body?.cart) ? req.body.cart : [];
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          cart,
+        },
+      },
+      {
+        new: true,
+        runValidators: false,
+      },
+    )
+      .select("cart")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy tài khoản.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      cart: Array.isArray(user.cart) ? user.cart : [],
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch("/me", requireAuth, async (req, res, next) => {
   try {
     const updates = {};

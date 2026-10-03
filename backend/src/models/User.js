@@ -81,6 +81,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    cart: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
   },
   {
     timestamps: true,

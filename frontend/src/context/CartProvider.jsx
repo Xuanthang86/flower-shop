@@ -16,6 +16,8 @@ import {
   getProductById,
 } from "@/services/catalog";
 
+import { getServerCart, saveServerCart } from "@/services/cartApi";
+
 import {
   validateProductQuantity,
   getStockStatusLabel,
@@ -204,17 +206,23 @@ const CartSession = ({ user, products, children }) => {
         return;
       }
 
+      const normalizedItems = Array.isArray(items)
+        ? items.map(normalizeCartItem)
+        : [];
+
       const storageKey = getCartStorageKey(userId);
 
-      if (!storageKey) {
-        return;
+      if (storageKey) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(normalizedItems));
+        } catch (error) {
+          console.error("Lỗi lưu giỏ hàng local:", error);
+        }
       }
 
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(items));
-      } catch (error) {
-        console.error("Lỗi lưu giỏ hàng:", error);
-      }
+      saveServerCart(normalizedItems).catch((error) => {
+        console.error("Không thể đồng bộ giỏ hàng với máy chủ:", error);
+      });
     },
     [userId]
   );
@@ -249,6 +257,75 @@ const CartSession = ({ user, products, children }) => {
 
     persistCart(nextItems);
   }, [userId, products, persistCart]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadServerCart = async () => {
+      try {
+        const serverCart = await getServerCart();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (serverCart.length > 0) {
+          const normalizedServerCart = serverCart.map(normalizeCartItem);
+
+          const nextItems =
+            Array.isArray(products) && products.length > 0
+              ? syncCartWithProducts(normalizedServerCart, products)
+              : normalizedServerCart;
+
+          setCartItems(nextItems);
+
+          const storageKey = getCartStorageKey(userId);
+
+          if (storageKey) {
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(nextItems));
+            } catch (error) {
+              console.error("Không thể cập nhật cache giỏ hàng:", error);
+            }
+          }
+
+          return;
+        }
+
+        /*
+         * Server chưa có cart:
+         * migration cart cũ của trình duyệt hiện tại
+         * lên MongoDB.
+         */
+        const localCart = readCart(userId);
+
+        if (localCart.length > 0) {
+          const normalizedLocalCart = localCart.map(normalizeCartItem);
+
+          const nextItems =
+            Array.isArray(products) && products.length > 0
+              ? syncCartWithProducts(normalizedLocalCart, products)
+              : normalizedLocalCart;
+
+          setCartItems(nextItems);
+
+          await saveServerCart(nextItems);
+        }
+      } catch (error) {
+        console.error("Không thể tải giỏ hàng từ máy chủ:", error);
+      }
+    };
+
+    loadServerCart();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, products]);
 
   /*
   ========================================================
