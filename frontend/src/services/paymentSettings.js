@@ -1,3 +1,5 @@
+import api from "./api";
+
 const PAYMENT_SETTINGS_STORAGE_KEY = "flower-shop-payment-settings";
 
 const VIETQR_BANKS_API_URL = "https://api.vietqr.io/v2/banks";
@@ -90,27 +92,16 @@ const writeStoredPaymentSettings = (settings) => {
 const syncPaymentSettingsToBackend = async (paymentSettings) => {
   const normalized = normalizeSettings(paymentSettings);
 
-  let snapshotResponse;
+  let snapshotPayload;
 
   try {
-    snapshotResponse = await fetch(`${API_BASE_URL}/data/snapshot`, {
-      method: "GET",
+    const response = await api.get("/data/snapshot");
 
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  } catch {
+    snapshotPayload = response.data;
+  } catch (error) {
     throw new Error(
-      "Không thể kết nối backend để đồng bộ cấu hình thanh toán."
-    );
-  }
-
-  const snapshotPayload = await snapshotResponse.json().catch(() => ({}));
-
-  if (!snapshotResponse.ok) {
-    throw new Error(
-      snapshotPayload?.message || "Không thể đọc cấu hình website từ backend."
+      error?.response?.data?.message ||
+        "Không thể đọc cấu hình website từ backend."
     );
   }
 
@@ -134,37 +125,29 @@ const syncPaymentSettingsToBackend = async (paymentSettings) => {
     },
   };
 
-  let saveResponse;
-
   try {
-    saveResponse = await fetch(`${API_BASE_URL}/data/snapshot`, {
-      method: "PUT",
+    const response = await api.put("/data/snapshot", {
+      products: Array.isArray(currentSnapshot.products)
+        ? currentSnapshot.products
+        : [],
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+      categories: Array.isArray(currentSnapshot.categories)
+        ? currentSnapshot.categories
+        : [],
 
-      body: JSON.stringify({
-        products: Array.isArray(currentSnapshot.products)
-          ? currentSnapshot.products
-          : [],
-
-        categories: Array.isArray(currentSnapshot.categories)
-          ? currentSnapshot.categories
-          : [],
-
-        settings: nextSettings,
-      }),
+      settings: nextSettings,
     });
-  } catch {
-    throw new Error("Không thể kết nối backend để lưu cấu hình thanh toán.");
-  }
 
-  const savePayload = await saveResponse.json().catch(() => ({}));
-
-  if (!saveResponse.ok) {
+    if (response.data?.success !== true) {
+      throw new Error(
+        response.data?.message || "Backend không thể lưu cấu hình thanh toán."
+      );
+    }
+  } catch (error) {
     throw new Error(
-      savePayload?.message || "Backend không thể lưu cấu hình thanh toán."
+      error?.response?.data?.message ||
+        error?.message ||
+        "Không thể đồng bộ cấu hình thanh toán với backend."
     );
   }
 
@@ -210,13 +193,7 @@ export const readPaymentSettings = () => {
 };
 
 export const fetchPaymentSettings = async () => {
-  const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
-    method: "GET",
-
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  const { data: payload } = await api.get("/data/snapshot");
 
   const payload = await response.json().catch(() => ({}));
 

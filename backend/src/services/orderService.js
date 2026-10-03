@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 
 const Order = require("../models/Order");
 const Product = require("../models/Product");
@@ -86,9 +87,13 @@ const normalizeItems = (items) => {
   return items.map((item) => {
     const productId = String(item?.productId || item?.id || "").trim();
 
+    const productSlug = String(item?.productSlug || item?.slug || "").trim();
+
+    const productName = String(item?.productName || item?.name || "").trim();
+
     const quantity = Math.floor(Number(item?.quantity) || 0);
 
-    if (!productId) {
+    if (!productId && !productSlug && !productName) {
       throw Object.assign(new Error("Sản phẩm trong đơn hàng không hợp lệ."), {
         status: 400,
       });
@@ -102,6 +107,8 @@ const normalizeItems = (items) => {
 
     return {
       productId,
+      productSlug,
+      productName,
       quantity,
     };
   });
@@ -110,21 +117,88 @@ const normalizeItems = (items) => {
 const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
   const requested = normalizeItems(items);
 
-  const ids = requested.map((item) => item.productId);
+  const validObjectIds = requested
+    .map((item) => item.productId)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  const slugs = requested.map((item) => item.productSlug).filter(Boolean);
+
+  const names = requested.map((item) => item.productName).filter(Boolean);
+
+  const productOrConditions = [];
+
+  if (validObjectIds.length > 0) {
+    productOrConditions.push({
+      _id: {
+        $in: validObjectIds,
+      },
+    });
+  }
+
+  if (slugs.length > 0) {
+    productOrConditions.push({
+      slug: {
+        $in: slugs,
+      },
+    });
+  }
+
+  if (names.length > 0) {
+    productOrConditions.push({
+      name: {
+        $in: names,
+      },
+    });
+  }
+
+  if (productOrConditions.length === 0) {
+    throw Object.assign(
+      new Error("Không xác định được sản phẩm trong giỏ hàng."),
+      {
+        status: 400,
+      },
+    );
+  }
 
   const products = await Product.find({
-    _id: {
-      $in: ids,
-    },
     active: true,
+
+    $or: productOrConditions,
   }).lean();
 
-  const byId = new Map(
-    products.map((product) => [String(product._id), product]),
-  );
+  const byId = new Map();
+
+  const bySlug = new Map();
+
+  const byName = new Map();
+
+  products.forEach((product) => {
+    byId.set(String(product._id), product);
+
+    if (product.slug) {
+      bySlug.set(String(product.slug), product);
+    }
+
+    if (product.name) {
+      byName.set(String(product.name).trim().toLowerCase(), product);
+    }
+  });
 
   const normalizedItems = requested.map((item) => {
-    const product = byId.get(item.productId);
+    let product = null;
+
+    if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
+      product = byId.get(item.productId);
+    }
+
+    if (!product && item.productSlug) {
+      product = bySlug.get(item.productSlug);
+    }
+
+    if (!product && item.productName) {
+      product = byName.get(item.productName.trim().toLowerCase());
+    }
 
     if (!product) {
       throw Object.assign(
@@ -538,7 +612,16 @@ const getById = async (id, user) => {
   return order;
 };
 
-const list = async ({ user, page = 1, limit = 50, status = "" }) => {
+const escapeRegex = (value = "") =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const list = async ({
+  user,
+  page = 1,
+  limit = 50,
+  status = "",
+  search = "",
+}) => {
   const safePage = Math.max(1, Number(page) || 1);
 
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
@@ -551,6 +634,42 @@ const list = async ({ user, page = 1, limit = 50, status = "" }) => {
 
   if (status) {
     filter.status = status;
+  }
+
+  const keyword = String(search || "").trim();
+
+  if (keyword) {
+    const regex = new RegExp(escapeRegex(keyword), "i");
+
+    filter.$or = [
+      {
+        orderCode: regex,
+      },
+
+      {
+        "customerSnapshot.fullName": regex,
+      },
+
+      {
+        "customerSnapshot.phone": regex,
+      },
+
+      {
+        "customerSnapshot.email": regex,
+      },
+
+      {
+        "recipientSnapshot.fullName": regex,
+      },
+
+      {
+        "recipientSnapshot.phone": regex,
+      },
+
+      {
+        "recipientSnapshot.email": regex,
+      },
+    ];
   }
 
   const [items, total] = await Promise.all([
@@ -567,9 +686,14 @@ const list = async ({ user, page = 1, limit = 50, status = "" }) => {
 
   return {
     items,
+
     total,
+
     page: safePage,
+
     limit: safeLimit,
+
+    totalPages: Math.ceil(total / safeLimit),
   };
 };
 

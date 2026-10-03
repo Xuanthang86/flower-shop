@@ -177,7 +177,11 @@ const AdminBlogManagementPage = () => {
 
   const [viewMode, setViewMode] = useState("published");
 
-  const POSTS_PER_PAGE = 9;
+  const [pageSize, setPageSize] = useState(9);
+
+  const DEFAULT_POSTS_PER_PAGE = 9;
+
+  const PAGE_SIZE_OPTIONS = [5, 9, 10, 20, 50, 100];
 
   const blogCategories = Array.isArray(settings.blogCategories)
     ? settings.blogCategories
@@ -802,9 +806,13 @@ const AdminBlogManagementPage = () => {
 
   const totalDraftPosts = draftPosts.length;
 
-  const totalPages = Math.max(1, Math.ceil(totalPosts / POSTS_PER_PAGE));
+  const currentTotal = visiblePosts.length;
 
-  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const totalPages =
+    currentTotal === 0 ? 0 : Math.ceil(currentTotal / pageSize);
+
+  const safeCurrentPage =
+    totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -813,8 +821,8 @@ const AdminBlogManagementPage = () => {
   }, [currentPage, totalPages]);
 
   const paginatedPosts = visiblePosts.slice(
-    (safeCurrentPage - 1) * POSTS_PER_PAGE,
-    safeCurrentPage * POSTS_PER_PAGE
+    (safeCurrentPage - 1) * pageSize,
+    safeCurrentPage * pageSize
   );
 
   const defaultShopInfo = buildDefaultBlogShopInfoHtml(settings);
@@ -904,62 +912,77 @@ const AdminBlogManagementPage = () => {
           </button>
         </header>
 
-        <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedPosts.map((post) => (
-            <article
-              key={post.id}
-              className="overflow-hidden rounded-2xl bg-white shadow-sm"
-            >
-              <div className="flex h-36 items-center justify-center overflow-hidden bg-gray-50 p-3">
-                {post.image ? (
-                  <img
-                    src={post.image}
-                    alt={post.title}
-                    loading="lazy"
-                    decoding="async"
-                    className="max-h-full max-w-full rounded-lg object-contain"
-                  />
-                ) : (
-                  <FiImage size={34} className="text-gray-300" />
-                )}
-              </div>
+        {viewMode === "draft" && totalDraftPosts === 0 ? (
+          <section className="rounded-2xl border border-gray-100 bg-white px-6 py-16 text-center shadow-sm">
+            <div className="text-4xl">📝</div>
 
-              <div className="p-5">
-                <h2 className="line-clamp-2 text-lg font-bold text-gray-800">
-                  {post.title}
-                </h2>
+            <h2 className="mt-4 text-lg font-semibold text-gray-800">
+              Hiện tại chưa có bản nháp nào
+            </h2>
 
-                <p className="mt-1 text-xs text-gray-400">
-                  {formatPostDate(post.date || post.publishedAt)}{" "}
-                  {post.time || "08:00"}
-                </p>
-
-                <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
-                  {stripHtml(normalizeBlogPostContent(post.content)) ||
-                    "Nội dung đang được cập nhật."}
-                </p>
-
-                <div className="mt-4 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(post)}
-                    className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50"
-                  >
-                    Sửa
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(post)}
-                    className="flex-1 rounded-xl border border-red-100 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
-                  >
-                    Xóa
-                  </button>
+            <p className="mt-2 text-sm text-gray-500">
+              Khi có bài viết ở trạng thái bản nháp, các bài viết sẽ được hiển
+              thị tại đây.
+            </p>
+          </section>
+        ) : (
+          <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedPosts.map((post) => (
+              <article
+                key={post.id}
+                className="overflow-hidden rounded-2xl bg-white shadow-sm"
+              >
+                <div className="flex h-36 items-center justify-center overflow-hidden bg-gray-50 p-3">
+                  {post.image ? (
+                    <img
+                      src={post.image}
+                      alt={post.title}
+                      loading="lazy"
+                      decoding="async"
+                      className="max-h-full max-w-full rounded-lg object-contain"
+                    />
+                  ) : (
+                    <FiImage size={34} className="text-gray-300" />
+                  )}
                 </div>
-              </div>
-            </article>
-          ))}
-        </section>
+
+                <div className="p-5">
+                  <h2 className="line-clamp-2 text-lg font-bold text-gray-800">
+                    {post.title}
+                  </h2>
+
+                  <p className="mt-1 text-xs text-gray-400">
+                    {formatPostDate(post.date || post.publishedAt)}{" "}
+                    {post.time || "08:00"}
+                  </p>
+
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
+                    {stripHtml(normalizeBlogPostContent(post.content)) ||
+                      "Nội dung đang được cập nhật."}
+                  </p>
+
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(post)}
+                      className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                    >
+                      Sửa
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(post)}
+                      className="flex-1 rounded-xl border border-red-100 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
 
         {totalPages > 1 && (
           <nav

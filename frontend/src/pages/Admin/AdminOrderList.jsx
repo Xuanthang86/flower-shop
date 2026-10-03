@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useOrder } from "@/context/OrderContext";
@@ -63,35 +63,36 @@ const formatDate = (date) => {
 };
 
 const AdminOrderList = () => {
-  const { orders = [] } = useOrder();
+  const { orders = [], pagination, loading, refreshOrders } = useOrder();
 
   const [searchTerm, setSearchTerm] = useState("");
 
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredOrders = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase();
+  const [page, setPage] = useState(1);
 
-    return orders.filter((order) => {
-      const status = normalizeOrderStatus(order?.status);
+  const [pageSize, setPageSize] = useState(20);
 
-      const name = getCustomerName(order).toLowerCase();
+  const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100];
 
-      const phone = getCustomerPhone(order).toLowerCase();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      refreshOrders({
+        page,
+        limit: pageSize,
+        status: statusFilter === "all" ? "" : statusFilter,
+        search: searchTerm,
+      });
+    }, 250);
 
-      const id = getOrderId(order).toLowerCase();
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [page, pageSize, statusFilter, searchTerm, refreshOrders]);
 
-      const matchesSearch =
-        !keyword ||
-        id.includes(keyword) ||
-        name.includes(keyword) ||
-        phone.includes(keyword);
+  const [searchTerm, setSearchTerm] = useState("");
 
-      const matchesStatus = statusFilter === "all" || status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -103,7 +104,7 @@ const AdminOrderList = () => {
             </h2>
 
             <p className="text-sm text-gray-500 mt-1">
-              Hiển thị {filteredOrders.length} / {orders.length} đơn hàng
+              Hiển thị {orders.length} / {pagination.total} đơn hàng
             </p>
           </div>
 
@@ -169,7 +170,7 @@ const AdminOrderList = () => {
             </thead>
 
             <tbody className="divide-y divide-gray-100">
-              {filteredOrders.map((order) => {
+              {orders.map((order) => {
                 const orderId = getOrderId(order);
 
                 const status = normalizeOrderStatus(order.status);
@@ -228,6 +229,60 @@ const AdminOrderList = () => {
               })}
             </tbody>
           </table>
+          {pagination.total > 0 && (
+            <div className="flex flex-col gap-4 border-t border-gray-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Hiển thị</span>
+
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-pink-400"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} đơn hàng
+                    </option>
+                  ))}
+                </select>
+
+                <span>/ trang</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1 || loading}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white font-semibold hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Trang trước"
+                >
+                  &lt;
+                </button>
+
+                <span className="min-w-[100px] text-center text-sm text-gray-600">
+                  Trang {page} / {pagination.totalPages || 1}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.min(pagination.totalPages || 1, current + 1)
+                    )
+                  }
+                  disabled={page >= (pagination.totalPages || 1) || loading}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white font-semibold hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Trang sau"
+                >
+                  &gt;
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

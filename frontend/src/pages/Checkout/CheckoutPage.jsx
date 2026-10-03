@@ -563,33 +563,83 @@ const CheckoutPage = () => {
 
         [name]: value,
       },
+
+      ...(senderSameAsRecipient
+        ? {
+            sender: {
+              ...currentData.sender,
+
+              ...(name === "fullName" ? { name: value } : {}),
+
+              ...(name === "phone" ? { phone: value } : {}),
+
+              ...(name === "email" ? { email: value } : {}),
+            },
+          }
+        : {}),
     }));
   };
 
-  useEffect(() => {
-    if (!senderSameAsRecipient) {
+  const handleSenderSameAsRecipientChange = (event) => {
+    const checked = event.target.checked;
+
+    setSenderSameAsRecipient(checked);
+
+    if (!checked) {
       return;
     }
 
-    setFormData((currentData) => ({
-      ...currentData,
+    setFormData((currentData) => {
+      const recipient = currentData.recipient || {};
+      const sender = currentData.sender || {};
 
-      sender: {
-        ...currentData.sender,
+      const recipientHasData =
+        String(recipient.fullName || "").trim() ||
+        String(recipient.phone || "").trim() ||
+        String(recipient.email || "").trim();
 
-        name: currentData.recipient.fullName,
+      /*
+       * Nếu người nhận đã có dữ liệu:
+       * Người nhận → Người gửi.
+       */
+      if (recipientHasData) {
+        return {
+          ...currentData,
 
-        phone: currentData.recipient.phone,
+          sender: {
+            ...sender,
 
-        email: currentData.recipient.email,
-      },
-    }));
-  }, [
-    senderSameAsRecipient,
-    formData.recipient.fullName,
-    formData.recipient.phone,
-    formData.recipient.email,
-  ]);
+            name: String(recipient.fullName || "").trim(),
+
+            phone: String(recipient.phone || "").trim(),
+
+            email: String(recipient.email || "").trim(),
+          },
+        };
+      }
+
+      /*
+       * Nếu người nhận đang trống:
+       * Người gửi hiện tại → Người nhận.
+       *
+       * Đây là trường hợp tài khoản đã tự điền
+       * thông tin người gửi.
+       */
+      return {
+        ...currentData,
+
+        recipient: {
+          ...recipient,
+
+          fullName: String(sender.name || "").trim(),
+
+          phone: String(sender.phone || "").trim(),
+
+          email: String(sender.email || "").trim(),
+        },
+      };
+    });
+  };
 
   const handleNoteChange = (event) => {
     setFormData((currentData) => ({
@@ -850,6 +900,13 @@ const CheckoutPage = () => {
       const orderSignature = JSON.stringify({
         items: cartItems.map((item) => ({
           productId: item.id,
+
+          id: item.id,
+
+          productSlug: item.slug || item.productSlug || "",
+
+          productName: item.name || item.productName || "",
+
           quantity: Number(item.quantity) || 1,
         })),
         couponCode: couponForOrder,
@@ -874,7 +931,13 @@ const CheckoutPage = () => {
           const orderResult = await createOrder({
             items: cartItems.map((item) => ({
               productId: item.id,
+
               id: item.id,
+
+              productSlug: item.slug || item.productSlug || "",
+
+              productName: item.name || item.productName || "",
+
               quantity: Number(item.quantity) || 1,
             })),
 
@@ -1947,27 +2010,7 @@ const CheckoutPage = () => {
                   <input
                     type="checkbox"
                     checked={senderSameAsRecipient}
-                    onChange={(event) => {
-                      const checked = event.target.checked;
-
-                      setSenderSameAsRecipient(checked);
-
-                      if (checked) {
-                        setFormData((currentData) => ({
-                          ...currentData,
-
-                          sender: {
-                            ...currentData.sender,
-
-                            name: currentData.recipient.fullName,
-
-                            phone: currentData.recipient.phone,
-
-                            email: currentData.recipient.email,
-                          },
-                        }));
-                      }
-                    }}
+                    onChange={handleSenderSameAsRecipientChange}
                     className="mt-1 h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                   />
 

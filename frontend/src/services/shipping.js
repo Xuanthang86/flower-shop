@@ -550,22 +550,37 @@ const buildAddressQueries = (address = {}) => {
 
   const queries = [];
 
+  // 1. Chính xác nhất:
+  // Số nhà + đường + phường + tỉnh/thành
   if (houseNumber && street && wardName) {
     queries.push(
       `${houseNumber} ${street}, ${wardName}, ${provinceName}, Việt Nam`
     );
   }
 
+  // 2. Số nhà + đường + tỉnh/thành
   if (houseNumber && street) {
     queries.push(`${houseNumber} ${street}, ${provinceName}, Việt Nam`);
   }
 
+  // 3. Đường + phường + tỉnh/thành
   if (street && wardName) {
     queries.push(`${street}, ${wardName}, ${provinceName}, Việt Nam`);
   }
 
+  // 4. Chỉ đường + tỉnh/thành
   if (street) {
     queries.push(`${street}, ${provinceName}, Việt Nam`);
+  }
+
+  // 5. Phường + tỉnh/thành
+  if (wardName) {
+    queries.push(`${wardName}, ${provinceName}, Việt Nam`);
+  }
+
+  // 6. Cuối cùng mới fallback tỉnh/thành
+  if (provinceName) {
+    queries.push(`${provinceName}, Việt Nam`);
   }
 
   return [...new Set(queries.filter(Boolean))];

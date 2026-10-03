@@ -16,6 +16,7 @@ router.get("/", requireAuth, async (req, res, next) => {
         page: req.query.page,
         limit: req.query.limit,
         status: req.query.status,
+        search: req.query.search,
       })),
     });
   } catch (error) {

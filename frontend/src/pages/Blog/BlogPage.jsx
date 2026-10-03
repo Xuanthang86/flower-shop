@@ -67,6 +67,15 @@ const formatPostDate = (value) => {
 const normalizeBlogContent = (content = "") =>
   normalizeBlogPostContent(content);
 
+const normalizeApiBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  const base = String(configured).replace(/\/+$/, "");
+
+  return base.endsWith("/api") ? base : `${base}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl();
 const DESKTOP_POSTS_PER_PAGE = 9;
 const NON_DESKTOP_POSTS_PER_PAGE = 8;
 
@@ -82,6 +91,75 @@ const BlogPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [settings, setSettings] = useState(() => readSiteSettings());
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshBlogFromBackend = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
+          method: "GET",
+
+          cache: "no-store",
+
+          credentials: "include",
+
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+
+        const remotePosts = Array.isArray(payload?.snapshot?.blogPosts)
+          ? payload.snapshot.blogPosts
+          : Array.isArray(payload?.blogPosts)
+            ? payload.blogPosts
+            : null;
+
+        if (cancelled || remotePosts === null) {
+          return;
+        }
+
+        const activeRemotePosts = remotePosts.filter(
+          (post) =>
+            post?.status !== "deleted" &&
+            post?.isDeleted !== true &&
+            !post?.deletedAt
+        );
+
+        try {
+          localStorage.setItem(
+            "flower-shop-blog-posts",
+            JSON.stringify(remotePosts)
+          );
+        } catch (storageError) {
+          console.warn("Không thể cập nhật Blog cache:", storageError);
+        }
+
+        window.dispatchEvent(new Event("flower-shop-blog-posts-updated"));
+
+        /*
+         * activeRemotePosts chỉ được tạo để xác nhận
+         * dữ liệu remote đã được lọc đúng.
+         * Không dùng local-only dữ liệu cũ để khôi phục
+         * bài đã xóa.
+         */
+        void activeRemotePosts;
+      } catch (error) {
+        console.warn("Không thể đồng bộ Blog từ backend:", error);
+      }
+    };
+
+    refreshBlogFromBackend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const siteName = getSiteName(settings);
 
