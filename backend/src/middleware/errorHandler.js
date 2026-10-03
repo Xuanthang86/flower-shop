@@ -29,12 +29,24 @@ const errorHandler = (error, req, res, next) => {
   const status = Number(error?.status || error?.statusCode);
   const safeStatus = status >= 400 && status < 600 ? status : 500;
 
+  const isDevelopment =
+    String(process.env.NODE_ENV || "development").toLowerCase() !==
+    "production";
+
   return res.status(safeStatus).json({
     success: false,
+
     message:
-      safeStatus === 500
+      safeStatus === 500 && !isDevelopment
         ? "Đã xảy ra lỗi máy chủ."
         : error?.message || "Yêu cầu không hợp lệ.",
+
+    ...(isDevelopment
+      ? {
+          errorName: error?.name || "",
+          errorCode: error?.code || "",
+        }
+      : {}),
   });
 };
 

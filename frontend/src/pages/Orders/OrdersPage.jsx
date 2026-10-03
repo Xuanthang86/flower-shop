@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { formatVietnamDateTime } from "@/utils/dateFormat";
 import {
   FiCheck,
   FiChevronDown,
@@ -152,20 +153,6 @@ const formatCurrency = (value = 0) => {
 /* =====================================================
    NGÀY
 ===================================================== */
-
-const formatDate = (value) => {
-  if (!value) {
-    return "—";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return date.toLocaleString("vi-VN");
-};
 
 /* =====================================================
    MÃ ĐƠN
@@ -470,7 +457,8 @@ const OrdersPage = () => {
                       </h2>
 
                       <p className="mt-2 text-sm text-gray-500">
-                        Thời gian đặt hàng: {formatDate(order?.createdAt)}
+                        Thời gian đặt hàng:{" "}
+                        {formatVietnamDateTime(order?.createdAt)}
                       </p>
                     </div>
 

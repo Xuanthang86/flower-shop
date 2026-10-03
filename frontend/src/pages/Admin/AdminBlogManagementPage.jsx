@@ -175,6 +175,8 @@ const AdminBlogManagementPage = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [viewMode, setViewMode] = useState("published");
+
   const POSTS_PER_PAGE = 9;
 
   const blogCategories = Array.isArray(settings.blogCategories)
@@ -786,11 +788,19 @@ const AdminBlogManagementPage = () => {
 
   const allPosts = Array.isArray(blogPosts) ? blogPosts : [];
 
-  const visiblePosts = allPosts
-    .filter((post) => !isDeletedBlogPost(post))
-    .sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
+  const activePosts = allPosts.filter((post) => !isDeletedBlogPost(post));
 
-  const totalPosts = visiblePosts.length;
+  const publishedPosts = activePosts.filter((post) => post.status !== "draft");
+
+  const draftPosts = activePosts.filter((post) => post.status === "draft");
+
+  const visiblePosts = (
+    viewMode === "draft" ? draftPosts : publishedPosts
+  ).sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
+
+  const totalPosts = publishedPosts.length;
+
+  const totalDraftPosts = draftPosts.length;
 
   const totalPages = Math.max(1, Math.ceil(totalPosts / POSTS_PER_PAGE));
 
@@ -852,9 +862,37 @@ const AdminBlogManagementPage = () => {
               Tạo, chỉnh sửa và quản lý nội dung bài viết.
             </p>
 
-            <p className="mt-2 text-sm font-semibold text-pink-600">
-              Tổng số bài viết: {totalPosts}
-            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("published");
+                  setCurrentPage(1);
+                }}
+                className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "published"
+                    ? "border-pink-200 bg-pink-50 text-pink-600"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Bài viết: {totalPosts}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("draft");
+                  setCurrentPage(1);
+                }}
+                className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "draft"
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Bản nháp: {totalDraftPosts}
+              </button>
+            </div>
           </div>
 
           <button

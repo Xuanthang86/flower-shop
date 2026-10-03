@@ -2,6 +2,8 @@ import { useEffect, useMemo } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { formatVietnamDateTime } from "@/utils/dateFormat";
+
 import {
   FiArrowLeft,
   FiPackage,
@@ -29,20 +31,6 @@ import {
 import { getBankTransferPaymentStatus } from "@/services/payment";
 
 import { readPaymentSettings } from "@/services/paymentSettings";
-
-const formatDate = (date) => {
-  if (!date) {
-    return "—";
-  }
-
-  const parsed = new Date(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "—";
-  }
-
-  return parsed.toLocaleString("vi-VN");
-};
 
 const formatCurrency = (value = 0) =>
   `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
@@ -678,7 +666,7 @@ const AdminOrderDetailPage = () => {
               <span className="text-gray-500">Thời gian đặt hàng</span>
 
               <span className="text-right font-medium text-gray-800">
-                {formatDate(order.createdAt)}
+                {formatVietnamDateTime(order.createdAt)}
               </span>
             </div>
 
@@ -686,7 +674,7 @@ const AdminOrderDetailPage = () => {
               <span className="text-gray-500">Thời gian thanh toán</span>
 
               <span className="text-right font-medium text-gray-800">
-                {formatDate(payment?.paidAt)}
+                {formatVietnamDateTime(payment?.paidAt)}
               </span>
             </div>
 
@@ -695,7 +683,7 @@ const AdminOrderDetailPage = () => {
                 <span className="text-gray-500">Bắt đầu thanh toán</span>
 
                 <span className="text-right font-medium text-gray-800">
-                  {formatDate(payment.paymentAttemptedAt)}
+                  {formatVietnamDateTime(payment.paymentAttemptedAt)}
                 </span>
               </div>
             )}

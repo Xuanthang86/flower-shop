@@ -34,6 +34,7 @@ import {
 import {
   readPaymentSettings,
   fetchPaymentSettings,
+  getDefaultPaymentSettings,
   buildTransferContent,
   buildVietQrUrl,
   resolvePaymentBank,
@@ -148,29 +149,11 @@ const CheckoutPage = () => {
 
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    setFormData((currentData) => ({
-      ...currentData,
-
-      sender: {
-        ...currentData.sender,
-
-        name: currentData.sender.name || user.name || "",
-
-        phone: currentData.sender.phone || user.phone || "",
-
-        email: currentData.sender.email || user.email || "",
-      },
-    }));
-  }, [user?.id, user?.name, user?.phone, user?.email]);
-
   const [paymentSettings, setPaymentSettings] = useState(() =>
-    readPaymentSettings()
+    getDefaultPaymentSettings()
   );
+
+  const [paymentSettingsLoading, setPaymentSettingsLoading] = useState(true);
 
   const [resolvedBankCode, setResolvedBankCode] = useState("");
 
@@ -202,6 +185,26 @@ const CheckoutPage = () => {
     paymentMethod: CHECKOUT_PAYMENT_METHOD,
   });
   const [senderSameAsRecipient, setSenderSameAsRecipient] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setFormData((currentData) => ({
+      ...currentData,
+
+      sender: {
+        ...currentData.sender,
+
+        name: currentData.sender.name || user.name || "",
+
+        phone: currentData.sender.phone || user.phone || "",
+
+        email: currentData.sender.email || user.email || "",
+      },
+    }));
+  }, [user?.id, user?.name, user?.phone, user?.email]);
 
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
@@ -331,6 +334,8 @@ const CheckoutPage = () => {
     let cancelled = false;
 
     const refreshPaymentSettings = async () => {
+      setPaymentSettingsLoading(true);
+
       try {
         const latestSettings = await fetchPaymentSettings();
 
@@ -338,10 +343,14 @@ const CheckoutPage = () => {
           setPaymentSettings(latestSettings);
         }
       } catch (error) {
-        console.warn("Không thể tải cấu hình thanh toán mới nhất:", error);
+        console.error("Không thể tải cấu hình thanh toán mới nhất:", error);
 
         if (!cancelled) {
-          setPaymentSettings(readPaymentSettings());
+          setPaymentSettings(getDefaultPaymentSettings());
+        }
+      } finally {
+        if (!cancelled) {
+          setPaymentSettingsLoading(false);
         }
       }
     };
@@ -588,8 +597,6 @@ const CheckoutPage = () => {
 
       note: event.target.value,
     }));
-
-    setShippingCalculation(EMPTY_SHIPPING_RESULT);
   };
 
   const handleAddressChange = (address) => {
@@ -780,7 +787,6 @@ const CheckoutPage = () => {
     };
   }, [
     formData.address,
-    formData.note,
     subtotal,
     deliveryDate,
     deliveryTimeSlot,
@@ -1158,20 +1164,7 @@ const CheckoutPage = () => {
       })
     : "";
 
-  const configuredQrCodeUrl = String(
-    paymentSettings?.bankTransfer?.qrCodeUrl || ""
-  ).trim();
-
-  /*
-   * Ưu tiên QR động vì QR động chứa:
-   * - số tiền thực tế
-   * - nội dung chuyển khoản
-   * - tài khoản mới nhất
-   *
-   * Nếu VietQR chưa tạo được thì dùng QR thực tế
-   * mà Admin đã cấu hình làm phương án dự phòng.
-   */
-  const qrCodeUrl = dynamicQrUrl || configuredQrCodeUrl;
+  const qrCodeUrl = dynamicQrUrl;
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
@@ -1711,12 +1704,6 @@ const CheckoutPage = () => {
         }
 
         newOrder = result.order;
-      }
-
-      if (!result || result.success !== true || !result.order) {
-        setError(result?.message || "Không thể tạo đơn hàng.");
-
-        return;
       }
 
       try {

@@ -199,6 +199,26 @@ const AuthProvider = ({ children }) => {
     let cancelled = false;
 
     const bootstrap = async () => {
+      const existingSession = readSession();
+
+      /*
+       * Không còn sessionStorage:
+       *
+       * - Đây là phiên trình duyệt mới.
+       * - Không được dùng accessToken cookie cũ để tự đăng nhập lại.
+       */
+      if (!existingSession) {
+        clearSession();
+
+        if (!cancelled) {
+          setUser(null);
+          setUsers([]);
+          setLoading(false);
+        }
+
+        return;
+      }
+
       try {
         const currentUser = await getCurrentAuthUserApi();
 
@@ -217,11 +237,13 @@ const AuthProvider = ({ children }) => {
           }
         } else {
           setUser(null);
+          setUsers([]);
           clearSession();
         }
       } catch {
         if (!cancelled) {
           setUser(null);
+          setUsers([]);
           clearSession();
         }
       } finally {

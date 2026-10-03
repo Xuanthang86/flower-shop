@@ -41,11 +41,22 @@ const generateOrderCode = async (preferredCode = "") => {
     });
   }
 
-  const d = new Date();
+  const vietnamDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
 
-  const prefix = `HTH${String(d.getFullYear()).slice(-2)}${String(
-    d.getMonth() + 1,
-  ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const vietnamDate = Object.fromEntries(
+    vietnamDateParts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  const prefix = `HTH${String(vietnamDate.year).slice(-2)}${String(
+    vietnamDate.month,
+  ).padStart(2, "0")}${String(vietnamDate.day).padStart(2, "0")}`;
 
   for (let i = 0; i < 100; i += 1) {
     const code = `${prefix}-${String(crypto.randomInt(0, 10000)).padStart(

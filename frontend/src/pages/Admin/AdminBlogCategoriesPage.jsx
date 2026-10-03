@@ -4,9 +4,11 @@ import { FiEdit2, FiPlus, FiSave, FiTrash2, FiX } from "react-icons/fi";
 
 import {
   getPageTitle,
+  readBlogPosts,
   readSiteSettings,
   saveSiteSettings,
   SITE_SETTINGS_UPDATED_EVENT,
+  BLOG_POSTS_UPDATED_EVENT,
 } from "@/services/siteSettings";
 
 import { useNotification } from "@/context/NotificationProvider";
@@ -79,10 +81,20 @@ const AdminBlogCategoriesPage = () => {
 
     window.addEventListener("storage", refresh);
 
+    const refreshPosts = () => {
+      setSettings((current) => ({
+        ...current,
+      }));
+    };
+
+    window.addEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
+
     return () => {
       window.removeEventListener("flower-shop-site-settings-updated", refresh);
 
       window.removeEventListener("storage", refresh);
+
+      window.removeEventListener(BLOG_POSTS_UPDATED_EVENT, refreshPosts);
     };
   }, []);
 
@@ -92,7 +104,7 @@ const AdminBlogCategoriesPage = () => {
     [settings.blogCategories]
   );
 
-  const posts = Array.isArray(settings.blogPosts) ? settings.blogPosts : [];
+  const posts = readBlogPosts();
 
   const openCreate = () => {
     setEditing(null);
@@ -293,6 +305,7 @@ const AdminBlogCategoriesPage = () => {
                   const count = posts.filter(
                     (post) =>
                       !isDeletedBlogPost(post) &&
+                      post.status !== "draft" &&
                       (String(post.categoryId || "") === String(category.id) ||
                         String(post.categorySlug || "") === category.slug)
                   ).length;
