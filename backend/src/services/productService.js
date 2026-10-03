@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const Product = require("../models/Product");
 
 const slugify = (value) =>
@@ -177,7 +179,26 @@ const list = async ({ page = 1, limit = 50, includeInactive = false } = {}) => {
 };
 
 const getById = async (id) => {
-  const item = await Product.findById(id).lean();
+  const normalizedId = String(id || "").trim();
+
+  let item = null;
+
+  if (mongoose.Types.ObjectId.isValid(normalizedId)) {
+    item = await Product.findById(normalizedId).lean();
+  }
+
+  if (!item) {
+    item = await Product.findOne({
+      $or: [
+        {
+          slug: normalizedId,
+        },
+        {
+          name: normalizedId,
+        },
+      ],
+    }).lean();
+  }
 
   if (!item) {
     throw Object.assign(new Error("Không tìm thấy sản phẩm."), {

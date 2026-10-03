@@ -137,6 +137,19 @@ const syncCartWithProducts = (cartItems, products) => {
     nextItems.push(
       normalizeCartItem({
         ...item,
+        slug:
+          product.slug ||
+          product.productSlug ||
+          item.slug ||
+          item.productSlug ||
+          "",
+
+        productSlug:
+          product.slug ||
+          product.productSlug ||
+          item.productSlug ||
+          item.slug ||
+          "",
 
         name: product.name || item.name,
 
@@ -307,6 +320,19 @@ const CartSession = ({ user, products, children }) => {
 
             return normalizeCartItem({
               ...item,
+              slug:
+                currentProduct.slug ||
+                currentProduct.productSlug ||
+                item.slug ||
+                item.productSlug ||
+                "",
+
+              productSlug:
+                currentProduct.slug ||
+                currentProduct.productSlug ||
+                item.productSlug ||
+                item.slug ||
+                "",
 
               name: currentProduct.name,
 
@@ -338,6 +364,11 @@ const CartSession = ({ user, products, children }) => {
 
           normalizeCartItem({
             ...currentProduct,
+
+            slug: currentProduct.slug || currentProduct.productSlug || "",
+
+            productSlug:
+              currentProduct.slug || currentProduct.productSlug || "",
 
             quantity: requestedQuantity,
           }),

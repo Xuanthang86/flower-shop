@@ -23,6 +23,15 @@ const ALLOWED_CHANNELS = [
 
 const ALLOWED_PAYMENT_METHODS = ["cod", "bank_transfer"];
 
+const slugifyProductName = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const generateOrderCode = async (preferredCode = "") => {
   const normalizedPreferred = String(preferredCode || "")
     .trim()
@@ -87,9 +96,11 @@ const normalizeItems = (items) => {
   return items.map((item) => {
     const productId = String(item?.productId || item?.id || "").trim();
 
-    const productSlug = String(item?.productSlug || item?.slug || "").trim();
-
     const productName = String(item?.productName || item?.name || "").trim();
+
+    const productSlug = String(
+      item?.productSlug || item?.slug || slugifyProductName(productName) || "",
+    ).trim();
 
     const quantity = Math.floor(Number(item?.quantity) || 0);
 
@@ -126,6 +137,10 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
 
   const names = requested.map((item) => item.productName).filter(Boolean);
 
+  const normalizedSlugs = requested
+    .map((item) => item.productSlug)
+    .filter(Boolean);
+
   const productOrConditions = [];
 
   if (validObjectIds.length > 0) {
@@ -136,10 +151,10 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
     });
   }
 
-  if (slugs.length > 0) {
+  if (normalizedSlugs.length > 0) {
     productOrConditions.push({
       slug: {
-        $in: slugs,
+        $in: normalizedSlugs,
       },
     });
   }

@@ -190,7 +190,14 @@ export const readPaymentSettings = () => {
 };
 
 export const fetchPaymentSettings = async () => {
-  const { data: payload } = await api.get("/data/snapshot");
+  const response = await api.get("/data/snapshot", {
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
+
+  const payload = response?.data;
 
   if (!payload) {
     throw new Error("Không thể tải cấu hình thanh toán mới nhất từ hệ thống.");
@@ -198,11 +205,11 @@ export const fetchPaymentSettings = async () => {
 
   const remotePaymentSettings = payload?.snapshot?.settings?.payment;
 
-  const normalized = normalizeSettings(
-    remotePaymentSettings && typeof remotePaymentSettings === "object"
-      ? remotePaymentSettings
-      : {}
-  );
+  if (!remotePaymentSettings || typeof remotePaymentSettings !== "object") {
+    throw new Error("Backend chưa có cấu hình thanh toán hợp lệ.");
+  }
+
+  const normalized = normalizeSettings(remotePaymentSettings);
 
   try {
     localStorage.setItem(
@@ -260,8 +267,7 @@ export const buildTransferContent = (
 ) => {
   const normalizedOrderCode = String(orderCode || "")
     .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
+    .toUpperCase();
 
   if (!normalizedOrderCode) {
     return "";
@@ -272,7 +278,21 @@ export const buildTransferContent = (
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 
-  return `${prefix}${normalizedOrderCode}`.slice(0, 50);
+  const normalizedCode = normalizedOrderCode.replace(/[^A-Z0-9-]/g, "");
+
+  if (!prefix) {
+    return normalizedCode.slice(0, 50);
+  }
+
+  if (
+    normalizedCode === prefix ||
+    normalizedCode.startsWith(`${prefix}-`) ||
+    normalizedCode.startsWith(prefix)
+  ) {
+    return normalizedCode.slice(0, 50);
+  }
+
+  return `${prefix}${normalizedCode}`.slice(0, 50);
 };
 
 /* ==========================================================

@@ -112,6 +112,15 @@ const normalizeProductId = (product = {}, fallback = {}) => {
   return String(rawId).trim();
 };
 
+const slugifyProduct = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const normalizeCategoryValue = (value, fallback = "") => {
   if (value && typeof value === "object") {
     const objectValue =
@@ -172,6 +181,15 @@ export const normalizeProduct = (product = {}, fallback = {}) => {
   };
 
   const id = normalizeProductId(product, fallback);
+  const name = String(merged.name || fallback.name || "").trim();
+
+  const slug = String(
+    merged.slug ||
+      merged.productSlug ||
+      fallback.slug ||
+      fallback.productSlug ||
+      slugifyProduct(name)
+  ).trim();
 
   const image = String(
     merged.image ||
@@ -237,7 +255,9 @@ export const normalizeProduct = (product = {}, fallback = {}) => {
 
     id,
 
-    name: String(merged.name || fallback.name || "").trim(),
+    name,
+
+    slug,
 
     category: normalizeCategoryValue(
       merged.category ??
