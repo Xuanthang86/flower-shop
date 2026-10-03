@@ -31,6 +31,12 @@ const Coupon = require("../models/Coupon");
 const Order = require("../models/Order");
 const Payment = require("../models/Payment");
 
+const PaymentTransaction = require("../models/PaymentTransaction");
+
+const PaymentIntent = require("../models/PaymentIntent");
+
+const crypto = require("crypto");
+
 const slugify = (value) =>
   String(value || "")
     .normalize("NFD")
@@ -64,10 +70,13 @@ const run = async () => {
     coupons: 0,
     orders: 0,
     payments: 0,
+    paymentTransactions: 0,
+    paymentIntents: 0,
   };
 
   const userMap = new Map();
   const productMap = new Map();
+  const orderMap = new Map();
 
   for (const raw of asArray(snapshot.users)) {
     const email = String(raw.email || "")
@@ -327,25 +336,241 @@ const run = async () => {
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     report.orders++;
+    orderMap.set(
+      String(raw.id || raw._id || raw.orderId || orderCode),
+      order._id,
+    );
 
-    if (raw.paymentMethod || raw.paymentStatus || raw.paymentAmount) {
+    orderMap.set(String(orderCode), order._id);
+
+    if (
+      raw.paymentMethod ||
+      raw.paymentStatus ||
+      raw.paymentAmount ||
+      raw.payment
+    ) {
+      const paymentSource = raw.payment || raw;
+
       await Payment.findOneAndUpdate(
-        { orderId: order._id },
+        {
+          orderId: order._id,
+        },
         {
           $set: {
-            method: String(raw.paymentMethod || ""),
-            provider: String(raw.paymentProvider || ""),
-            amount: Number(raw.paymentAmount ?? raw.grandTotal ?? 0),
-            currency: "VND",
-            status: raw.paymentStatus || "pending",
-            transactionId: String(raw.transactionId || ""),
-            paidAt: raw.paidAt || null,
+            method: String(
+              paymentSource.paymentMethod ||
+                paymentSource.method ||
+                raw.paymentMethod ||
+                "",
+            ),
+
+            provider: String(
+              paymentSource.paymentProvider ||
+                paymentSource.provider ||
+                raw.paymentProvider ||
+                "",
+            ),
+
+            amount: Math.max(
+              0,
+              Number(
+                paymentSource.amount ??
+                  raw.paymentAmount ??
+                  raw.grandTotal ??
+                  0,
+              ),
+            ),
+
+            currency: String(paymentSource.currency || "VND"),
+
+            status: paymentSource.status || raw.paymentStatus || "pending",
+
+            transactionId: String(
+              paymentSource.transactionId || raw.transactionId || "",
+            ),
+
+            paidAt: paymentSource.paidAt || raw.paidAt || null,
+
+            rawResponse: paymentSource.rawResponse || null,
+
+            paymentIntentId: String(
+              paymentSource.paymentIntentId || raw.paymentIntentId || "",
+            ),
           },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
       );
+
       report.payments++;
     }
+  }
+
+  for (const raw of asArray(snapshot.paymentTransactions)) {
+    const providerTransactionId = String(
+      raw.providerTransactionId || raw.transactionId || raw.id || "",
+    ).trim();
+
+    if (!providerTransactionId) {
+      continue;
+    }
+
+    const rawOrderId = String(raw.orderId || raw.order || "").trim();
+
+    const orderId =
+      orderMap.get(rawOrderId) ||
+      orderMap.get(String(raw.orderCode || "").trim()) ||
+      null;
+
+    await PaymentTransaction.findOneAndUpdate(
+      {
+        providerTransactionId,
+      },
+      {
+        $set: {
+          provider: String(raw.provider || "sepay").trim(),
+
+          providerTransactionId,
+
+          paymentIntentId: String(raw.paymentIntentId || "").trim(),
+
+          orderId,
+
+          orderCode: String(raw.orderCode || "").trim(),
+
+          amount: Math.max(0, Number(raw.amount || raw.transferAmount || 0)),
+
+          content: String(raw.content || raw.description || ""),
+
+          referenceCode: String(raw.referenceCode || ""),
+
+          transactionDate: raw.transactionDate
+            ? new Date(raw.transactionDate)
+            : null,
+
+          matched: Boolean(raw.matched),
+
+          rawPayload: raw.rawPayload || raw.payload || raw,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+
+    report.paymentTransactions++;
+  }
+
+  for (const raw of asArray(snapshot.paymentIntents)) {
+    const rawOrderId = String(raw.orderId || raw.order || "").trim();
+
+    const orderId =
+      orderMap.get(rawOrderId) ||
+      orderMap.get(String(raw.orderCode || "").trim()) ||
+      null;
+
+    if (!orderId) {
+      continue;
+    }
+
+    const order = await Order.findById(orderId).lean();
+
+    if (!order) {
+      continue;
+    }
+
+    const intentId = String(
+      raw.intentId || raw.id || crypto.randomUUID(),
+    ).trim();
+
+    const amount = Math.max(
+      0,
+      Number(raw.amount ?? order.paymentDepositAmount ?? order.grandTotal ?? 0),
+    );
+
+    const depositPercent =
+      Number(raw.depositPercent ?? order.paymentDepositPercent ?? 100) === 50
+        ? 50
+        : 100;
+
+    const intent = await PaymentIntent.findOneAndUpdate(
+      {
+        orderId,
+      },
+      {
+        $set: {
+          intentId,
+
+          orderId,
+
+          customerId: order.customerId,
+
+          orderCode: order.orderCode,
+
+          reference: String(raw.reference || order.orderCode),
+
+          amount,
+
+          currency: String(raw.currency || "VND"),
+
+          paymentMethod: String(
+            raw.paymentMethod || order.paymentMethod || "bank_transfer",
+          ),
+
+          depositPercent,
+
+          status: raw.status || "pending",
+
+          expiresAt: raw.expiresAt
+            ? new Date(raw.expiresAt)
+            : new Date(Date.now() + 30 * 60 * 1000),
+
+          paidAt: raw.paidAt ? new Date(raw.paidAt) : null,
+
+          paymentAttemptedAt: raw.paymentAttemptedAt
+            ? new Date(raw.paymentAttemptedAt)
+            : null,
+
+          transactionId: String(raw.transactionId || ""),
+
+          transaction: raw.transaction || null,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+
+    await Order.updateOne(
+      {
+        _id: order._id,
+      },
+      {
+        $set: {
+          paymentIntentId: intent.intentId,
+        },
+      },
+    );
+
+    await Payment.updateOne(
+      {
+        orderId: order._id,
+      },
+      {
+        $set: {
+          paymentIntentId: intent.intentId,
+        },
+      },
+    );
+
+    report.paymentIntents++;
   }
 
   console.log(JSON.stringify({ success: true, report }, null, 2));

@@ -1,9 +1,12 @@
 import api from "./api";
 
-export const createPaymentIntent = async ({ orderId, amount }) => {
+export const createPaymentIntent = async ({
+  orderId,
+  depositPercent = 100,
+}) => {
   const { data } = await api.post("/payments/intents", {
     orderId,
-    amount,
+    depositPercent: Number(depositPercent) === 50 ? 50 : 100,
   });
 
   return data?.paymentIntent;

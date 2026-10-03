@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -222,22 +222,18 @@ const CheckoutPage = () => {
 
   const [paymentDepositPercent, setPaymentDepositPercent] = useState(100);
 
-  const paymentDepositAmount = Math.round(
-    ((Number(grandTotal) || 0) *
-      (Number(paymentDepositPercent) === 50 ? 50 : 100)) /
-      100
-  );
-
-  const paymentRemainingAmount = Math.max(
-    0,
-    Math.round(Number(grandTotal) || 0) - paymentDepositAmount
-  );
-
   const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
   const [paymentVerified, setPaymentVerified] = useState(false);
 
   const [paymentError, setPaymentError] = useState("");
+
+  const [paymentOrder, setPaymentOrder] = useState(null);
+
+  const paymentOrderRef = useRef({
+    signature: "",
+    orderId: "",
+  });
 
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -285,6 +281,17 @@ const CheckoutPage = () => {
   const discountAmount = checkoutTotals.discountAmount;
 
   const grandTotal = checkoutTotals.grandTotal;
+
+  const paymentDepositAmount = Math.round(
+    ((Number(grandTotal) || 0) *
+      (Number(paymentDepositPercent) === 50 ? 50 : 100)) /
+      100
+  );
+
+  const paymentRemainingAmount = Math.max(
+    0,
+    Math.round(Number(grandTotal) || 0) - paymentDepositAmount
+  );
 
   const checkoutPaymentAmount = Math.round(Number(grandTotal) || 0);
 
@@ -709,91 +716,231 @@ const CheckoutPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
-      setPaymentIntent(EMPTY_PAYMENT_INTENT);
-      setPaymentVerified(false);
+    const prepareBankTransferPayment = async () => {
+      if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+        setPaymentVerified(false);
+        setPaymentError("");
+        setPaymentIntentLoading(false);
+        setPaymentOrder(null);
+
+        paymentOrderRef.current = {
+          signature: "",
+          orderId: "",
+        };
+
+        return;
+      }
+
+      if (paymentSettings?.bankTransfer?.enabled === false) {
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+        setPaymentVerified(false);
+        setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
+        setPaymentIntentLoading(false);
+        setPaymentOrder(null);
+
+        paymentOrderRef.current = {
+          signature: "",
+          orderId: "",
+        };
+
+        return;
+      }
+
+      if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+        setPaymentVerified(false);
+        setPaymentError("");
+        setPaymentIntentLoading(false);
+        setPaymentOrder(null);
+
+        return;
+      }
+
+      const couponForOrder =
+        appliedCoupon?.coupon?.code || couponCode.trim().toUpperCase() || "";
+
+      const orderSignature = JSON.stringify({
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          quantity: Number(item.quantity) || 1,
+        })),
+        couponCode: couponForOrder,
+        shippingFee: Number(shippingFee) || 0,
+        paymentDepositPercent,
+        recipient: formData.recipient,
+        address: formData.address,
+        deliveryDate,
+        deliveryTimeSlot,
+        note: formData.note,
+      });
+
+      setPaymentIntentLoading(true);
       setPaymentError("");
-      setPaymentIntentLoading(false);
-
-      return undefined;
-    }
-
-    if (paymentSettings?.bankTransfer?.enabled === false) {
-      setPaymentIntent(EMPTY_PAYMENT_INTENT);
       setPaymentVerified(false);
-      setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
-      setPaymentIntentLoading(false);
 
-      return undefined;
-    }
+      try {
+        let orderId = paymentOrderRef.current.orderId;
+        let order = paymentOrder;
 
-    if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
-      setPaymentIntent(EMPTY_PAYMENT_INTENT);
-      setPaymentVerified(false);
-      setPaymentError("");
-      setPaymentIntentLoading(false);
+        if (!orderId || paymentOrderRef.current.signature !== orderSignature) {
+          const orderResult = await createOrder({
+            items: cartItems.map((item) => ({
+              productId: item.id,
+              id: item.id,
+              quantity: Number(item.quantity) || 1,
+            })),
 
-      return undefined;
-    }
+            paymentMethod: BANK_TRANSFER_PAYMENT_METHOD,
 
-    const normalizedAmount = Math.round(Number(checkoutPaymentAmount) || 0);
+            paymentDepositPercent,
 
-    setPaymentIntent(EMPTY_PAYMENT_INTENT);
-    setPaymentVerified(false);
-    setPaymentError("");
-    setPaymentIntentLoading(true);
+            couponCode: couponForOrder,
 
-    createBankTransferPaymentIntent({
-      amount: normalizedAmount,
-    })
-      .then((result) => {
+            shippingFee: Math.max(0, Math.round(Number(shippingFee) || 0)),
+
+            deliveryDate,
+
+            deliveryTimeSlot,
+
+            deliveryMode,
+
+            notes: String(formData.note || "").trim(),
+
+            channel: "website",
+
+            customer: {
+              name: user?.name || "",
+              email: user?.email || "",
+              phone: user?.phone || "",
+            },
+
+            recipient: {
+              fullName: formData.recipient.fullName.trim(),
+              name: formData.recipient.fullName.trim(),
+              phone: formData.recipient.phone.trim(),
+              email: formData.recipient.email.trim(),
+            },
+
+            shippingAddress: {
+              provinceCode: formData.address.provinceCode,
+              provinceName: formData.address.provinceName,
+              wardCode: formData.address.wardCode,
+              wardName: formData.address.wardName,
+              houseNumber: formData.address.houseNumber.trim(),
+              street: formData.address.street.trim(),
+              note: String(formData.note || "").trim(),
+            },
+
+            address: {
+              provinceCode: formData.address.provinceCode,
+              provinceName: formData.address.provinceName,
+              wardCode: formData.address.wardCode,
+              wardName: formData.address.wardName,
+              houseNumber: formData.address.houseNumber.trim(),
+              street: formData.address.street.trim(),
+              note: String(formData.note || "").trim(),
+            },
+          });
+
+          if (!orderResult?.success || !orderResult?.order) {
+            throw new Error(
+              orderResult?.message || "Không thể tạo đơn hàng chờ thanh toán."
+            );
+          }
+
+          order = orderResult.order;
+
+          orderId = String(order.id || order._id || order.orderId || "").trim();
+
+          if (!orderId) {
+            throw new Error("Backend không trả về Order ID hợp lệ.");
+          }
+
+          paymentOrderRef.current = {
+            signature: orderSignature,
+            orderId,
+          };
+
+          setPaymentOrder(order);
+        }
+
         if (cancelled) {
           return;
         }
 
-        const intent = result?.paymentIntent;
+        const intentResult = await createBankTransferPaymentIntent({
+          orderId,
+          depositPercent: paymentDepositPercent,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        const intent = intentResult?.paymentIntent;
 
         if (!intent?.id || !intent?.orderCode) {
           throw new Error("Backend không trả về Payment Intent hợp lệ.");
         }
 
+        const serverOrderAmount = Math.round(
+          Number(order?.paymentDepositAmount ?? paymentDepositAmount) || 0
+        );
+
         const receivedAmount = Math.round(Number(intent.amount) || 0);
 
-        if (receivedAmount !== normalizedAmount) {
+        if (serverOrderAmount <= 0 || receivedAmount !== serverOrderAmount) {
           throw new Error(
-            "Số tiền Payment Intent không khớp với tổng tiền Checkout."
+            "Số tiền Payment Intent không khớp với số tiền thanh toán của Order."
           );
         }
 
         setPaymentIntent(intent);
-      })
-      .catch((intentError) => {
+      } catch (intentError) {
         if (cancelled) {
           return;
         }
 
         setPaymentIntent(EMPTY_PAYMENT_INTENT);
         setPaymentVerified(false);
-
         setPaymentError(
           intentError?.message ||
             "Không thể tạo yêu cầu thanh toán chuyển khoản."
         );
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setPaymentIntentLoading(false);
         }
-      });
+      }
+    };
+
+    prepareBankTransferPayment();
 
     return () => {
       cancelled = true;
     };
   }, [
     formData.paymentMethod,
+    formData.recipient,
+    formData.address,
+    formData.note,
     paymentSettings?.bankTransfer?.enabled,
     shippingCalculation.success,
     checkoutPaymentAmount,
+    paymentDepositAmount,
+    paymentDepositPercent,
+    shippingFee,
+    couponCode,
+    appliedCoupon?.coupon?.code,
+    cartItems,
+    deliveryDate,
+    deliveryTimeSlot,
+    deliveryMode,
+    user?.id,
+    user?.name,
+    user?.email,
+    user?.phone,
   ]);
 
   /*
@@ -1267,7 +1414,9 @@ const CheckoutPage = () => {
       const finalGrandTotal = finalCheckoutTotals.grandTotal;
 
       if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
-        const expectedPaymentAmount = Math.round(Number(finalGrandTotal) || 0);
+        const expectedPaymentAmount = Math.round(
+          Number(paymentDepositAmount) || 0
+        );
 
         const currentPaymentAmount = Math.round(
           Number(paymentIntent?.amount) || 0
@@ -1281,7 +1430,7 @@ const CheckoutPage = () => {
           setPaymentVerified(false);
 
           setError(
-            "Thông tin thanh toán chưa được cập nhật theo tổng tiền mới. Vui lòng chờ hệ thống tạo lại mã thanh toán."
+            "Thông tin thanh toán chưa khớp với số tiền phải thanh toán. Vui lòng chờ hệ thống tạo lại mã thanh toán."
           );
 
           return;
@@ -1298,173 +1447,190 @@ const CheckoutPage = () => {
 
           return;
         }
+
+        setPaymentVerified(true);
       }
 
       const paymentIsBankTransfer =
         formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD;
 
-      const result = await createOrder({
-        orderId: paymentIsBankTransfer ? paymentIntent.orderCode : undefined,
+      let newOrder = null;
 
-        customer: {
-          name: formData.recipient.fullName.trim(),
+      if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
+        const preparedOrder = paymentOrder;
 
-          fullName: formData.recipient.fullName.trim(),
+        if (!preparedOrder) {
+          setError(
+            "Đơn hàng thanh toán chưa được chuẩn bị. Vui lòng chờ hệ thống tạo lại thanh toán."
+          );
 
-          phone: formData.recipient.phone.trim(),
+          return;
+        }
 
-          email: formData.recipient.email.trim(),
+        const preparedGrandTotal = Math.round(
+          Number(preparedOrder.grandTotal) || 0
+        );
 
-          address: {
-            provinceCode: formData.address.provinceCode,
+        if (preparedGrandTotal !== Math.round(Number(finalGrandTotal) || 0)) {
+          setPaymentVerified(false);
 
-            provinceName: formData.address.provinceName,
+          setError(
+            "Tổng tiền đơn hàng đã thay đổi. Vui lòng chờ hệ thống tạo lại thanh toán."
+          );
 
-            wardCode: formData.address.wardCode,
+          return;
+        }
 
-            wardName: formData.address.wardName,
+        const refreshedOrderResult = await getOrderById(
+          preparedOrder.id || preparedOrder._id || preparedOrder.orderId
+        );
 
-            houseNumber: formData.address.houseNumber.trim(),
+        if (!refreshedOrderResult?.success || !refreshedOrderResult?.order) {
+          setError(
+            refreshedOrderResult?.message ||
+              "Không thể tải lại đơn hàng sau khi thanh toán."
+          );
 
-            street: formData.address.street.trim(),
+          return;
+        }
+
+        newOrder = refreshedOrderResult.order;
+
+        if (
+          String(newOrder.paymentStatus || "") !== "paid" &&
+          String(newOrder.paymentStatus || "") !== "partially_paid"
+        ) {
+          setPaymentVerified(false);
+
+          setError("Thanh toán chưa được ghi nhận trên đơn hàng.");
+
+          return;
+        }
+      } else {
+        const result = await createOrder({
+          customer: {
+            name: formData.recipient.fullName.trim(),
+
+            fullName: formData.recipient.fullName.trim(),
+
+            phone: formData.recipient.phone.trim(),
+
+            email: formData.recipient.email.trim(),
+
+            address: {
+              provinceCode: formData.address.provinceCode,
+
+              provinceName: formData.address.provinceName,
+
+              wardCode: formData.address.wardCode,
+
+              wardName: formData.address.wardName,
+
+              houseNumber: formData.address.houseNumber.trim(),
+
+              street: formData.address.street.trim(),
+            },
+
+            note: formData.note.trim(),
           },
 
-          note: formData.note.trim(),
-        },
+          sender: {
+            name: formData.sender.name.trim(),
 
-        sender: {
-          name: formData.sender.name.trim(),
+            phone: formData.sender.phone.trim(),
 
-          phone: formData.sender.phone.trim(),
+            email: formData.sender.email.trim(),
 
-          email: formData.sender.email.trim(),
+            isHiddenFromRecipient:
+              formData.sender.isHiddenFromRecipient !== false,
+          },
 
-          isHiddenFromRecipient:
-            formData.sender.isHiddenFromRecipient !== false,
-        },
+          recipient: {
+            name: formData.recipient.fullName.trim(),
 
-        recipient: {
-          name: formData.recipient.fullName.trim(),
+            fullName: formData.recipient.fullName.trim(),
 
-          fullName: formData.recipient.fullName.trim(),
+            phone: formData.recipient.phone.trim(),
 
-          phone: formData.recipient.phone.trim(),
+            email: formData.recipient.email.trim(),
+          },
 
-          email: formData.recipient.email.trim(),
-        },
+          paymentMethod: formData.paymentMethod,
 
-        paymentMethod: formData.paymentMethod,
+          paymentStatus: "pending",
 
-        paymentStatus: paymentIsBankTransfer ? "paid" : "pending",
+          items: cartItems.map((item) => ({
+            id: item.id,
 
-        paymentConfirmed: paymentIsBankTransfer,
+            productId: item.id,
 
-        paymentOrderCode: paymentIsBankTransfer ? paymentIntent.orderCode : "",
+            name: item.name,
 
-        paymentTransferContent: paymentIsBankTransfer ? transferContent : "",
+            productName: item.name,
 
-        paymentTransaction: paymentIsBankTransfer
-          ? paymentIntent.transaction || null
-          : null,
+            price: Number(item.price) || 0,
 
-        payment: {
-          id: paymentIsBankTransfer ? paymentIntent?.id || "" : "",
+            unitPrice: Number(item.price) || 0,
 
-          reference: paymentIsBankTransfer
-            ? paymentIntent?.reference || paymentIntent?.orderCode || ""
-            : "",
+            quantity: Number(item.quantity) || 0,
 
-          method: formData.paymentMethod,
+            image: item.image || "",
 
-          provider: paymentIsBankTransfer
-            ? paymentSettings?.bankTransfer?.bankName ||
-              paymentSettings?.bankTransfer?.bankCode ||
-              "Chuyển khoản ngân hàng"
-            : "cod",
+            productImage: item.image || "",
+          })),
 
-          status: paymentIsBankTransfer ? "paid" : "pending",
+          subtotal,
 
-          amount: finalGrandTotal,
+          shippingFee: finalShippingFee,
 
-          currency: "VND",
+          discountAmount: finalDiscountAmount,
 
-          transactionId: paymentIsBankTransfer
-            ? paymentIntent?.transactionId || ""
-            : "",
+          couponCode:
+            finalCouponResult?.coupon?.code ||
+            appliedCoupon?.coupon?.code ||
+            "",
 
-          transaction: paymentIsBankTransfer
-            ? paymentIntent?.transaction || null
-            : null,
+          total: finalGrandTotal,
 
-          transferContent: paymentIsBankTransfer ? transferContent : "",
+          shippingSnapshot,
 
-          paidAt: paymentIsBankTransfer ? paymentIntent?.paidAt || null : null,
+          deliveryMode: finalShippingCalculation.deliveryMode,
 
-          failedAt: null,
+          deliveryModeLabel: finalShippingCalculation.deliveryModeLabel,
 
-          refundedAt: null,
+          deliveryDate: finalShippingCalculation.deliveryDate,
 
-          failureReason: "",
+          deliveryTimeSlot: finalShippingCalculation.deliveryTimeSlot,
 
-          refundAmount: 0,
-        },
+          deliveryTimeSlotLabel: finalShippingCalculation.deliveryTimeSlotLabel,
 
-        items: cartItems.map((item) => ({
-          id: item.id,
+          estimatedDeliveryTime: finalShippingCalculation.estimatedDeliveryTime,
 
-          name: item.name,
+          deliveryNote: finalShippingCalculation.deliveryNote,
 
-          price: Number(item.price) || 0,
+          deliveryDistanceKm: finalShippingCalculation.distanceKm,
 
-          quantity: Number(item.quantity) || 0,
+          notes: formData.note.trim(),
 
-          image: item.image || "",
-        })),
+          status: "pending",
 
-        subtotal,
+          channel: "website",
+        });
 
-        shippingFee: finalShippingFee,
+        if (!result || result.success !== true || !result.order) {
+          setError(result?.message || "Không thể tạo đơn hàng.");
 
-        discountAmount: finalDiscountAmount,
+          return;
+        }
 
-        couponCode:
-          finalCouponResult?.coupon?.code || appliedCoupon?.coupon?.code || "",
-
-        couponSnapshot:
-          finalCouponResult?.couponSnapshot ||
-          appliedCoupon?.couponSnapshot ||
-          null,
-
-        total: finalGrandTotal,
-
-        shippingSnapshot,
-
-        deliveryMode: finalShippingCalculation.deliveryMode,
-
-        deliveryModeLabel: finalShippingCalculation.deliveryModeLabel,
-
-        deliveryDate: finalShippingCalculation.deliveryDate,
-
-        deliveryTimeSlot: finalShippingCalculation.deliveryTimeSlot,
-
-        deliveryTimeSlotLabel: finalShippingCalculation.deliveryTimeSlotLabel,
-
-        estimatedDeliveryTime: finalShippingCalculation.estimatedDeliveryTime,
-
-        deliveryNote: finalShippingCalculation.deliveryNote,
-
-        deliveryDistanceKm: finalShippingCalculation.distanceKm,
-
-        status: "pending",
-      });
+        newOrder = result.order;
+      }
 
       if (!result || result.success !== true || !result.order) {
         setError(result?.message || "Không thể tạo đơn hàng.");
 
         return;
       }
-
-      const newOrder = result.order;
 
       try {
         localStorage.setItem(

@@ -1,133 +1,205 @@
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+
 const Payment = require("../models/Payment");
 const PaymentTransaction = require("../models/PaymentTransaction");
+const PaymentIntent = require("../models/PaymentIntent");
 const Order = require("../models/Order");
 
-const paymentIntentSchema = new mongoose.Schema(
-  {
-    intentId: { type: String, required: true, unique: true, index: true },
-    orderCode: { type: String, required: true, unique: true, index: true },
-    reference: { type: String, default: "" },
-    amount: { type: Number, required: true, min: 0 },
-    currency: { type: String, default: "VND" },
-    paymentMethod: { type: String, default: "bank_transfer" },
-    depositPercent: {
-      type: Number,
-      enum: [50, 100],
-      default: 100,
-    },
-    status: {
-      type: String,
-      enum: ["pending", "paid", "failed", "refunded", "expired", "cancelled"],
-      default: "pending",
-      index: true,
-    },
-    expiresAt: { type: Date, required: true },
-    paidAt: { type: Date, default: null },
-    paymentAttemptedAt: { type: Date, default: null },
-    transactionId: { type: String, default: "" },
-    transaction: { type: mongoose.Schema.Types.Mixed, default: null },
-    orderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Order",
-      default: null,
-      index: true,
-    },
-  },
-  { timestamps: true },
-);
+const isStaff = (user) =>
+  ["admin", "manager"].includes(String(user?.role || ""));
 
-const PaymentIntent =
-  mongoose.models.PaymentIntent ||
-  mongoose.model("PaymentIntent", paymentIntentSchema);
+const ensureObjectId = (value, message = "ID không hợp lệ.") => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    throw Object.assign(new Error(message), {
+      status: 400,
+    });
+  }
+};
 
-const createIntent = async ({ orderId, amount, depositPercent = 100 }) => {
-  const numericAmount = Math.round(Number(amount) || 0);
+const ensureOrderOwnership = (order, user) => {
+  if (!order) {
+    throw Object.assign(new Error("Không tìm thấy đơn hàng."), {
+      status: 404,
+    });
+  }
 
-  const normalizedDepositPercent = Number(depositPercent) === 50 ? 50 : 100;
+  if (
+    !isStaff(user) &&
+    String(order.customerId || "") !== String(user?._id || "")
+  ) {
+    throw Object.assign(
+      new Error("Bạn không có quyền truy cập đơn hàng này."),
+      {
+        status: 403,
+      },
+    );
+  }
+};
 
-  if (numericAmount <= 0) {
+const createIntent = async ({ orderId, depositPercent, user }) => {
+  ensureObjectId(orderId, "Order ID không hợp lệ.");
+
+  const order = await Order.findById(orderId);
+
+  ensureOrderOwnership(order, user);
+
+  if (order.status === "cancelled") {
+    throw Object.assign(
+      new Error("Không thể tạo thanh toán cho đơn hàng đã hủy."),
+      {
+        status: 400,
+      },
+    );
+  }
+
+  if (
+    !["pending", "confirmed", "processing", "shipping"].includes(
+      String(order.status),
+    )
+  ) {
+    throw Object.assign(
+      new Error("Đơn hàng hiện không ở trạng thái cho phép thanh toán."),
+      {
+        status: 400,
+      },
+    );
+  }
+
+  if (String(order.paymentMethod || "") !== "bank_transfer") {
+    throw Object.assign(
+      new Error("Payment Intent chỉ được tạo cho đơn hàng chuyển khoản."),
+      {
+        status: 400,
+      },
+    );
+  }
+
+  const normalizedDepositPercent =
+    Number(order.paymentDepositPercent) === 50 ? 50 : 100;
+
+  /*
+   * Không tin depositPercent từ Frontend.
+   * Order trong MongoDB mới là nguồn sự thật.
+   */
+  if (
+    depositPercent !== undefined &&
+    Number(depositPercent) !== normalizedDepositPercent
+  ) {
+    throw Object.assign(
+      new Error("Tỷ lệ thanh toán không khớp với cấu hình của đơn hàng."),
+      {
+        status: 400,
+      },
+    );
+  }
+
+  const grandTotal = Math.max(0, Math.round(Number(order.grandTotal) || 0));
+
+  if (grandTotal <= 0) {
+    throw Object.assign(new Error("Tổng tiền đơn hàng không hợp lệ."), {
+      status: 400,
+    });
+  }
+
+  const calculatedDepositAmount = Math.round(
+    (grandTotal * normalizedDepositPercent) / 100,
+  );
+
+  const paymentAmount = Math.max(0, calculatedDepositAmount);
+
+  if (paymentAmount <= 0) {
     throw Object.assign(new Error("Số tiền thanh toán không hợp lệ."), {
       status: 400,
     });
   }
 
-  const existingIntent = await PaymentIntent.findOne({
-    orderCode: {
-      $regex: /^HTH\d{6}-\d{4}$/,
-      $options: "i",
-    },
-  }).sort({ createdAt: -1 });
+  const paymentRemainingAmount = Math.max(0, grandTotal - paymentAmount);
 
-  let orderCode;
+  if (
+    Number(order.paymentDepositAmount) !== paymentAmount ||
+    Number(order.paymentRemainingAmount) !== paymentRemainingAmount
+  ) {
+    order.paymentDepositAmount = paymentAmount;
+    order.paymentRemainingAmount = paymentRemainingAmount;
 
-  if (orderId) {
-    const order = await Order.findById(orderId);
-
-    if (!order) {
-      throw Object.assign(new Error("Không tìm thấy đơn hàng."), {
-        status: 404,
-      });
-    }
-
-    orderCode = order.orderCode;
+    await order.save();
   }
 
-  if (!orderCode) {
-    const d = new Date();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    const prefix = `HTH${String(d.getFullYear()).slice(-2)}${String(
-      d.getMonth() + 1,
-    ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-
-    for (let i = 0; i < 100; i += 1) {
-      const candidate = `${prefix}-${String(
-        crypto.randomInt(0, 10000),
-      ).padStart(4, "0")}`;
-
-      const exists = await PaymentIntent.exists({
-        orderCode: candidate,
-      });
-
-      if (!exists) {
-        orderCode = candidate;
-        break;
-      }
-    }
-  }
-
-  if (!orderCode) {
-    throw new Error("Không thể tạo mã thanh toán.");
-  }
-
-  const intent = await PaymentIntent.create({
-    intentId: crypto.randomUUID(),
-
-    orderCode,
-
-    reference: orderCode,
-
-    amount: numericAmount,
-
-    currency: "VND",
-
-    paymentMethod: "bank_transfer",
-
-    depositPercent: normalizedDepositPercent,
-
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-
-    status: "pending",
-
-    orderId: orderId || null,
+  let intent = await PaymentIntent.findOne({
+    orderId: order._id,
   });
+
+  if (
+    intent &&
+    intent.status === "pending" &&
+    intent.expiresAt &&
+    new Date(intent.expiresAt).getTime() > Date.now()
+  ) {
+    return intent.toObject();
+  }
+
+  const intentId = crypto.randomUUID();
+
+  if (intent) {
+    intent.intentId = intentId;
+    intent.customerId = order.customerId;
+    intent.orderCode = order.orderCode;
+    intent.reference = order.orderCode;
+    intent.amount = paymentAmount;
+    intent.currency = "VND";
+    intent.paymentMethod = "bank_transfer";
+    intent.depositPercent = normalizedDepositPercent;
+    intent.status = "pending";
+    intent.expiresAt = expiresAt;
+    intent.paidAt = null;
+    intent.paymentAttemptedAt = null;
+    intent.transactionId = "";
+    intent.transaction = null;
+
+    await intent.save();
+  } else {
+    intent = await PaymentIntent.create({
+      intentId,
+      orderId: order._id,
+      customerId: order.customerId,
+      orderCode: order.orderCode,
+      reference: order.orderCode,
+      amount: paymentAmount,
+      currency: "VND",
+      paymentMethod: "bank_transfer",
+      depositPercent: normalizedDepositPercent,
+      status: "pending",
+      expiresAt,
+    });
+  }
+
+  order.paymentIntentId = intent.intentId;
+
+  await order.save();
+
+  await Payment.updateOne(
+    {
+      orderId: order._id,
+    },
+    {
+      $set: {
+        paymentIntentId: intent.intentId,
+        amount: paymentAmount,
+        currency: "VND",
+        status: "pending",
+      },
+    },
+  );
 
   return intent.toObject();
 };
 
 const serializeIntent = (intent) => ({
   id: intent.intentId,
+  orderId: intent.orderId,
   orderCode: intent.orderCode,
   reference: intent.reference || intent.orderCode,
   amount: intent.amount,
@@ -141,32 +213,67 @@ const serializeIntent = (intent) => ({
   transaction: intent.status === "paid" ? intent.transaction : null,
 });
 
-const getIntent = async (intentId) => {
-  const intent = await PaymentIntent.findOne({ intentId });
-  if (!intent)
+const getIntent = async (intentId, user) => {
+  const intent = await PaymentIntent.findOne({
+    intentId: String(intentId || "").trim(),
+  });
+
+  if (!intent) {
     throw Object.assign(new Error("Không tìm thấy Payment Intent."), {
       status: 404,
     });
+  }
+
+  const order = await Order.findById(intent.orderId).lean();
+
+  ensureOrderOwnership(order, user);
 
   if (
     intent.status === "pending" &&
+    intent.expiresAt &&
     new Date(intent.expiresAt).getTime() < Date.now()
   ) {
     intent.status = "expired";
     await intent.save();
   }
+
   return serializeIntent(intent);
 };
 
-const markStarted = async (intentId) => {
-  const intent = await PaymentIntent.findOne({ intentId });
-  if (!intent)
+const markStarted = async (intentId, user) => {
+  const intent = await PaymentIntent.findOne({
+    intentId: String(intentId || "").trim(),
+  });
+
+  if (!intent) {
     throw Object.assign(new Error("Không tìm thấy Payment Intent."), {
       status: 404,
     });
-  if (intent.status !== "pending") return serializeIntent(intent);
+  }
+
+  const order = await Order.findById(intent.orderId).lean();
+
+  ensureOrderOwnership(order, user);
+
+  if (
+    intent.status === "pending" &&
+    intent.expiresAt &&
+    new Date(intent.expiresAt).getTime() < Date.now()
+  ) {
+    intent.status = "expired";
+    await intent.save();
+
+    return serializeIntent(intent);
+  }
+
+  if (intent.status !== "pending") {
+    return serializeIntent(intent);
+  }
+
   intent.paymentAttemptedAt = new Date();
+
   await intent.save();
+
   return serializeIntent(intent);
 };
 
@@ -178,14 +285,28 @@ const applySePayWebhook = async (payload) => {
       crypto.randomUUID(),
   ).trim();
 
-  const exists = await PaymentTransaction.findOne({ providerTransactionId });
-  if (exists) return { duplicate: true };
+  const existing = await PaymentTransaction.findOne({
+    providerTransactionId,
+  });
+
+  if (existing) {
+    return {
+      duplicate: true,
+      transactionId: existing._id,
+    };
+  }
 
   const content = String(payload?.content || payload?.description || "").trim();
-  const amount = Number(payload?.transferAmount ?? payload?.amount ?? 0);
+
+  const amount = Math.max(
+    0,
+    Math.round(Number(payload?.transferAmount ?? payload?.amount ?? 0) || 0),
+  );
+
   const transferType = String(payload?.transferType || "").toLowerCase();
 
   const match = content.match(/HTH\d{6}-\d{4}/i);
+
   const orderCode = match?.[0] || String(payload?.code || "").trim();
 
   const intent = orderCode
@@ -200,6 +321,8 @@ const applySePayWebhook = async (payload) => {
   const transaction = await PaymentTransaction.create({
     provider: "sepay",
     providerTransactionId,
+    paymentIntentId: intent?.intentId || "",
+    orderId: intent?.orderId || null,
     orderCode: intent?.orderCode || orderCode,
     amount,
     content,
@@ -212,28 +335,65 @@ const applySePayWebhook = async (payload) => {
   });
 
   if (transferType !== "in" || !intent || intent.status !== "pending") {
-    return { duplicate: false, matched: false, transactionId: transaction._id };
+    return {
+      duplicate: false,
+      matched: false,
+      transactionId: transaction._id,
+    };
   }
 
-  if (
-    amount < intent.amount ||
-    (intent.expiresAt && new Date(intent.expiresAt) < new Date())
-  ) {
-    return { duplicate: false, matched: false, transactionId: transaction._id };
+  if (intent.expiresAt && new Date(intent.expiresAt).getTime() < Date.now()) {
+    intent.status = "expired";
+    await intent.save();
+
+    return {
+      duplicate: false,
+      matched: false,
+      transactionId: transaction._id,
+    };
+  }
+
+  if (amount < Number(intent.amount || 0)) {
+    return {
+      duplicate: false,
+      matched: false,
+      transactionId: transaction._id,
+    };
   }
 
   const normalizedContent = content.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const normalizedOrderCode = intent.orderCode
+
+  const normalizedOrderCode = String(intent.orderCode || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
-  if (!normalizedContent.includes(normalizedOrderCode)) {
-    return { duplicate: false, matched: false, transactionId: transaction._id };
+
+  if (
+    !normalizedOrderCode ||
+    !normalizedContent.includes(normalizedOrderCode)
+  ) {
+    return {
+      duplicate: false,
+      matched: false,
+      transactionId: transaction._id,
+    };
+  }
+
+  const order = await Order.findById(intent.orderId);
+
+  if (!order) {
+    return {
+      duplicate: false,
+      matched: false,
+      transactionId: transaction._id,
+    };
   }
 
   const paidAt = new Date();
+
   intent.status = "paid";
   intent.paidAt = paidAt;
   intent.transactionId = providerTransactionId;
+
   intent.transaction = {
     provider: "sepay",
     providerTransactionId,
@@ -242,55 +402,66 @@ const applySePayWebhook = async (payload) => {
     referenceCode: String(payload?.referenceCode || ""),
     transactionDate: payload?.transactionDate || null,
   };
+
   await intent.save();
 
-  await PaymentTransaction.updateOne(
-    { _id: transaction._id },
-    { $set: { matched: true } },
-  );
+  transaction.matched = true;
+  transaction.paymentIntentId = intent.intentId;
+  transaction.orderId = order._id;
+  transaction.orderCode = order.orderCode;
 
-  const order = await Order.findOne({ orderCode: intent.orderCode });
-  if (order) {
-    order.paymentStatus =
-      Number(intent.depositPercent) === 50 ? "partially_paid" : "paid";
-    order.paymentIntentId = intent.intentId;
+  await transaction.save();
 
-    const payment = await Payment.findOne({
+  const depositPercent = Number(intent.depositPercent) === 50 ? 50 : 100;
+
+  order.paymentStatus = depositPercent === 50 ? "partially_paid" : "paid";
+
+  order.paymentIntentId = intent.intentId;
+
+  const payment = await Payment.findOne({
+    orderId: order._id,
+  });
+
+  if (payment) {
+    payment.paymentIntentId = intent.intentId;
+
+    payment.status = "paid";
+
+    payment.transactionId = providerTransactionId;
+
+    payment.paidAt = paidAt;
+
+    payment.rawResponse = payload;
+
+    payment.amount = Number(intent.amount);
+
+    await payment.save();
+
+    order.paymentId = payment._id;
+  } else {
+    const createdPayment = await Payment.create({
       orderId: order._id,
+      provider: "sepay",
+      method: order.paymentMethod || "bank_transfer",
+      amount: Number(intent.amount),
+      currency: "VND",
+      status: "paid",
+      paymentIntentId: intent.intentId,
+      transactionId: providerTransactionId,
+      paidAt,
+      rawResponse: payload,
     });
 
-    if (payment) {
-      order.paymentId = payment._id;
-      await order.save();
-
-      payment.paymentIntentId = intent.intentId;
-      payment.status = "paid";
-      payment.transactionId = providerTransactionId;
-      payment.paidAt = paidAt;
-      payment.rawResponse = payload;
-
-      await payment.save();
-    } else {
-      const createdPayment = await Payment.create({
-        orderId: order._id,
-        provider: "sepay",
-        method: order.paymentMethod || "bank_transfer",
-        amount: intent.amount,
-        currency: "VND",
-        status: "paid",
-        paymentIntentId: intent.intentId,
-        transactionId: providerTransactionId,
-        paidAt,
-        rawResponse: payload,
-      });
-
-      order.paymentId = createdPayment._id;
-
-      await order.save();
-    }
+    order.paymentId = createdPayment._id;
   }
 
-  return { duplicate: false, matched: true, transactionId: transaction._id };
+  await order.save();
+
+  return {
+    duplicate: false,
+    matched: true,
+    transactionId: transaction._id,
+  };
 };
 
 module.exports = {

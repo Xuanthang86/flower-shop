@@ -55,6 +55,15 @@ router.post("/", requireAuth, authorize("admin"), async (req, res, next) => {
   try {
     const { name, email, phone, password, role } = req.body;
 
+    const normalizedPassword = String(password || "");
+
+    if (normalizedPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu phải có ít nhất 8 ký tự.",
+      });
+    }
+
     if (!["manager", "product_manager"].includes(role)) {
       return res.status(400).json({
         success: false,
@@ -82,7 +91,7 @@ router.post("/", requireAuth, authorize("admin"), async (req, res, next) => {
       });
     }
 
-    const passwordHash = await bcrypt.hash(String(password || ""), 12);
+    const passwordHash = await bcrypt.hash(normalizedPassword, 12);
 
     const user = await User.create({
       name: String(name || "").trim(),

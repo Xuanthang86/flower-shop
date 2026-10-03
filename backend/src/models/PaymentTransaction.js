@@ -15,6 +15,12 @@ const paymentTransactionSchema = new mongoose.Schema(
       index: true,
     },
 
+    paymentIntentId: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
@@ -31,6 +37,7 @@ const paymentTransactionSchema = new mongoose.Schema(
     amount: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     content: {
