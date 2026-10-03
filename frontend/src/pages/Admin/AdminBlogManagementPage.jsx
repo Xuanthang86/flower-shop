@@ -179,8 +179,6 @@ const AdminBlogManagementPage = () => {
 
   const [pageSize, setPageSize] = useState(9);
 
-  const DEFAULT_POSTS_PER_PAGE = 9;
-
   const PAGE_SIZE_OPTIONS = [5, 9, 10, 20, 50, 100];
 
   const blogCategories = Array.isArray(settings.blogCategories)
@@ -982,6 +980,36 @@ const AdminBlogManagementPage = () => {
               </article>
             ))}
           </section>
+        )}
+
+        {paginatedPosts.length > 0 && (
+          <div className="mt-6 flex flex-col gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>Hiển thị</span>
+
+              <select
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                aria-label="Số bài viết mỗi trang"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} bài
+                  </option>
+                ))}
+              </select>
+
+              <span>bài/trang</span>
+            </div>
+
+            <p className="text-sm text-gray-500">
+              Tổng số: {visiblePosts.length} bài
+            </p>
+          </div>
         )}
 
         {totalPages > 1 && (

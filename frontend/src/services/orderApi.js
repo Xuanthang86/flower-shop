@@ -16,6 +16,9 @@ export const getOrder = async (id) => {
 };
 
 export const updateOrderStatus = async (id, payload) => {
-  const { data } = await api.patch(`/orders/${encodeURIComponent(id)}/status`, payload);
+  const { data } = await api.patch(
+    `/orders/${encodeURIComponent(id)}/status`,
+    payload
+  );
   return data?.item;
 };

@@ -90,10 +90,6 @@ const AdminOrderList = () => {
     };
   }, [page, pageSize, statusFilter, searchTerm, refreshOrders]);
 
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const [statusFilter, setStatusFilter] = useState("all");
-
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-5 border-b border-gray-100">
@@ -112,14 +108,20 @@ const AdminOrderList = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm mã đơn, khách hàng, số điện thoại..."
               className="w-full sm:w-80 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-100"
             />
 
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
               className="border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:border-pink-500"
             >
               <option value="all">Tất cả trạng thái</option>
@@ -134,7 +136,7 @@ const AdminOrderList = () => {
         </div>
       </div>
 
-      {filteredOrders.length === 0 ? (
+      {orders.length === 0 ? (
         <div className="px-6 py-16 text-center">
           <div className="text-4xl mb-4">📦</div>
 

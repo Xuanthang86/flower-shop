@@ -32,7 +32,6 @@ import {
 } from "@/services/shipping";
 
 import {
-  readPaymentSettings,
   fetchPaymentSettings,
   getDefaultPaymentSettings,
   buildTransferContent,
@@ -152,8 +151,6 @@ const CheckoutPage = () => {
   const [paymentSettings, setPaymentSettings] = useState(() =>
     getDefaultPaymentSettings()
   );
-
-  const [paymentSettingsLoading, setPaymentSettingsLoading] = useState(true);
 
   const [resolvedBankCode, setResolvedBankCode] = useState("");
 
@@ -334,8 +331,6 @@ const CheckoutPage = () => {
     let cancelled = false;
 
     const refreshPaymentSettings = async () => {
-      setPaymentSettingsLoading(true);
-
       try {
         const latestSettings = await fetchPaymentSettings();
 
@@ -347,10 +342,6 @@ const CheckoutPage = () => {
 
         if (!cancelled) {
           setPaymentSettings(getDefaultPaymentSettings());
-        }
-      } finally {
-        if (!cancelled) {
-          setPaymentSettingsLoading(false);
         }
       }
     };

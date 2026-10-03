@@ -233,8 +233,20 @@ const OrderProvider = ({ children }) => {
       try {
         const response = await listOrders({
           page: params.page || 1,
+
           limit: params.limit || 50,
-          ...(params.status ? { status: params.status } : {}),
+
+          ...(params.status
+            ? {
+                status: params.status,
+              }
+            : {}),
+
+          ...(params.search?.trim()
+            ? {
+                search: params.search.trim(),
+              }
+            : {}),
         });
 
         const normalized = normalizeListResponse(response);

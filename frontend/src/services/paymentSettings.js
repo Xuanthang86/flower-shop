@@ -195,13 +195,8 @@ export const readPaymentSettings = () => {
 export const fetchPaymentSettings = async () => {
   const { data: payload } = await api.get("/data/snapshot");
 
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(
-      payload?.message ||
-        "Không thể tải cấu hình thanh toán mới nhất từ hệ thống."
-    );
+  if (!payload) {
+    throw new Error("Không thể tải cấu hình thanh toán mới nhất từ hệ thống.");
   }
 
   const remotePaymentSettings = payload?.snapshot?.settings?.payment;
