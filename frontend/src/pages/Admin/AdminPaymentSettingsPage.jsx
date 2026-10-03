@@ -6,6 +6,7 @@ import { useNotification } from "@/context/NotificationProvider";
 
 import {
   readPaymentSettings,
+  fetchPaymentSettings,
   savePaymentSettings,
   resolvePaymentBank,
 } from "@/services/paymentSettings";
@@ -20,17 +21,35 @@ const inputClass =
 const AdminPaymentSettingsPage = () => {
   const { notifySuccess, notifyError } = useNotification();
 
+  /*
+   * Chỉ dùng readPaymentSettings() làm fallback ban đầu.
+   * Sau khi component mount, fetchPaymentSettings() sẽ lấy
+   * cấu hình mới nhất trực tiếp từ backend.
+   */
   const [settings, setSettings] = useState(() => readPaymentSettings());
 
   const [uploadingQr, setUploadingQr] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
+  /*
+   * Ghi nhận chính xác những trường Admin đã thay đổi.
+   *
+   * Mục đích:
+   * Nếu một Admin khác vừa cập nhật cấu hình trên trình duyệt khác,
+   * khi Admin hiện tại bấm Lưu sẽ không lấy dữ liệu cũ trong form
+   * để ghi đè những trường mà Admin hiện tại không chỉnh sửa.
+   */
+  const [dirtyBankFields, setDirtyBankFields] = useState({});
+
+  /*
+   * Cập nhật title trang.
+   */
   useEffect(() => {
     const updateTitle = () => {
-      const settings = readSiteSettings();
+      const siteSettings = readSiteSettings();
 
-      document.title = getPageTitle(settings, "Cấu hình thanh toán");
+      document.title = getPageTitle(siteSettings, "Cấu hình thanh toán");
     };
 
     updateTitle();
@@ -49,43 +68,123 @@ const AdminPaymentSettingsPage = () => {
     };
   }, []);
 
+  /*
+   * QUAN TRỌNG:
+   * Khi mở trang, luôn lấy payment settings mới nhất từ backend.
+   *
+   * Không sử dụng localStorage làm nguồn dữ liệu chính.
+   *
+   * Điều này xử lý trường hợp:
+   *
+   * Browser A:
+   *   cập nhật số tài khoản/chủ tài khoản
+   *
+   * Browser B:
+   *   mở lại Cấu hình thanh toán
+   *
+   * Browser B phải nhận dữ liệu mới nhất từ backend.
+   */
   useEffect(() => {
-    const refresh = () => {
-      setSettings(readPaymentSettings());
+    let cancelled = false;
+
+    const refresh = async () => {
+      try {
+        const latest = await fetchPaymentSettings();
+
+        if (cancelled) {
+          return;
+        }
+
+        setSettings(latest);
+        setDirtyBankFields({});
+      } catch (error) {
+        console.error("Không thể tải cấu hình thanh toán mới nhất:", error);
+
+        /*
+         * Chỉ fallback về local cache khi backend không thể truy cập.
+         */
+        if (!cancelled) {
+          setSettings(readPaymentSettings());
+        }
+      }
     };
 
-    window.addEventListener("flower-shop-payment-settings-updated", refresh);
+    refresh();
 
-    window.addEventListener("flower-shop-site-settings-updated", refresh);
+    const handlePaymentSettingsUpdated = () => {
+      refresh();
+    };
 
-    window.addEventListener("storage", refresh);
+    const handleStorage = () => {
+      refresh();
+    };
+
+    window.addEventListener(
+      "flower-shop-payment-settings-updated",
+      handlePaymentSettingsUpdated
+    );
+
+    window.addEventListener(
+      "flower-shop-site-settings-updated",
+      handlePaymentSettingsUpdated
+    );
+
+    window.addEventListener("storage", handleStorage);
 
     return () => {
+      cancelled = true;
+
       window.removeEventListener(
         "flower-shop-payment-settings-updated",
-        refresh
+        handlePaymentSettingsUpdated
       );
 
-      window.removeEventListener("flower-shop-site-settings-updated", refresh);
+      window.removeEventListener(
+        "flower-shop-site-settings-updated",
+        handlePaymentSettingsUpdated
+      );
 
-      window.removeEventListener("storage", refresh);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
-  const bankTransfer = settings.bankTransfer || {};
+  const bankTransfer = settings?.bankTransfer || {};
 
+  /*
+   * Cập nhật trường cấu hình chuyển khoản.
+   *
+   * Đồng thời đánh dấu field đã được Admin chỉnh sửa.
+   */
   const updateBankTransfer = (field, value) => {
     setSettings((current) => ({
       ...current,
 
       bankTransfer: {
-        ...(current.bankTransfer || {}),
+        ...(current?.bankTransfer || {}),
 
         [field]: value,
       },
     }));
+
+    setDirtyBankFields((current) => ({
+      ...current,
+
+      [field]: true,
+    }));
   };
 
+  /*
+   * Upload QR ngân hàng thực tế.
+   *
+   * Lưu ý:
+   * QR này KHÔNG thay thế QR động của từng đơn hàng.
+   * QR động vẫn phải được tạo từ:
+   *
+   * BIN
+   * + số tài khoản
+   * + số tiền
+   * + nội dung chuyển khoản
+   */
   const handleQrUpload = async (event) => {
     const file = event.target.files?.[0];
 
@@ -98,16 +197,8 @@ const AdminPaymentSettingsPage = () => {
     setUploadingQr(true);
 
     try {
-      /*
-       * QR thanh toán phải giữ nguyên file gốc.
-       *
-       * Không resize.
-       * Không convert WebP.
-       * Không nén lossy.
-       */
       const url = await uploadImageFile(file, {
         folder: "flower-shop/payment",
-
         preserveOriginal: true,
       });
 
@@ -123,6 +214,19 @@ const AdminPaymentSettingsPage = () => {
     }
   };
 
+  /*
+   * Lưu cấu hình thanh toán.
+   *
+   * QUAN TRỌNG:
+   * Trước khi lưu, luôn lấy cấu hình mới nhất từ backend.
+   *
+   * Sau đó:
+   * - giữ nguyên các field mới nhất từ backend;
+   * - chỉ ghi đè những field mà Admin hiện tại thực sự thay đổi.
+   *
+   * Điều này tránh Browser B dùng dữ liệu cũ để ghi đè
+   * thay đổi mới của Browser A.
+   */
   const handleSave = async () => {
     const accountNumber = String(bankTransfer.accountNumber || "")
       .trim()
@@ -170,19 +274,78 @@ const AdminPaymentSettingsPage = () => {
 
     try {
       /*
-       * Không sử dụng bankCode nhập tay trực tiếp nữa.
-       *
-       * resolvePaymentBank sẽ kiểm tra:
-       * - BIN
-       * - code
-       * - shortName
-       * - tên ngân hàng
-       *
-       * và trả về BIN chuẩn của VietQR.
+       * Lấy cấu hình mới nhất từ backend trước khi save.
+       */
+      const latestSettings = await fetchPaymentSettings();
+
+      const latestBankTransfer = latestSettings?.bankTransfer || {};
+
+      /*
+       * Bắt đầu từ dữ liệu mới nhất trên backend.
+       */
+      const mergedBankTransfer = {
+        ...latestBankTransfer,
+      };
+
+      /*
+       * Chỉ ghi đè những field mà Admin hiện tại
+       * thực sự đã chỉnh sửa.
+       */
+      Object.keys(dirtyBankFields).forEach((field) => {
+        if (dirtyBankFields[field]) {
+          mergedBankTransfer[field] = bankTransfer[field];
+        }
+      });
+
+      /*
+       * Chuẩn hóa lại các giá trị quan trọng.
+       */
+      const finalBankName = String(mergedBankTransfer.bankName || "").trim();
+
+      const finalBankCode = String(mergedBankTransfer.bankCode || "").trim();
+
+      const finalAccountNumber = String(mergedBankTransfer.accountNumber || "")
+        .trim()
+        .replace(/\s+/g, "");
+
+      const finalAccountName = String(
+        mergedBankTransfer.accountName || ""
+      ).trim();
+
+      const finalPrefix = String(
+        mergedBankTransfer.transferContentPrefix || ""
+      ).trim();
+
+      if (!finalBankName) {
+        notifyError("Vui lòng nhập tên ngân hàng.");
+
+        return;
+      }
+
+      if (!finalAccountNumber) {
+        notifyError("Vui lòng nhập số tài khoản nhận tiền.");
+
+        return;
+      }
+
+      if (!finalAccountName) {
+        notifyError("Vui lòng nhập tên chủ tài khoản.");
+
+        return;
+      }
+
+      if (!finalPrefix) {
+        notifyError("Vui lòng nhập tiền tố nội dung chuyển khoản.");
+
+        return;
+      }
+
+      /*
+       * Kiểm tra và chuẩn hóa ngân hàng theo VietQR.
        */
       const resolvedBank = await resolvePaymentBank({
-        bankCode,
-        bankName,
+        bankCode: finalBankCode,
+        bankName: finalBankName,
       });
 
       if (!resolvedBank) {
@@ -199,40 +362,57 @@ const AdminPaymentSettingsPage = () => {
         return;
       }
 
-      const saved = await savePaymentSettings({
-        ...settings,
+      /*
+       * Tạo payload cuối cùng.
+       *
+       * Dữ liệu payment ở đây được xây dựng từ
+       * bản mới nhất backend + các thay đổi thực sự
+       * của Admin hiện tại.
+       */
+      const mergedSettings = {
+        ...latestSettings,
 
         bankTransfer: {
-          ...bankTransfer,
+          ...mergedBankTransfer,
 
-          enabled: bankTransfer.enabled !== false,
+          enabled: mergedBankTransfer.enabled !== false,
 
-          bankName,
+          bankName: finalBankName,
 
           /*
-           * QUAN TRỌNG:
-           * lưu BIN 6 số chuẩn VietQR thay cho giá trị nhập tự do.
+           * Luôn lưu BIN chuẩn VietQR.
            */
           bankCode: resolvedBank.bin,
 
-          accountNumber,
+          accountNumber: finalAccountNumber,
 
-          accountName,
+          accountName: finalAccountName,
 
-          qrCodeUrl: String(bankTransfer.qrCodeUrl || "").trim(),
+          /*
+           * QR upload chỉ là QR ngân hàng thực tế/dự phòng.
+           *
+           * Không dùng QR upload làm QR động của từng đơn.
+           */
+          qrCodeUrl: String(mergedBankTransfer.qrCodeUrl || "").trim(),
 
-          transferContentPrefix: prefix,
+          transferContentPrefix: finalPrefix,
 
-          instructions: String(bankTransfer.instructions || "").trim(),
+          instructions: String(mergedBankTransfer.instructions || "").trim(),
         },
-      });
+      };
+
+      const saved = await savePaymentSettings(mergedSettings);
 
       setSettings(saved);
+
+      setDirtyBankFields({});
 
       notifySuccess(
         `Đã lưu cấu hình thanh toán. BIN VietQR: ${resolvedBank.bin}.`
       );
     } catch (error) {
+      console.error("Không thể lưu cấu hình thanh toán:", error);
+
       notifyError(error?.message || "Không thể đồng bộ cấu hình thanh toán.");
     } finally {
       setSaving(false);
@@ -371,7 +551,7 @@ const AdminPaymentSettingsPage = () => {
                       event.target.value.toUpperCase()
                     )
                   }
-                  placeholder="FLOWERSHOP"
+                  placeholder="HTH"
                   className={inputClass}
                 />
 
