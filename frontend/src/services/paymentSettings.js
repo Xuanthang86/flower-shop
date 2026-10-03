@@ -209,6 +209,57 @@ export const readPaymentSettings = () => {
   return clone(DEFAULT_PAYMENT_SETTINGS);
 };
 
+export const fetchPaymentSettings = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/data/snapshot`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.message ||
+          "Không thể tải cấu hình thanh toán mới nhất từ hệ thống."
+      );
+    }
+
+    const remotePaymentSettings = payload?.snapshot?.settings?.payment;
+
+    if (!remotePaymentSettings || typeof remotePaymentSettings !== "object") {
+      return readPaymentSettings();
+    }
+
+    const normalized = normalizeSettings(remotePaymentSettings);
+
+    try {
+      localStorage.setItem(
+        PAYMENT_SETTINGS_STORAGE_KEY,
+        JSON.stringify(normalized)
+      );
+    } catch (storageError) {
+      console.warn(
+        "Không thể cập nhật cache cấu hình thanh toán:",
+        storageError
+      );
+    }
+
+    window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+
+    return normalized;
+  } catch (error) {
+    console.warn(
+      "Không thể tải cấu hình thanh toán từ backend, sử dụng cache hiện tại:",
+      error
+    );
+
+    return readPaymentSettings();
+  }
+};
+
 export const savePaymentSettings = async (paymentSettings = {}) => {
   const current = readPaymentSettings();
 

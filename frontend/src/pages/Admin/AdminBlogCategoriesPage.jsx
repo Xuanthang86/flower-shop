@@ -39,6 +39,11 @@ const EMPTY_FORM = {
   seoDescription: "",
 };
 
+const isDeletedBlogPost = (post) =>
+  Boolean(
+    post?.isDeleted === true || post?.deletedAt || post?.status === "deleted"
+  );
+
 const AdminBlogCategoriesPage = () => {
   useEffect(() => {
     const updateTitle = () => {
@@ -287,8 +292,9 @@ const AdminBlogCategoriesPage = () => {
                 {categories.map((category) => {
                   const count = posts.filter(
                     (post) =>
-                      String(post.categoryId || "") === String(category.id) ||
-                      String(post.categorySlug || "") === category.slug
+                      !isDeletedBlogPost(post) &&
+                      (String(post.categoryId || "") === String(category.id) ||
+                        String(post.categorySlug || "") === category.slug)
                   ).length;
 
                   return (

@@ -556,6 +556,10 @@ export const DEFAULT_SITE_SETTINGS = {
     },
   },
 
+  notifications: {
+    orderEmail: "",
+  },
+
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 
   blogCategories: [],
@@ -999,6 +1003,16 @@ const mergeSettings = (input = {}) => {
       : [],
   };
 
+  const notifications = {
+    orderEmail: String(
+      source.notifications?.orderEmail ||
+        defaults.notifications.orderEmail ||
+        ""
+    )
+      .trim()
+      .toLowerCase(),
+  };
+
   const normalizedBlogCategories = normalizeBlogCategories(
     Array.isArray(source.blogCategories) ? source.blogCategories : []
   );
@@ -1012,6 +1026,8 @@ const mergeSettings = (input = {}) => {
     branding,
 
     seo,
+
+    notifications,
 
     hero: {
       ...defaults.hero,

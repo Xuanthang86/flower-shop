@@ -75,6 +75,28 @@ const orderSchema = new mongoose.Schema(
       },
     },
 
+    senderSnapshot: {
+      fullName: {
+        type: String,
+        default: "",
+      },
+
+      phone: {
+        type: String,
+        default: "",
+      },
+
+      email: {
+        type: String,
+        default: "",
+      },
+
+      isHiddenFromRecipient: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
     recipientSnapshot: {
       fullName: {
         type: String,
@@ -119,6 +141,42 @@ const orderSchema = new mongoose.Schema(
       street: {
         type: String,
         default: "",
+      },
+
+      deliveryMode: {
+        type: String,
+        default: "",
+      },
+
+      deliveryModeLabel: {
+        type: String,
+        default: "",
+      },
+
+      deliveryTimeSlotLabel: {
+        type: String,
+        default: "",
+      },
+
+      estimatedDeliveryTime: {
+        type: String,
+        default: "",
+      },
+
+      deliveryDistanceKm: {
+        type: Number,
+        default: null,
+        min: 0,
+      },
+
+      deliveryNote: {
+        type: String,
+        default: "",
+      },
+
+      shippingSnapshot: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
       },
 
       note: {

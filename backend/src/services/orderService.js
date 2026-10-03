@@ -5,6 +5,10 @@ const Product = require("../models/Product");
 const Coupon = require("../models/Coupon");
 const Payment = require("../models/Payment");
 const User = require("../models/User");
+const {
+  sendNewOrderNotification,
+  sendOrderStatusNotification,
+} = require("./emailService");
 
 const ALLOWED_CHANNELS = [
   "website",
@@ -276,6 +280,8 @@ const create = async ({ payload = {}, user }) => {
 
   const recipient = payload.recipient || payload.address || {};
 
+  const sender = payload.sender || {};
+
   const paymentDepositPercent =
     Number(payload.paymentDepositPercent) === 50 ? 50 : 100;
 
@@ -301,6 +307,18 @@ const create = async ({ payload = {}, user }) => {
       email: String(customer.email || "")
         .trim()
         .toLowerCase(),
+    },
+
+    senderSnapshot: {
+      fullName: String(sender.name || "").trim(),
+
+      phone: String(sender.phone || "").trim(),
+
+      email: String(sender.email || "")
+        .trim()
+        .toLowerCase(),
+
+      isHiddenFromRecipient: sender.isHiddenFromRecipient !== false,
     },
 
     recipientSnapshot: {
@@ -372,6 +390,25 @@ const create = async ({ payload = {}, user }) => {
     deliveryDate: payload.deliveryDate || null,
 
     deliveryTimeSlot: String(payload.deliveryTimeSlot || "").trim(),
+
+    deliveryMode: String(payload.deliveryMode || "").trim(),
+
+    deliveryModeLabel: String(payload.deliveryModeLabel || "").trim(),
+
+    deliveryTimeSlotLabel: String(payload.deliveryTimeSlotLabel || "").trim(),
+
+    estimatedDeliveryTime: String(payload.estimatedDeliveryTime || "").trim(),
+
+    deliveryDistanceKm: Number.isFinite(Number(payload.deliveryDistanceKm))
+      ? Number(payload.deliveryDistanceKm)
+      : null,
+
+    deliveryNote: String(payload.deliveryNote || "").trim(),
+
+    shippingSnapshot:
+      payload.shippingSnapshot && typeof payload.shippingSnapshot === "object"
+        ? payload.shippingSnapshot
+        : null,
 
     notes: String(payload.notes || "").trim(),
 
@@ -462,6 +499,7 @@ const create = async ({ payload = {}, user }) => {
   await order.save();
 
   const finalOrder = await Order.findById(order._id).lean();
+  void sendNewOrderNotification(finalOrder);
 
   return {
     order: finalOrder,
@@ -540,6 +578,14 @@ const updateStatus = async (id, status, paymentStatus) => {
     });
   }
 
+  const existingOrder = await Order.findById(id).lean();
+
+  if (!existingOrder) {
+    throw Object.assign(new Error("Không tìm thấy đơn hàng."), {
+      status: 404,
+    });
+  }
+
   const update = {
     status,
   };
@@ -586,6 +632,10 @@ const updateStatus = async (id, status, paymentStatus) => {
     throw Object.assign(new Error("Không tìm thấy đơn hàng."), {
       status: 404,
     });
+  }
+
+  if (String(existingOrder.status || "") !== String(order.status || "")) {
+    void sendOrderStatusNotification(order);
   }
 
   return order;

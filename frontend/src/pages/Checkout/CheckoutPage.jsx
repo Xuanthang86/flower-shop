@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { getOrder } from "@/services/orderApi";
 
 import { FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -32,6 +33,8 @@ import {
 
 import {
   readPaymentSettings,
+  fetchPaymentSettings,
+  buildTransferContent,
   buildVietQrUrl,
   resolvePaymentBank,
 } from "@/services/paymentSettings";
@@ -145,6 +148,26 @@ const CheckoutPage = () => {
 
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setFormData((currentData) => ({
+      ...currentData,
+
+      sender: {
+        ...currentData.sender,
+
+        name: currentData.sender.name || user.name || "",
+
+        phone: currentData.sender.phone || user.phone || "",
+
+        email: currentData.sender.email || user.email || "",
+      },
+    }));
+  }, [user?.id, user?.name, user?.phone, user?.email]);
+
   const [paymentSettings, setPaymentSettings] = useState(() =>
     readPaymentSettings()
   );
@@ -178,6 +201,7 @@ const CheckoutPage = () => {
 
     paymentMethod: CHECKOUT_PAYMENT_METHOD,
   });
+  const [senderSameAsRecipient, setSenderSameAsRecipient] = useState(false);
 
   const [deliveryMode, setDeliveryMode] = useState(DELIVERY_MODE.STANDARD);
 
@@ -304,34 +328,65 @@ const CheckoutPage = () => {
   };
 
   useEffect(() => {
-    const refreshPaymentSettings = () => {
-      setPaymentSettings(readPaymentSettings());
+    let cancelled = false;
+
+    const refreshPaymentSettings = async () => {
+      try {
+        const latestSettings = await fetchPaymentSettings();
+
+        if (!cancelled && latestSettings) {
+          setPaymentSettings(latestSettings);
+        }
+      } catch (error) {
+        console.warn("Không thể tải cấu hình thanh toán mới nhất:", error);
+
+        if (!cancelled) {
+          setPaymentSettings(readPaymentSettings());
+        }
+      }
+    };
+
+    refreshPaymentSettings();
+
+    const handlePaymentSettingsUpdated = () => {
+      refreshPaymentSettings();
+    };
+
+    const handleStorage = (event) => {
+      if (
+        event.key === "flower-shop-payment-settings" ||
+        event.key === "flower-shop-site-settings"
+      ) {
+        refreshPaymentSettings();
+      }
     };
 
     window.addEventListener(
       "flower-shop-payment-settings-updated",
-      refreshPaymentSettings
+      handlePaymentSettingsUpdated
     );
 
     window.addEventListener(
       "flower-shop-site-settings-updated",
-      refreshPaymentSettings
+      handlePaymentSettingsUpdated
     );
 
-    window.addEventListener("storage", refreshPaymentSettings);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
+      cancelled = true;
+
       window.removeEventListener(
         "flower-shop-payment-settings-updated",
-        refreshPaymentSettings
+        handlePaymentSettingsUpdated
       );
 
       window.removeEventListener(
         "flower-shop-site-settings-updated",
-        refreshPaymentSettings
+        handlePaymentSettingsUpdated
       );
 
-      window.removeEventListener("storage", refreshPaymentSettings);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -501,6 +556,31 @@ const CheckoutPage = () => {
       },
     }));
   };
+
+  useEffect(() => {
+    if (!senderSameAsRecipient) {
+      return;
+    }
+
+    setFormData((currentData) => ({
+      ...currentData,
+
+      sender: {
+        ...currentData.sender,
+
+        name: currentData.recipient.fullName,
+
+        phone: currentData.recipient.phone,
+
+        email: currentData.recipient.email,
+      },
+    }));
+  }, [
+    senderSameAsRecipient,
+    formData.recipient.fullName,
+    formData.recipient.phone,
+    formData.recipient.email,
+  ]);
 
   const handleNoteChange = (event) => {
     setFormData((currentData) => ({
@@ -705,6 +785,7 @@ const CheckoutPage = () => {
     deliveryDate,
     deliveryTimeSlot,
     deliveryMode,
+    currentTime,
   ]);
 
   /*
@@ -1054,7 +1135,10 @@ const CheckoutPage = () => {
   }, [formData.paymentMethod, paymentIntent?.id]);
 
   const transferContent = paymentIntent?.orderCode
-    ? paymentIntent.orderCode
+    ? buildTransferContent(
+        paymentIntent.orderCode,
+        paymentSettings?.bankTransfer || {}
+      )
     : "";
 
   const paymentIntentAmount = Math.round(Number(paymentIntent?.amount) || 0);
@@ -1062,23 +1146,32 @@ const CheckoutPage = () => {
   const checkoutAmountIsSynchronized =
     Boolean(paymentIntent?.id) &&
     Boolean(paymentIntent?.orderCode) &&
-    paymentIntentAmount === checkoutPaymentAmount;
+    paymentIntentAmount === paymentDepositAmount;
 
   const dynamicQrUrl = checkoutAmountIsSynchronized
     ? buildVietQrUrl({
         bankCode: resolvedBankCode,
-
         accountNumber: paymentSettings?.bankTransfer?.accountNumber,
-
-        amount: checkoutPaymentAmount,
-
+        amount: paymentIntentAmount,
         accountName: paymentSettings?.bankTransfer?.accountName,
-
         transferContent,
       })
     : "";
 
-  const qrCodeUrl = dynamicQrUrl;
+  const configuredQrCodeUrl = String(
+    paymentSettings?.bankTransfer?.qrCodeUrl || ""
+  ).trim();
+
+  /*
+   * Ưu tiên QR động vì QR động chứa:
+   * - số tiền thực tế
+   * - nội dung chuyển khoản
+   * - tài khoản mới nhất
+   *
+   * Nếu VietQR chưa tạo được thì dùng QR thực tế
+   * mà Admin đã cấu hình làm phương án dự phòng.
+   */
+  const qrCodeUrl = dynamicQrUrl || configuredQrCodeUrl;
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
@@ -1451,9 +1544,6 @@ const CheckoutPage = () => {
         setPaymentVerified(true);
       }
 
-      const paymentIsBankTransfer =
-        formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD;
-
       let newOrder = null;
 
       if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
@@ -1481,20 +1571,17 @@ const CheckoutPage = () => {
           return;
         }
 
-        const refreshedOrderResult = await getOrderById(
+        const refreshedOrder = await getOrder(
           preparedOrder.id || preparedOrder._id || preparedOrder.orderId
         );
 
-        if (!refreshedOrderResult?.success || !refreshedOrderResult?.order) {
-          setError(
-            refreshedOrderResult?.message ||
-              "Không thể tải lại đơn hàng sau khi thanh toán."
-          );
+        if (!refreshedOrder) {
+          setError("Không thể tải lại đơn hàng sau khi thanh toán.");
 
           return;
         }
 
-        newOrder = refreshedOrderResult.order;
+        newOrder = refreshedOrder;
 
         if (
           String(newOrder.paymentStatus || "") !== "paid" &&
@@ -1869,6 +1956,41 @@ const CheckoutPage = () => {
                 <h2 className="text-xl font-semibold text-gray-800">
                   Thông tin người nhận
                 </h2>
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-pink-100 bg-pink-50 p-4">
+                  <input
+                    type="checkbox"
+                    checked={senderSameAsRecipient}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+
+                      setSenderSameAsRecipient(checked);
+
+                      if (checked) {
+                        setFormData((currentData) => ({
+                          ...currentData,
+
+                          sender: {
+                            ...currentData.sender,
+
+                            name: currentData.recipient.fullName,
+
+                            phone: currentData.recipient.phone,
+
+                            email: currentData.recipient.email,
+                          },
+                        }));
+                      }
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                  />
+
+                  <span className="text-sm leading-6 text-gray-700">
+                    <strong>Người nhận cũng là người gửi</strong>
+                    <br />
+                    Tự động lấy họ tên, số điện thoại và email người nhận làm
+                    thông tin người gửi.
+                  </span>
+                </label>
 
                 <div className="mt-6 space-y-5">
                   <div>

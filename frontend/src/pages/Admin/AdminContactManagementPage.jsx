@@ -361,6 +361,56 @@ const AdminContactManagementPage = () => {
         </section>
 
         <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900">
+            Email nhận thông báo đơn hàng
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-gray-500">
+            Email này sẽ nhận thông báo khi có đơn hàng mới và khi trạng thái
+            đơn hàng thay đổi.
+          </p>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Email nhận thông báo
+            </label>
+
+            <input
+              type="email"
+              value={settings.notifications?.orderEmail || ""}
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+
+                  notifications: {
+                    ...(current.notifications || {}),
+
+                    orderEmail: event.target.value,
+                  },
+                }))
+              }
+              placeholder="admin@example.com"
+              className={inputClass}
+            />
+
+            <p className="mt-2 text-xs leading-5 text-gray-500">
+              Nếu để trống, hệ thống sẽ sử dụng EMAIL_NOTIFICATION_TO trong file
+              backend/.env.
+            </p>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={saveContact}
+              className="rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
+            >
+              Lưu email nhận thông báo
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">
