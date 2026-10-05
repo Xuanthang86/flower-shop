@@ -203,21 +203,34 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
   const normalizedItems = requested.map((item) => {
     let product = null;
 
+    /*
+     * 1. Ưu tiên ObjectId nếu frontend đã gửi
+     * đúng MongoDB Product _id.
+     */
     if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
-      product = byId.get(item.productId);
+      product = byId.get(String(item.productId));
     }
 
+    /*
+     * 2. Nếu ID frontend không phải Mongo ObjectId
+     * hoặc không còn tồn tại → tìm theo slug.
+     */
     if (!product && item.productSlug) {
-      product = bySlug.get(item.productSlug);
+      product = bySlug.get(String(item.productSlug).trim());
     }
 
+    /*
+     * 3. Fallback cuối cùng theo tên.
+     */
     if (!product && item.productName) {
-      product = byName.get(item.productName.trim().toLowerCase());
+      product = byName.get(String(item.productName).trim().toLowerCase());
     }
 
-    if (!product) {
+    if (!product || product.active !== true) {
       throw Object.assign(
-        new Error("Một sản phẩm không còn tồn tại hoặc đã ngừng bán."),
+        new Error(
+          `Sản phẩm "${item.productName || item.productSlug || item.productId}" không còn tồn tại hoặc đã ngừng bán.`,
+        ),
         {
           status: 400,
         },
@@ -237,10 +250,15 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
 
     return {
       productId: product._id,
+
       productName: String(product.name || "").trim(),
+
       productImage: String(product.image || "").trim(),
+
       unitPrice,
+
       quantity: item.quantity,
+
       subtotal: unitPrice * item.quantity,
     };
   });

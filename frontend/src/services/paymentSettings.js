@@ -226,19 +226,13 @@ export const fetchPaymentSettings = async () => {
 };
 
 export const savePaymentSettings = async (paymentSettings = {}) => {
-  const current = readPaymentSettings();
-
-  const next = normalizeSettings({
-    ...current,
-
-    ...paymentSettings,
-
-    bankTransfer: {
-      ...current.bankTransfer,
-
-      ...(paymentSettings?.bankTransfer || {}),
-    },
-  });
+  /*
+   * Khi Admin đã fetch dữ liệu mới nhất từ backend,
+   * paymentSettings chính là snapshot mới nhất.
+   *
+   * Không được lấy localStorage cũ làm base nữa.
+   */
+  const next = normalizeSettings(paymentSettings);
 
   const saved = writeStoredPaymentSettings(next);
 

@@ -69,10 +69,16 @@ const normalizeCartItem = (item = {}) => {
     ? Math.max(0, Math.floor(Number(item.lowStockThreshold)))
     : 3;
 
+  const slug = String(item.slug || item.productSlug || "").trim();
+
   return {
     ...item,
 
     id: item.id,
+
+    slug,
+
+    productSlug: slug,
 
     name: item.name || "Sản phẩm",
 

@@ -236,8 +236,6 @@ const AdminPaymentSettingsPage = () => {
 
     const bankName = String(bankTransfer.bankName || "").trim();
 
-    const bankCode = String(bankTransfer.bankCode || "").trim();
-
     const prefix = String(bankTransfer.transferContentPrefix || "").trim();
 
     if (!bankName) {
