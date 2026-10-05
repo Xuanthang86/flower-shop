@@ -431,6 +431,8 @@ const CheckoutPage = () => {
       !shippingCalculation?.success ||
       paymentDepositAmount <= 0
     ) {
+      setPaymentIntentLoading(false);
+
       return undefined;
     }
 
@@ -449,10 +451,6 @@ const CheckoutPage = () => {
 
     let cancelled = false;
 
-    /*
-     * Xóa PaymentIntent cũ trước khi tạo PaymentIntent
-     * tương ứng với thông tin mới.
-     */
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
     setPaymentVerified(false);
     setPaymentError("");
@@ -466,12 +464,10 @@ const CheckoutPage = () => {
           throw new Error("Không thể tạo thông tin giao hàng.");
         }
 
-        const checkoutSignature = automaticPaymentIntentSignature;
-
         const intentResult = await createBankTransferPaymentIntent({
           depositPercent: paymentDepositPercent,
 
-          checkoutSignature,
+          checkoutSignature: automaticPaymentIntentSignature,
 
           draft: {
             paymentMethod: BANK_TRANSFER_PAYMENT_METHOD,
@@ -636,19 +632,6 @@ const CheckoutPage = () => {
     formData.paymentMethod,
     paymentSettings?.bankTransfer?.enabled,
     automaticPaymentIntentSignature,
-    shippingCalculation,
-    paymentDepositAmount,
-    paymentDepositPercent,
-    cartItems,
-    appliedCoupon?.coupon?.code,
-    couponCode,
-    formData.sender,
-    formData.recipient,
-    formData.address,
-    formData.note,
-    deliveryDate,
-    deliveryTimeSlot,
-    deliveryMode,
   ]);
 
   useEffect(() => {
@@ -1015,6 +998,8 @@ const CheckoutPage = () => {
       setPaymentVerified(false);
 
       setPaymentError("");
+
+      setPaymentIntentLoading(false);
 
       setError("");
 
@@ -2654,8 +2639,10 @@ const CheckoutPage = () => {
                     </h3>
 
                     {paymentIntentLoading ? (
-                      <div className="mt-4 rounded-lg bg-white p-4 text-sm text-gray-600">
-                        Đang tạo thông tin thanh toán...
+                      <div className="mt-4 flex min-h-32 flex-col items-center justify-center rounded-lg bg-white p-4 text-sm text-gray-600">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-pink-600" />
+
+                        <p className="mt-3">Đang tạo thông tin thanh toán...</p>
                       </div>
                     ) : (
                       <>
@@ -2942,9 +2929,9 @@ const CheckoutPage = () => {
                         </div>
 
                         {paymentError && (
-                          <p className="mt-3 text-sm text-red-600">
+                          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                             {paymentError}
-                          </p>
+                          </div>
                         )}
                       </>
                     )}
@@ -3044,9 +3031,10 @@ const CheckoutPage = () => {
                     submitting ||
                     shippingLoading ||
                     !shippingCalculation.success ||
-                    paymentIntentLoading ||
                     (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-                      (!paymentIntent?.id || !paymentVerified))
+                      (paymentIntentLoading ||
+                        !paymentIntent?.id ||
+                        !paymentVerified))
                   }
                   className="mt-6 w-full rounded-lg bg-pink-600 px-6 py-3 font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >

@@ -182,9 +182,20 @@ const getOrderTotal = (order) => {
 const getOrderAddress = (order) => {
   const customer = order?.customerSnapshot || order?.customer || {};
 
+  const shippingSnapshot =
+    order?.shippingSnapshot && typeof order.shippingSnapshot === "object"
+      ? order.shippingSnapshot
+      : {};
+
+  const snapshotAddress =
+    shippingSnapshot?.address && typeof shippingSnapshot.address === "object"
+      ? shippingSnapshot.address
+      : shippingSnapshot;
+
   const address =
-    order?.recipientSnapshot ||
     order?.shippingAddress ||
+    snapshotAddress ||
+    order?.recipientSnapshot ||
     customer?.address ||
     order?.customerAddress ||
     order?.address ||
@@ -294,7 +305,7 @@ const CustomerOrderDetailPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    if (order || !orderId || typeof getOrderById !== "function") {
+    if (!orderId || typeof getOrderById !== "function") {
       return undefined;
     }
 
@@ -327,7 +338,7 @@ const CustomerOrderDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [order, orderId, getOrderById]);
+  }, [orderId, getOrderById]);
 
   /* ===================================================
      KHÔNG TÌM THẤY
@@ -404,7 +415,7 @@ const CustomerOrderDetailPage = () => {
      DỮ LIỆU
   =================================================== */
 
-  const customer = order?.customer || {};
+  const customer = order?.customerSnapshot || order?.customer || {};
 
   const address = getOrderAddress(order);
 
@@ -452,7 +463,7 @@ const CustomerOrderDetailPage = () => {
               <p className="text-sm text-gray-500">Mã đơn hàng</p>
 
               <h1 className="text-2xl font-bold text-gray-900 mt-1">
-                #{getOrderId(order)}
+                {getOrderId(order)}
               </h1>
 
               <p className="text-sm text-gray-500 mt-2">

@@ -332,8 +332,8 @@ const AdminOrderDetailPage = () => {
   const customer = order.customerSnapshot || order.customer || {};
 
   const address =
-    order.shippingAddress ||
     order.recipientSnapshot ||
+    order.shippingAddress ||
     customer.address ||
     order.customerAddress ||
     order.address ||

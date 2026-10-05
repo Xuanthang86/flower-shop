@@ -169,6 +169,45 @@ const getFullRecipientAddress = (recipient = {}) => {
   return parts.join(", ");
 };
 
+const getFullOrderAddress = (order = {}) => {
+  const recipient = order?.recipientSnapshot || {};
+
+  const shippingSnapshot =
+    order?.shippingSnapshot && typeof order.shippingSnapshot === "object"
+      ? order.shippingSnapshot
+      : {};
+
+  const shippingAddress =
+    order?.shippingAddress && typeof order.shippingAddress === "object"
+      ? order.shippingAddress
+      : shippingSnapshot?.address &&
+          typeof shippingSnapshot.address === "object"
+        ? shippingSnapshot.address
+        : shippingSnapshot;
+
+  const address = {
+    houseNumber: shippingAddress?.houseNumber || recipient?.houseNumber || "",
+
+    street: shippingAddress?.street || recipient?.street || "",
+
+    wardName: shippingAddress?.wardName || recipient?.wardName || "",
+
+    provinceName:
+      shippingAddress?.provinceName || recipient?.provinceName || "",
+  };
+
+  const parts = [
+    address.houseNumber,
+    address.street,
+    address.wardName,
+    address.provinceName,
+  ]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
+};
+
 const getStatusLabel = (status) => {
   const labels = {
     pending: "Chờ xác nhận",
@@ -235,7 +274,10 @@ const buildOrderHtml = (order, title) => {
 
       <p>
         <strong>Thời gian đặt:</strong>
-        ${formatVietnamDateTime(order?.createdAt)}
+${formatVietnamDateTime(order?.createdAt).replace(
+  /^(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2})$/,
+  "$2 ngày $1",
+)}
       </p>
 
       <hr />
@@ -272,7 +314,7 @@ const buildOrderHtml = (order, title) => {
 
 <p>
   <strong>Địa chỉ giao hàng:</strong>
-${getFullOrderAddress(order) || "—"}
+  ${getFullOrderAddress(order) || "—"}
 </p>
 
       <h3>Sản phẩm</h3>

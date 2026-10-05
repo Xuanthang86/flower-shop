@@ -170,7 +170,7 @@ const AdminOrderList = () => {
 
                 return (
                   <tr key={orderId} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 font-semibold">#{orderId}</td>
+                    <td className="px-5 py-4 font-semibold">{orderId}</td>
 
                     <td className="px-5 py-4">
                       <p className="font-medium">{getCustomerName(order)}</p>
