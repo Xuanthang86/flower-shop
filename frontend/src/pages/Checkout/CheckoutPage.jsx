@@ -235,6 +235,8 @@ const CheckoutPage = () => {
 
   const [couponMessage, setCouponMessage] = useState("");
 
+  const [couponLoading, setCouponLoading] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
 
   const [showExpressFallbackModal, setShowExpressFallbackModal] =
@@ -244,7 +246,7 @@ const CheckoutPage = () => {
 
   const [paymentDepositPercent, setPaymentDepositPercent] = useState(100);
 
-  const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
+  const [paymentIntentLoading] = useState(false);
 
   const [paymentVerified, setPaymentVerified] = useState(false);
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { FiCreditCard, FiImage, FiSave } from "react-icons/fi";
 
@@ -41,6 +41,8 @@ const AdminPaymentSettingsPage = () => {
    * để ghi đè những trường mà Admin hiện tại không chỉnh sửa.
    */
   const [dirtyBankFields, setDirtyBankFields] = useState({});
+
+  const dirtyBankFieldsRef = useRef({});
 
   /*
    * Cập nhật title trang.
@@ -88,6 +90,15 @@ const AdminPaymentSettingsPage = () => {
     let cancelled = false;
 
     const refresh = async () => {
+      /*
+       * Nếu Admin đang chỉnh sửa bất kỳ trường nào,
+       * tuyệt đối không được tự động lấy dữ liệu backend
+       * rồi ghi đè form hiện tại.
+       */
+      if (Object.keys(dirtyBankFieldsRef.current).length > 0) {
+        return;
+      }
+
       try {
         const latest = await fetchPaymentSettings();
 
@@ -95,27 +106,68 @@ const AdminPaymentSettingsPage = () => {
           return;
         }
 
-        setSettings(latest);
-        setDirtyBankFields({});
+        /*
+         * Chỉ cập nhật form khi Admin không có thay đổi
+         * chưa lưu.
+         */
+        if (Object.keys(dirtyBankFieldsRef.current).length === 0) {
+          setSettings(latest);
+        }
       } catch (error) {
         console.error("Không thể tải cấu hình thanh toán mới nhất:", error);
 
         /*
-         * Chỉ fallback về local cache khi backend không thể truy cập.
+         * Chỉ fallback localStorage khi form không có
+         * thay đổi chưa lưu.
          */
-        if (!cancelled) {
+        if (
+          !cancelled &&
+          Object.keys(dirtyBankFieldsRef.current).length === 0
+        ) {
           setSettings(readPaymentSettings());
         }
       }
     };
 
+    /*
+     * Lần đầu mở trang:
+     * lấy dữ liệu mới nhất từ backend.
+     */
     refresh();
 
     const handlePaymentSettingsUpdated = () => {
+      /*
+       * Nếu chính trang Admin đang chỉnh sửa:
+       * KHÔNG reload dữ liệu.
+       *
+       * Điều này ngăn:
+       *
+       * Xóa "M"
+       * ↓
+       * event
+       * ↓
+       * fetch backend
+       * ↓
+       * "M" quay lại
+       */
+      if (Object.keys(dirtyBankFieldsRef.current).length > 0) {
+        return;
+      }
+
       refresh();
     };
 
     const handleStorage = () => {
+      /*
+       * Storage event có thể đến từ tab/browser khác.
+       *
+       * Nếu form hiện tại đang có thay đổi chưa lưu,
+       * không được phá form đang nhập.
+       */
+      if (Object.keys(dirtyBankFieldsRef.current).length > 0) {
+        return;
+      }
+
       refresh();
     };
 
@@ -166,11 +218,16 @@ const AdminPaymentSettingsPage = () => {
       },
     }));
 
-    setDirtyBankFields((current) => ({
-      ...current,
+    setDirtyBankFields((current) => {
+      const next = {
+        ...current,
+        [field]: true,
+      };
 
-      [field]: true,
-    }));
+      dirtyBankFieldsRef.current = next;
+
+      return next;
+    });
   };
 
   /*
@@ -403,7 +460,15 @@ const AdminPaymentSettingsPage = () => {
 
       const saved = await savePaymentSettings(mergedSettings);
 
+      /*
+       * Backend đã lưu thành công.
+       *
+       * Giữ nguyên dữ liệu backend vừa trả về trên form.
+       * Không cho event đồng bộ bên ngoài ghi đè.
+       */
       setSettings(saved);
+
+      dirtyBankFieldsRef.current = {};
 
       setDirtyBankFields({});
 
