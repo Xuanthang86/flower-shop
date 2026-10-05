@@ -212,32 +212,81 @@ DATE
 ============================================================
 */
 
-export const formatDateKey = (date) => {
-  const target = date instanceof Date ? date : new Date(date);
+const getVietnamDateParts = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value);
 
-  if (Number.isNaN(target.getTime())) {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const parts = formatter.formatToParts(date);
+
+  const result = {};
+
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
+  });
+
+  return result;
+};
+
+export const getVietnamHour = (value = new Date()) => {
+  const parts = getVietnamDateParts(value);
+
+  return parts ? Number(parts.hour) : NaN;
+};
+
+export const formatDateKey = (date) => {
+  const parts = getVietnamDateParts(date);
+
+  if (!parts) {
     return "";
   }
 
   return [
-    target.getFullYear(),
-    String(target.getMonth() + 1).padStart(2, "0"),
-    String(target.getDate()).padStart(2, "0"),
+    parts.year,
+    String(parts.month).padStart(2, "0"),
+    String(parts.day).padStart(2, "0"),
   ].join("-");
 };
 
 export const getTodayDateKey = (now = new Date()) => formatDateKey(now);
 
 export const addDaysToDateKey = (dateKey, days) => {
-  const date = new Date(`${dateKey}T00:00:00`);
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (!match) {
+    return "";
+  }
+
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  );
 
   if (Number.isNaN(date.getTime())) {
     return "";
   }
 
-  date.setDate(date.getDate() + Number(days || 0));
+  date.setUTCDate(date.getUTCDate() + Number(days || 0));
 
-  return formatDateKey(date);
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
 };
 
 export const getDefaultDeliveryDate = () => getTodayDateKey();

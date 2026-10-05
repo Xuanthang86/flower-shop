@@ -1001,7 +1001,25 @@ const getById = async (id, user) => {
     });
   }
 
-  return order;
+  const payment = order.paymentId
+    ? await Payment.findById(order.paymentId).lean()
+    : await Payment.findOne({
+        orderId: order._id,
+      }).lean();
+
+  return {
+    ...order,
+
+    payment: payment
+      ? {
+          ...payment,
+
+          id: String(payment.paymentIntentId || payment._id || ""),
+
+          _id: String(payment._id),
+        }
+      : null,
+  };
 };
 
 const escapeRegex = (value = "") =>

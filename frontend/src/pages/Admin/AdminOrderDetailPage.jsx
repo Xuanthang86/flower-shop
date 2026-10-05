@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -47,11 +47,11 @@ const formatDistance = (value) => {
 
 const getPaymentLabel = (paymentMethod) => {
   if (paymentMethod === "cod") {
-    return "Thanh toán khi nhận hàng (COD)";
+    return "Thanh toán khi nhận hàng";
   }
 
   if (paymentMethod === "bank_transfer") {
-    return "Chuyển khoản ngân hàng";
+    return "Chuyển khoản";
   }
 
   return paymentMethod || "—";
@@ -96,19 +96,75 @@ const AdminOrderDetailPage = () => {
 
   const navigate = useNavigate();
 
-  const {
-    getOrderById,
-    getPaymentByOrderId,
-    updateOrderStatus,
-    updateOrderPaymentStatus,
-  } = useOrder();
+  const { orders = [], getOrderById, updateOrderStatus } = useOrder();
 
-  const order = useMemo(() => getOrderById(orderId), [getOrderById, orderId]);
+  const [remoteOrder, setRemoteOrder] = useState(null);
 
-  const payment = useMemo(
-    () => getPaymentByOrderId(orderId),
-    [getPaymentByOrderId, orderId]
-  );
+  const localOrder = useMemo(() => {
+    const normalizedId = String(orderId || "")
+      .replace(/^#/, "")
+      .trim()
+      .toLowerCase();
+
+    return (
+      orders.find((item) => {
+        const candidates = [
+          item?.id,
+          item?._id,
+          item?.orderId,
+          item?.orderCode,
+          item?.code,
+        ]
+          .map((value) =>
+            String(value || "")
+              .replace(/^#/, "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean);
+
+        return candidates.includes(normalizedId);
+      }) || null
+    );
+  }, [orders, orderId]);
+
+  const order = remoteOrder || localOrder;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (localOrder || !orderId) {
+      return undefined;
+    }
+
+    const loadOrder = async () => {
+      try {
+        const result = await getOrderById(
+          String(orderId).replace(/^#/, "").trim()
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (result?.success && result?.order) {
+          setRemoteOrder(result.order);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Không thể tải chi tiết đơn hàng:", error);
+        }
+      }
+    };
+
+    loadOrder();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localOrder, orderId, getOrderById]);
+
+  const payment = order?.payment || null;
 
   const paymentSettings = useMemo(() => readPaymentSettings(), []);
 
@@ -133,7 +189,9 @@ const AdminOrderDetailPage = () => {
       return undefined;
     }
 
-    const paymentIntentId = String(payment.id || "").trim();
+    const paymentIntentId = String(
+      payment.paymentIntentId || payment.id || order.paymentIntentId || ""
+    ).trim();
 
     if (!paymentIntentId) {
       return undefined;
@@ -208,15 +266,9 @@ const AdminOrderDetailPage = () => {
           Number(payment.refundAmount || 0) !== Number(nextRefundAmount || 0);
 
         if (hasChanged) {
-          await updateOrderPaymentStatus(order.id, nextStatus, {
-            reference: nextReference,
-            transactionId: nextTransactionId,
-            transaction: nextTransaction,
-            paidAt: nextPaidAt,
-            failedAt: nextFailedAt,
-            refundedAt: nextRefundedAt,
-            failureReason: nextFailureReason,
-            refundAmount: nextRefundAmount,
+          await updateOrderStatus(order.id, {
+            status: order.status,
+            paymentStatus: nextStatus,
           });
         }
 
@@ -277,11 +329,12 @@ const AdminOrderDetailPage = () => {
     );
   }
 
-  const customer = order.customer || {};
+  const customer = order.customerSnapshot || order.customer || {};
 
   const address =
-    customer.address ||
+    order.recipientSnapshot ||
     order.shippingAddress ||
+    customer.address ||
     order.customerAddress ||
     order.address ||
     {};
@@ -491,6 +544,21 @@ const AdminOrderDetailPage = () => {
 
             <div className="mt-5">
               <OrderAddress address={address} />
+              <div className="mt-5">
+                <p className="text-sm text-gray-500">Địa chỉ đầy đủ</p>
+
+                <p className="mt-1 font-medium text-gray-800">
+                  {[
+                    address?.houseNumber,
+                    address?.street,
+                    address?.wardName,
+                    address?.provinceName,
+                  ]
+                    .map((value) => String(value || "").trim())
+                    .filter(Boolean)
+                    .join(", ") || "—"}
+                </p>
+              </div>
             </div>
           </div>
         </div>

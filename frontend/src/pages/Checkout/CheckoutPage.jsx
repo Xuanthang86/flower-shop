@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -18,6 +18,7 @@ import PaymentMethod from "@/components/checkout/PaymentMethod";
 import {
   addDaysToDateKey,
   calculateShippingAsync,
+  getVietnamHour,
   createShippingSnapshot,
   DELIVERY_MODE,
   DELIVERY_MODE_LABELS,
@@ -208,7 +209,7 @@ const CheckoutPage = () => {
   const getInitialDeliveryDate = () => {
     const now = new Date();
 
-    if (now.getHours() >= getDeliveryDateNextDayCutoffHour()) {
+    if (getVietnamHour(now) >= getDeliveryDateNextDayCutoffHour()) {
       return (
         addDaysToDateKey(getTodayDateKey(now), 1) || getDefaultDeliveryDate()
       );
@@ -246,7 +247,7 @@ const CheckoutPage = () => {
 
   const [paymentDepositPercent, setPaymentDepositPercent] = useState(100);
 
-  const [paymentIntentLoading] = useState(false);
+  const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
 
   const [paymentVerified, setPaymentVerified] = useState(false);
 
@@ -310,12 +311,21 @@ const CheckoutPage = () => {
     Math.round(Number(grandTotal) || 0) - paymentDepositAmount
   );
 
+  const automaticPaymentIntentRequestRef = useRef("");
+  const automaticPaymentIntentSequenceRef = useRef(0);
+
   const resetPaymentIntentForAmountChange = () => {
+    automaticPaymentIntentSequenceRef.current += 1;
+
+    automaticPaymentIntentRequestRef.current = "";
+
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
 
     setPaymentVerified(false);
 
     setPaymentError("");
+
+    setPaymentIntentLoading(false);
   };
 
   useEffect(() => {
@@ -471,7 +481,7 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (currentTime.getHours() < SHIPPING_CONFIG.expressCutoffHour) {
+    if (getVietnamHour(currentTime) < SHIPPING_CONFIG.expressCutoffHour) {
       return;
     }
 
@@ -502,7 +512,7 @@ const CheckoutPage = () => {
     if (
       mode === DELIVERY_MODE.EXPRESS &&
       deliveryDate === today &&
-      currentTime.getHours() >= SHIPPING_CONFIG.expressCutoffHour
+      getVietnamHour(currentTime) >= SHIPPING_CONFIG.expressCutoffHour
     ) {
       showExpressFallback();
 
@@ -1252,7 +1262,7 @@ const CheckoutPage = () => {
       if (
         deliveryDate === getTodayDateKey(now) &&
         deliveryMode === DELIVERY_MODE.EXPRESS &&
-        now.getHours() >= SHIPPING_CONFIG.expressCutoffHour
+        getVietnamHour(now) >= SHIPPING_CONFIG.expressCutoffHour
       ) {
         showExpressFallback();
 

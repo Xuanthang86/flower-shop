@@ -237,26 +237,38 @@ const buildOrderHtml = (order, title) => {
 
       <h3>Thông tin người gửi</h3>
 
-      <p>
-        ${sender.fullName || customer.fullName || ""}<br />
-        ${sender.phone || customer.phone || ""}<br />
-        ${sender.email || customer.email || ""}
-      </p>
+<p>
+  <strong>Tên người gửi:</strong>
+  ${sender.fullName || customer.fullName || ""}
+  <br />
 
-      <h3>Thông tin người nhận</h3>
+  <strong>Số điện thoại người gửi:</strong>
+  ${sender.phone || customer.phone || ""}
+  <br />
 
-      <p>
-        ${recipient.fullName || ""}<br />
-        ${recipient.phone || ""}<br />
-        ${recipient.email || ""}
-      </p>
+  <strong>Email người gửi:</strong>
+  ${sender.email || customer.email || ""}
+</p>
 
-      <p>
-        ${recipient.houseNumber || ""}
-        ${recipient.street || ""}<br />
-        ${recipient.wardName || ""}<br />
-        ${recipient.provinceName || ""}
-      </p>
+<h3>Thông tin người nhận</h3>
+
+<p>
+  <strong>Tên người nhận:</strong>
+  ${recipient.fullName || ""}
+  <br />
+
+  <strong>Số điện thoại người nhận:</strong>
+  ${recipient.phone || ""}
+  <br />
+
+  <strong>Email người nhận:</strong>
+  ${recipient.email || ""}
+</p>
+
+<p>
+  <strong>Địa chỉ giao hàng:</strong>
+  ${getFullRecipientAddress(recipient) || "—"}
+</p>
 
       <h3>Sản phẩm</h3>
 

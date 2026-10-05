@@ -180,11 +180,12 @@ const getOrderTotal = (order) => {
 ===================================================== */
 
 const getOrderAddress = (order) => {
-  const customer = order?.customer || {};
+  const customer = order?.customerSnapshot || order?.customer || {};
 
   const address =
-    customer?.address ||
+    order?.recipientSnapshot ||
     order?.shippingAddress ||
+    customer?.address ||
     order?.customerAddress ||
     order?.address ||
     {};
@@ -567,12 +568,10 @@ const CustomerOrderDetailPage = () => {
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-gray-100">
+              <div className="mt-5">
                 <p className="text-sm text-gray-500">Địa chỉ đầy đủ</p>
 
-                <p className="font-semibold text-gray-900 mt-1">
-                  {fullAddress}
-                </p>
+                <p className="mt-1 font-medium text-gray-800">{fullAddress}</p>
               </div>
             </div>
           </div>

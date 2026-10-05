@@ -220,11 +220,13 @@ const getOrderTotal = (order) => {
 ===================================================== */
 
 const getPaymentMethod = (order) => {
-  const method = String(order?.paymentMethod || "").toLowerCase();
+  const method = String(order?.paymentMethod || "")
+    .trim()
+    .toLowerCase();
 
   switch (method) {
     case "cod":
-      return "COD";
+      return "Thanh toán khi nhận hàng";
 
     case "bank":
     case "bank_transfer":

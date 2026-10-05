@@ -148,7 +148,20 @@ const normalizeOrder = (order = {}) => {
 
     paymentMethod: String(order.paymentMethod || order.payment?.method || ""),
 
-    payment: order.payment || null,
+    payment: order.payment
+      ? {
+          ...order.payment,
+
+          id: String(
+            order.payment.paymentIntentId ||
+              order.payment.id ||
+              order.payment._id ||
+              ""
+          ),
+
+          paymentIntentId: String(order.payment.paymentIntentId || ""),
+        }
+      : null,
 
     customerId: order.customerId || order.customerSnapshot?.id || "",
 
@@ -187,6 +200,13 @@ const normalizeListResponse = (response) => {
     total: Number(response.total || items.length),
     page: Number(response.page || 1),
     limit: Number(response.limit || 50),
+    totalPages: Number(
+      response.totalPages ||
+        Math.ceil(
+          Number(response.total || items.length) / Number(response.limit || 50)
+        ) ||
+        0
+    ),
   };
 };
 
@@ -209,6 +229,7 @@ const OrderProvider = ({ children }) => {
     total: 0,
     page: 1,
     limit: 50,
+    totalPages: 0,
   });
 
   const loadOrders = useCallback(
@@ -219,6 +240,7 @@ const OrderProvider = ({ children }) => {
           total: 0,
           page: 1,
           limit: 50,
+          totalPages: 0,
         });
         return {
           success: true,
@@ -257,6 +279,7 @@ const OrderProvider = ({ children }) => {
           total: normalized.total,
           page: normalized.page,
           limit: normalized.limit,
+          totalPages: Number(normalized.totalPages || 0),
         });
 
         return {
