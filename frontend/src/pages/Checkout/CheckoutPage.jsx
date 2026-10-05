@@ -1,5 +1,4 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { getOrder } from "@/services/orderApi";
 
 import { FiCopy, FiDownload } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -234,8 +233,6 @@ const CheckoutPage = () => {
 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
 
-  const [couponLoading, setCouponLoading] = useState(false);
-
   const [couponMessage, setCouponMessage] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -310,8 +307,6 @@ const CheckoutPage = () => {
     0,
     Math.round(Number(grandTotal) || 0) - paymentDepositAmount
   );
-
-  const checkoutPaymentAmount = Math.round(Number(grandTotal) || 0);
 
   const resetPaymentIntentForAmountChange = () => {
     setPaymentIntent(EMPTY_PAYMENT_INTENT);
@@ -705,24 +700,6 @@ const CheckoutPage = () => {
     setError("");
   };
 
-  const handleDeliveryDateChange = (event) => {
-    const nextDate = event.target.value;
-
-    setDeliveryDate(nextDate);
-
-    setDeliveryTimeSlot("");
-
-    setShippingCalculation(EMPTY_SHIPPING_RESULT);
-
-    setPaymentIntent(EMPTY_PAYMENT_INTENT);
-
-    setPaymentVerified(false);
-
-    setPaymentError("");
-
-    setError("");
-  };
-
   useEffect(() => {
     let cancelled = false;
 
@@ -953,6 +930,13 @@ const CheckoutPage = () => {
     Boolean(paymentIntent?.orderCode) &&
     paymentIntentAmount === paymentDepositAmount;
 
+  /*
+   * QR CHỈ được tạo từ Payment Intent hiện tại.
+   *
+   * Vì orderCode + amount của Payment Intent không thay đổi
+   * trong suốt phiên thanh toán nên QR không tự thay đổi
+   * mỗi vài giây.
+   */
   const dynamicQrUrl =
     checkoutAmountIsSynchronized &&
     resolvedBankCode &&
@@ -967,6 +951,150 @@ const CheckoutPage = () => {
       : "";
 
   const qrCodeUrl = dynamicQrUrl;
+
+  /*
+   * ==========================================================
+   * COUPON
+   * ==========================================================
+   */
+
+  const handleApplyCoupon = () => {
+    const code = couponCode.trim();
+
+    if (!code) {
+      setAppliedCoupon(null);
+
+      setCouponMessage("Vui lòng nhập mã giảm giá.");
+
+      resetPaymentIntentForAmountChange();
+
+      setError("");
+
+      return;
+    }
+
+    setCouponLoading(true);
+
+    try {
+      const products = getProductsSnapshot();
+
+      const result = validateCoupon({
+        code,
+        items: cartItems,
+        subtotal,
+        userId: user?.id,
+        now: new Date(),
+        productLookup: (productId) => getProductById(productId, products),
+      });
+
+      if (!result.success) {
+        setAppliedCoupon(null);
+
+        setCouponMessage(result.message || "Mã giảm giá không hợp lệ.");
+
+        resetPaymentIntentForAmountChange();
+
+        return;
+      }
+
+      /*
+       * Coupon hợp lệ làm thay đổi tổng tiền.
+       * Payment Intent cũ không được tiếp tục sử dụng.
+       */
+      resetPaymentIntentForAmountChange();
+
+      setAppliedCoupon(result);
+
+      setCouponMessage(
+        result.message || `Đã áp dụng mã ${result.coupon.code}.`
+      );
+
+      setError("");
+    } catch (couponError) {
+      setAppliedCoupon(null);
+
+      resetPaymentIntentForAmountChange();
+
+      setCouponMessage(
+        couponError?.message || "Không thể kiểm tra mã giảm giá."
+      );
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode("");
+
+    setAppliedCoupon(null);
+
+    setCouponMessage("");
+
+    /*
+     * Bỏ mã giảm giá làm thay đổi tổng tiền.
+     * Payment Intent cũ phải bị hủy khỏi Checkout UI.
+     */
+    resetPaymentIntentForAmountChange();
+
+    setError("");
+  };
+
+  /*
+   * Kiểm tra lại coupon đang áp dụng.
+   *
+   * Điều này đặc biệt quan trọng khi coupon hết hạn
+   * trong lúc người dùng vẫn đang mở trang Checkout.
+   */
+  useEffect(() => {
+    if (!appliedCoupon?.coupon?.code) {
+      return;
+    }
+
+    const products = getProductsSnapshot();
+
+    const result = validateCoupon({
+      code: appliedCoupon.coupon.code,
+      items: cartItems,
+      subtotal,
+      userId: user?.id,
+      now: currentTime,
+      productLookup: (productId) => getProductById(productId, products),
+    });
+
+    if (!result.success) {
+      setAppliedCoupon(null);
+
+      setCouponMessage(
+        result.message || "Mã giảm giá không còn áp dụng cho đơn hàng hiện tại."
+      );
+
+      resetPaymentIntentForAmountChange();
+
+      return;
+    }
+
+    setAppliedCoupon(result);
+
+    setCouponMessage(result.message || `Đã áp dụng mã ${result.coupon.code}.`);
+  }, [appliedCoupon?.coupon?.code, cartItems, subtotal, user?.id, currentTime]);
+
+  /*
+   * ==========================================================
+   * ĐẶT HÀNG
+   * ==========================================================
+   *
+   * Quy tắc:
+   *
+   * COD:
+   *   1 lần bấm Đặt hàng -> tạo Order.
+   *
+   * Chuyển khoản:
+   *   Lần 1 -> tạo PaymentIntent + QR.
+   *   Chờ webhook xác minh.
+   *   Lần 2 -> kiểm tra paid -> finalize Order.
+   *
+   * Tuyệt đối không tạo Order khi PaymentIntent chưa paid.
+   */
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1063,11 +1191,22 @@ const CheckoutPage = () => {
       return;
     }
 
+    /*
+     * Với chuyển khoản:
+     * Không cho tạo Order nếu chưa xác minh thanh toán.
+     *
+     * Ngoại lệ:
+     * lần đầu bấm Đặt hàng khi chưa có PaymentIntent
+     * sẽ tạo PaymentIntent chứ KHÔNG tạo Order.
+     */
     if (
       formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
+      paymentIntent?.id &&
       !paymentVerified
     ) {
-      setError("Vui lòng hoàn tất thanh toán trước khi đặt hàng.");
+      setError(
+        "Vui lòng hoàn tất thanh toán và chờ hệ thống xác minh giao dịch."
+      );
 
       return;
     }
@@ -1084,19 +1223,16 @@ const CheckoutPage = () => {
     setSubmitting(true);
 
     try {
+      /*
+       * Tính lại phí giao hàng ngay trước khi tạo PaymentIntent/Order.
+       */
       const finalShippingCalculation = await calculateShippingAsync({
         address: formData.address,
-
         subtotal,
-
         deliveryDate,
-
         deliveryTimeSlot,
-
         deliveryMode,
-
         deliveryNote: formData.note,
-
         now: new Date(),
       });
 
@@ -1136,6 +1272,9 @@ const CheckoutPage = () => {
       const finalShippingFee =
         Number(finalShippingCalculation.shippingFee) || 0;
 
+      /*
+       * Xác minh coupon lần cuối trước khi gửi dữ liệu xuống backend.
+       */
       let finalCouponResult = null;
 
       if (couponCode.trim()) {
@@ -1143,13 +1282,10 @@ const CheckoutPage = () => {
 
         finalCouponResult = validateCoupon({
           code: couponCode,
-
           items: cartItems,
-
           subtotal,
-
           userId: user?.id,
-
+          now: new Date(),
           productLookup: (productId) => getProductById(productId, products),
         });
 
@@ -1164,6 +1300,8 @@ const CheckoutPage = () => {
             finalCouponResult.message || "Mã giảm giá không còn hợp lệ."
           );
 
+          resetPaymentIntentForAmountChange();
+
           return;
         }
 
@@ -1176,31 +1314,37 @@ const CheckoutPage = () => {
         couponResult: finalCouponResult || appliedCoupon,
       });
 
-      const finalDiscountAmount = finalCheckoutTotals.discountAmount;
-
       const finalGrandTotal = finalCheckoutTotals.grandTotal;
+
+      /*
+       * newOrder phải tồn tại trong scope của cả:
+       * - Chuyển khoản
+       * - COD
+       */
+      let newOrder = null;
+
+      /*
+       * ======================================================
+       * CHUYỂN KHOẢN
+       * ======================================================
+       */
 
       if (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD) {
         /*
-         * ======================================================
-         * LẦN BẤM ĐẦU:
-         * CHỈ TẠO PAYMENT INTENT + QR
-         *
-         * TUYỆT ĐỐI KHÔNG:
-         * - tạo Order
-         * - trừ kho
-         * - tăng usedCount coupon
-         * - gửi email
-         * - clear cart
-         * - navigate
-         * ======================================================
+         * ----------------------------------------------------
+         * LẦN 1:
+         * CHỈ TẠO PAYMENT INTENT.
+         * ----------------------------------------------------
          */
         if (!paymentIntent?.id) {
           const checkoutSignature = JSON.stringify({
             items: cartItems.map((item) => ({
               productId: item.id,
+
               productSlug: item.slug || item.productSlug || "",
+
               productName: item.name || item.productName || "",
+
               quantity: Number(item.quantity) || 1,
             })),
 
@@ -1216,7 +1360,9 @@ const CheckoutPage = () => {
             paymentDepositPercent,
 
             sender: formData.sender,
+
             recipient: formData.recipient,
+
             address: formData.address,
 
             deliveryDate: finalShippingCalculation.deliveryDate,
@@ -1238,6 +1384,7 @@ const CheckoutPage = () => {
 
               items: cartItems.map((item) => ({
                 id: item.id,
+
                 productId: item.id,
 
                 productSlug: item.slug || item.productSlug || "",
@@ -1266,7 +1413,9 @@ const CheckoutPage = () => {
 
               sender: {
                 name: formData.sender.name.trim(),
+
                 phone: formData.sender.phone.trim(),
+
                 email: formData.sender.email.trim(),
 
                 isHiddenFromRecipient:
@@ -1356,15 +1505,26 @@ const CheckoutPage = () => {
 
           setPaymentError("");
 
+          /*
+           * CỰC KỲ QUAN TRỌNG:
+           *
+           * Không tạo Order.
+           * Không gửi email.
+           * Không trừ kho.
+           * Không tăng usedCount coupon.
+           * Không clear cart.
+           * Không navigate.
+           */
           return;
         }
 
         /*
-         * ======================================================
-         * ĐÃ CÓ PAYMENT INTENT
-         * ======================================================
+         * ----------------------------------------------------
+         * LẦN 2:
+         * PAYMENT INTENT ĐÃ CÓ.
+         * KIỂM TRA TRỰC TIẾP BACKEND.
+         * ----------------------------------------------------
          */
-
         const latestPayment = await getBankTransferPaymentStatus(
           paymentIntent.id
         );
@@ -1382,11 +1542,10 @@ const CheckoutPage = () => {
         setPaymentVerified(true);
 
         /*
-         * ======================================================
-         * CHỈ TẠI ĐÂY MỚI TẠO ORDER
-         * ======================================================
+         * ----------------------------------------------------
+         * CHỈ TẠI ĐÂY MỚI TẠO ORDER.
+         * ----------------------------------------------------
          */
-
         const finalOrderResult = await finalizeBankTransferOrder(
           paymentIntent.id
         );
@@ -1398,6 +1557,138 @@ const CheckoutPage = () => {
         }
 
         newOrder = finalOrderResult.order;
+      } else {
+        /*
+         * ====================================================
+         * COD
+         * ====================================================
+         *
+         * COD được phép tạo Order ngay khi người dùng
+         * bấm Đặt hàng.
+         */
+
+        const orderResult = await createOrder({
+          paymentMethod: CHECKOUT_PAYMENT_METHOD,
+
+          paymentDepositPercent: 100,
+
+          items: cartItems.map((item) => ({
+            id: item.id,
+
+            productId: item.id,
+
+            productSlug: item.slug || item.productSlug || "",
+
+            productName: item.name || item.productName || "",
+
+            name: item.name || "",
+
+            price: Number(item.price) || 0,
+
+            unitPrice: Number(item.price) || 0,
+
+            quantity: Number(item.quantity) || 1,
+
+            image: item.image || "",
+
+            productImage: item.image || "",
+          })),
+
+          couponCode:
+            finalCouponResult?.coupon?.code ||
+            appliedCoupon?.coupon?.code ||
+            "",
+
+          shippingFee: finalShippingFee,
+
+          sender: {
+            name: formData.sender.name.trim(),
+
+            phone: formData.sender.phone.trim(),
+
+            email: formData.sender.email.trim(),
+
+            isHiddenFromRecipient:
+              formData.sender.isHiddenFromRecipient !== false,
+          },
+
+          recipient: {
+            fullName: formData.recipient.fullName.trim(),
+
+            name: formData.recipient.fullName.trim(),
+
+            phone: formData.recipient.phone.trim(),
+
+            email: formData.recipient.email.trim(),
+          },
+
+          shippingAddress: {
+            ...formData.address,
+
+            houseNumber: formData.address.houseNumber.trim(),
+
+            street: formData.address.street.trim(),
+
+            note: String(formData.note || "").trim(),
+          },
+
+          address: {
+            ...formData.address,
+
+            houseNumber: formData.address.houseNumber.trim(),
+
+            street: formData.address.street.trim(),
+
+            note: String(formData.note || "").trim(),
+          },
+
+          deliveryDate: finalShippingCalculation.deliveryDate,
+
+          deliveryTimeSlot: finalShippingCalculation.deliveryTimeSlot,
+
+          deliveryMode: finalShippingCalculation.deliveryMode,
+
+          deliveryModeLabel: finalShippingCalculation.deliveryModeLabel,
+
+          deliveryTimeSlotLabel: finalShippingCalculation.deliveryTimeSlotLabel,
+
+          estimatedDeliveryTime: finalShippingCalculation.estimatedDeliveryTime,
+
+          deliveryDistanceKm: finalShippingCalculation.distanceKm,
+
+          deliveryNote: finalShippingCalculation.deliveryNote,
+
+          shippingSnapshot,
+
+          notes: String(formData.note || "").trim(),
+
+          channel: "website",
+        });
+
+        if (!orderResult?.success || !orderResult?.order) {
+          throw new Error(orderResult?.message || "Không thể tạo đơn hàng.");
+        }
+
+        newOrder = orderResult.order;
+      }
+
+      /*
+       * Không cho phép đi tiếp nếu backend không trả Order.
+       */
+      if (!newOrder) {
+        throw new Error("Không xác định được đơn hàng sau khi thanh toán.");
+      }
+
+      /*
+       * Backend có thể trả id hoặc _id.
+       * Chuẩn hóa trước khi lưu/navigate.
+       */
+      const createdOrderId = String(
+        newOrder.id || newOrder._id || newOrder.orderId || ""
+      ).trim();
+
+      if (!createdOrderId) {
+        throw new Error("Backend không trả về mã định danh đơn hàng hợp lệ.");
       }
 
       try {
@@ -1413,7 +1704,9 @@ const CheckoutPage = () => {
 
       navigate("/order-success", {
         state: {
-          orderId: newOrder.id,
+          orderId: createdOrderId,
+
+          orderCode: newOrder.orderCode || newOrder.code || "",
         },
       });
     } catch (submitError) {

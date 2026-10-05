@@ -305,13 +305,18 @@ const buildOrderHtml = (order, title) => {
         ${formatMoney(order?.grandTotal)}
       </p>
 
-      <p>
+            <p>
         <strong>Hình thức thanh toán:</strong>
         ${
           order?.paymentMethod === "bank_transfer"
             ? "Chuyển khoản"
             : "Thanh toán khi nhận hàng"
         }
+      </p>
+
+      <p>
+        <strong>Trạng thái thanh toán:</strong>
+        ${getPaymentDescription(order)}
       </p>
 
       <p>

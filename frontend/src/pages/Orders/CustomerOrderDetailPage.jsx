@@ -1,4 +1,4 @@
-import { useContext, useMemo } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatVietnamDateTime } from "@/utils/dateFormat";
 
@@ -247,9 +247,11 @@ const CustomerOrderDetailPage = () => {
 
   const authContext = useContext(AuthContext);
 
-  const { orders = [], canViewOrder } = orderContext || {};
+  const { orders = [], canViewOrder, getOrderById } = orderContext || {};
 
   const { user } = authContext || {};
+
+  const [remoteOrder, setRemoteOrder] = useState(null);
 
   /* ===================================================
      TÌM ĐƠN
@@ -257,22 +259,74 @@ const CustomerOrderDetailPage = () => {
 
   const order = useMemo(() => {
     if (!orderId || !Array.isArray(orders)) {
-      return null;
+      return remoteOrder;
     }
 
-    const normalizedOrderId = String(orderId).replace(/^#/, "");
+    const normalizedOrderId = String(orderId)
+      .replace(/^#/, "")
+      .trim()
+      .toLowerCase();
 
-    return (
+    const foundOrder =
       orders.find((item) => {
-        const currentId = String(item?.id || item?.orderId || "").replace(
-          /^#/,
-          ""
-        );
+        const candidates = [
+          item?.id,
+          item?._id,
+          item?.orderId,
+          item?.orderCode,
+          item?.code,
+        ]
+          .map((value) =>
+            String(value || "")
+              .replace(/^#/, "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean);
 
-        return currentId === normalizedOrderId;
-      }) || null
-    );
-  }, [orders, orderId]);
+        return candidates.includes(normalizedOrderId);
+      }) || null;
+
+    return foundOrder || remoteOrder;
+  }, [orders, orderId, remoteOrder]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (order || !orderId || typeof getOrderById !== "function") {
+      return undefined;
+    }
+
+    const normalizedOrderId = String(orderId).replace(/^#/, "").trim();
+
+    if (!normalizedOrderId) {
+      return undefined;
+    }
+
+    const loadOrder = async () => {
+      try {
+        const result = await getOrderById(normalizedOrderId);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (result?.success && result?.order) {
+          setRemoteOrder(result.order);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Không thể tải chi tiết đơn hàng từ backend:", error);
+        }
+      }
+    };
+
+    loadOrder();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [order, orderId, getOrderById]);
 
   /* ===================================================
      KHÔNG TÌM THẤY
