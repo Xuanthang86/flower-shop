@@ -298,13 +298,23 @@ const ProductsPage = () => {
     Boolean(stockFilter);
 
   useEffect(() => {
+    const normalizeSeoTitle = (value) => {
+      const title = String(value || "").trim();
+
+      if (!title) {
+        return "";
+      }
+
+      return title.replace(/\|\s*Flower Shop\s*$/i, "| HTH Flower Shop");
+    };
+
     const title = currentCategory?.seoTitle
-      ? currentCategory.seoTitle
+      ? normalizeSeoTitle(currentCategory.seoTitle)
       : currentCategory?.name
-        ? `${currentCategory.name} | Flower Shop`
+        ? `${currentCategory.name} | HTH Flower Shop`
         : keyword
-          ? `Tìm kiếm "${keyword}" | Flower Shop`
-          : "Tất cả sản phẩm | Flower Shop";
+          ? `Tìm kiếm "${keyword}" | HTH Flower Shop`
+          : "Tất cả sản phẩm | HTH Flower Shop";
 
     document.title = title;
 

@@ -130,7 +130,7 @@ const formatDeliveryTimeSlot = (value) => {
 
   const [, start, end] = match;
 
-  return `Từ ${Number(start)} giờ đến ${Number(end)} giờ`;
+  return `Từ ${Number(start)} giờ đến ${Number(end)} giờ.`;
 };
 
 const getPaymentDescription = (order) => {
@@ -148,9 +148,9 @@ const getPaymentDescription = (order) => {
   );
 
   if (depositPercent === 50) {
-    return `Đã thanh toán trước 50% — ${formatMoney(
+    return `Đã thanh toán trước 50%, tương ứng số tiền: ${formatMoney(
       depositAmount,
-    )}; còn lại ${formatMoney(remainingAmount)} khi nhận hoa.`;
+    )}; Số tiền còn lại thanh toán khi nhận hoa: ${formatMoney(remainingAmount)}.`;
   }
 
   return `Đã thanh toán 100% — ${formatMoney(depositAmount)}.`;
@@ -209,8 +209,13 @@ const buildOrderRows = (order) => {
 
 const buildOrderHtml = (order, title) => {
   const sender = order?.senderSnapshot || {};
+
   const recipient = order?.recipientSnapshot || {};
+
   const customer = order?.customerSnapshot || {};
+
+  const shippingAddress =
+    order?.shippingAddress || order?.shippingSnapshot || recipient || {};
 
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
@@ -267,7 +272,7 @@ const buildOrderHtml = (order, title) => {
 
 <p>
   <strong>Địa chỉ giao hàng:</strong>
-  ${getFullRecipientAddress(recipient) || "—"}
+${getFullOrderAddress(order) || "—"}
 </p>
 
       <h3>Sản phẩm</h3>

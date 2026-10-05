@@ -33,7 +33,7 @@ const OrderSuccessPage = () => {
           </h1>
 
           <p className="mt-4 text-gray-600 leading-relaxed">
-            Cảm ơn bạn đã mua hàng tại Flower Shop. Đơn hàng của bạn đã được
+            Cảm ơn bạn đã mua hàng tại HTH Flower Shop. Đơn hàng của bạn đã được
             tiếp nhận và đang được xử lý.
           </p>
 

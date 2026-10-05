@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useCart } from "@/context/CartContext";
 import { OrderContext } from "@/context/OrderContext";
+import { useNotification } from "@/context/NotificationProvider";
 
 import AddressForm from "@/components/checkout/AddressForm";
 import PaymentMethod from "@/components/checkout/PaymentMethod";
@@ -98,13 +99,9 @@ const CheckoutPage = () => {
     try {
       await navigator.clipboard.writeText(text);
 
-      setPaymentError(`Đã sao chép ${label}.`);
-
-      window.setTimeout(() => {
-        setPaymentError("");
-      }, 1800);
+      notifySuccess(`Đã sao chép ${label}.`);
     } catch {
-      setPaymentError(`Không thể sao chép ${label}.`);
+      notifyError(`Không thể sao chép ${label}.`);
     }
   };
 
@@ -148,6 +145,7 @@ const CheckoutPage = () => {
   const { createOrder } = useContext(OrderContext);
 
   const { user } = useAuth();
+  const { notifySuccess, notifyError } = useNotification();
 
   const [paymentSettings, setPaymentSettings] = useState(() =>
     getDefaultPaymentSettings()
@@ -327,6 +325,331 @@ const CheckoutPage = () => {
 
     setPaymentIntentLoading(false);
   };
+
+  /*
+   * ==========================================================
+   * TỰ ĐỘNG TẠO PAYMENT INTENT CHO CHUYỂN KHOẢN
+   * ==========================================================
+   *
+   * Khi:
+   * - thông tin người gửi đầy đủ
+   * - thông tin người nhận đầy đủ
+   * - địa chỉ đầy đủ
+   * - ngày giao đầy đủ
+   * - khung giờ đầy đủ
+   * - tính phí giao hàng thành công
+   * - đã chọn Chuyển khoản
+   *
+   * => hệ thống tự tạo PaymentIntent.
+   *
+   * Không chờ người dùng bấm "Tạo mã QR".
+   */
+
+  const automaticPaymentIntentSignature = useMemo(() => {
+    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
+      return "";
+    }
+
+    if (!shippingCalculation?.success) {
+      return "";
+    }
+
+    if (!cartItems?.length) {
+      return "";
+    }
+
+    return JSON.stringify({
+      items: cartItems.map((item) => ({
+        productId: item.id,
+        productSlug: item.slug || item.productSlug || "",
+        productName: item.name || item.productName || "",
+        quantity: Number(item.quantity) || 1,
+      })),
+
+      couponCode:
+        appliedCoupon?.coupon?.code || couponCode.trim().toUpperCase() || "",
+
+      subtotal: Math.round(Number(subtotal) || 0),
+
+      shippingFee: Math.round(Number(shippingCalculation.shippingFee) || 0),
+
+      grandTotal: Math.round(Number(grandTotal) || 0),
+
+      paymentDepositPercent: Number(paymentDepositPercent) === 50 ? 50 : 100,
+
+      sender: {
+        name: formData.sender.name.trim(),
+        phone: formData.sender.phone.trim(),
+        email: formData.sender.email.trim(),
+        isHiddenFromRecipient: formData.sender.isHiddenFromRecipient !== false,
+      },
+
+      recipient: {
+        fullName: formData.recipient.fullName.trim(),
+        phone: formData.recipient.phone.trim(),
+        email: formData.recipient.email.trim(),
+      },
+
+      address: {
+        provinceCode: formData.address.provinceCode,
+        provinceName: formData.address.provinceName,
+        wardCode: formData.address.wardCode,
+        wardName: formData.address.wardName,
+        houseNumber: formData.address.houseNumber.trim(),
+        street: formData.address.street.trim(),
+      },
+
+      note: String(formData.note || "").trim(),
+
+      deliveryDate,
+      deliveryTimeSlot,
+      deliveryMode,
+    });
+  }, [
+    formData.paymentMethod,
+    formData.sender,
+    formData.recipient,
+    formData.address,
+    formData.note,
+    cartItems,
+    couponCode,
+    appliedCoupon?.coupon?.code,
+    subtotal,
+    shippingCalculation,
+    grandTotal,
+    paymentDepositPercent,
+    deliveryDate,
+    deliveryTimeSlot,
+    deliveryMode,
+  ]);
+
+  useEffect(() => {
+    if (
+      formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD ||
+      paymentSettings?.bankTransfer?.enabled === false ||
+      !automaticPaymentIntentSignature ||
+      !shippingCalculation?.success ||
+      paymentDepositAmount <= 0
+    ) {
+      return undefined;
+    }
+
+    if (
+      automaticPaymentIntentRequestRef.current ===
+      automaticPaymentIntentSignature
+    ) {
+      return undefined;
+    }
+
+    automaticPaymentIntentRequestRef.current = automaticPaymentIntentSignature;
+
+    const requestSequence = automaticPaymentIntentSequenceRef.current + 1;
+
+    automaticPaymentIntentSequenceRef.current = requestSequence;
+
+    let cancelled = false;
+
+    /*
+     * Xóa PaymentIntent cũ trước khi tạo PaymentIntent
+     * tương ứng với thông tin mới.
+     */
+    setPaymentIntent(EMPTY_PAYMENT_INTENT);
+    setPaymentVerified(false);
+    setPaymentError("");
+    setPaymentIntentLoading(true);
+
+    const createAutomaticPaymentIntent = async () => {
+      try {
+        const shippingSnapshot = createShippingSnapshot(shippingCalculation);
+
+        if (!shippingSnapshot) {
+          throw new Error("Không thể tạo thông tin giao hàng.");
+        }
+
+        const checkoutSignature = automaticPaymentIntentSignature;
+
+        const intentResult = await createBankTransferPaymentIntent({
+          depositPercent: paymentDepositPercent,
+
+          checkoutSignature,
+
+          draft: {
+            paymentMethod: BANK_TRANSFER_PAYMENT_METHOD,
+
+            items: cartItems.map((item) => ({
+              id: item.id,
+
+              productId: item.id,
+
+              productSlug: item.slug || item.productSlug || "",
+
+              productName: item.name || item.productName || "",
+
+              name: item.name || "",
+
+              price: Number(item.price) || 0,
+
+              unitPrice: Number(item.price) || 0,
+
+              quantity: Number(item.quantity) || 1,
+
+              image: item.image || "",
+
+              productImage: item.image || "",
+            })),
+
+            couponCode:
+              appliedCoupon?.coupon?.code ||
+              couponCode.trim().toUpperCase() ||
+              "",
+
+            shippingFee: Number(shippingCalculation.shippingFee) || 0,
+
+            sender: {
+              name: formData.sender.name.trim(),
+
+              phone: formData.sender.phone.trim(),
+
+              email: formData.sender.email.trim(),
+
+              isHiddenFromRecipient:
+                formData.sender.isHiddenFromRecipient !== false,
+            },
+
+            recipient: {
+              fullName: formData.recipient.fullName.trim(),
+
+              name: formData.recipient.fullName.trim(),
+
+              phone: formData.recipient.phone.trim(),
+
+              email: formData.recipient.email.trim(),
+            },
+
+            shippingAddress: {
+              ...formData.address,
+
+              houseNumber: formData.address.houseNumber.trim(),
+
+              street: formData.address.street.trim(),
+
+              note: String(formData.note || "").trim(),
+            },
+
+            address: {
+              ...formData.address,
+
+              houseNumber: formData.address.houseNumber.trim(),
+
+              street: formData.address.street.trim(),
+
+              note: String(formData.note || "").trim(),
+            },
+
+            deliveryDate: shippingCalculation.deliveryDate || deliveryDate,
+
+            deliveryTimeSlot:
+              shippingCalculation.deliveryTimeSlot || deliveryTimeSlot,
+
+            deliveryMode: shippingCalculation.deliveryMode || deliveryMode,
+
+            deliveryModeLabel: shippingCalculation.deliveryModeLabel || "",
+
+            deliveryTimeSlotLabel:
+              shippingCalculation.deliveryTimeSlotLabel || "",
+
+            estimatedDeliveryTime:
+              shippingCalculation.estimatedDeliveryTime || "",
+
+            deliveryDistanceKm: shippingCalculation.distanceKm ?? null,
+
+            deliveryNote: shippingCalculation.deliveryNote || "",
+
+            shippingSnapshot,
+
+            notes: String(formData.note || "").trim(),
+
+            channel: "website",
+          },
+        });
+
+        if (
+          cancelled ||
+          requestSequence !== automaticPaymentIntentSequenceRef.current
+        ) {
+          return;
+        }
+
+        const intent = intentResult?.paymentIntent;
+
+        if (!intent?.id || !intent?.orderCode) {
+          throw new Error("Backend không trả về Payment Intent hợp lệ.");
+        }
+
+        const expectedAmount = Math.round(Number(paymentDepositAmount) || 0);
+
+        const receivedAmount = Math.round(Number(intent.amount) || 0);
+
+        if (expectedAmount <= 0 || receivedAmount !== expectedAmount) {
+          throw new Error(
+            "Số tiền Payment Intent không khớp với số tiền thanh toán."
+          );
+        }
+
+        setPaymentIntent(intent);
+
+        setPaymentVerified(intent.status === "paid");
+
+        setPaymentError("");
+      } catch (intentError) {
+        if (
+          cancelled ||
+          requestSequence !== automaticPaymentIntentSequenceRef.current
+        ) {
+          return;
+        }
+
+        automaticPaymentIntentRequestRef.current = "";
+
+        setPaymentIntent(EMPTY_PAYMENT_INTENT);
+
+        setPaymentVerified(false);
+
+        setPaymentError(
+          intentError?.message || "Không thể tạo mã QR thanh toán tự động."
+        );
+      } finally {
+        if (!cancelled) {
+          setPaymentIntentLoading(false);
+        }
+      }
+    };
+
+    const timer = window.setTimeout(createAutomaticPaymentIntent, 250);
+
+    return () => {
+      cancelled = true;
+
+      window.clearTimeout(timer);
+    };
+  }, [
+    formData.paymentMethod,
+    paymentSettings?.bankTransfer?.enabled,
+    automaticPaymentIntentSignature,
+    shippingCalculation,
+    paymentDepositAmount,
+    paymentDepositPercent,
+    cartItems,
+    appliedCoupon?.coupon?.code,
+    couponCode,
+    formData.sender,
+    formData.recipient,
+    formData.address,
+    formData.note,
+    deliveryDate,
+    deliveryTimeSlot,
+    deliveryMode,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2571,8 +2894,23 @@ const CheckoutPage = () => {
                               </p>
                             </div>
                           ) : (
-                            <div className="flex min-h-48 items-center justify-center rounded-xl bg-white p-4 text-center text-xs text-gray-500">
-                              Mã QR hoặc mã ngân hàng đang được tạo.
+                            <div className="flex min-h-48 flex-col items-center justify-center rounded-xl bg-white p-4 text-center text-xs text-gray-500">
+                              {paymentIntentLoading ? (
+                                <>
+                                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-pink-600" />
+
+                                  <p className="mt-3">
+                                    Đang tạo mã QR thanh toán...
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p>
+                                    Vui lòng hoàn tất thông tin đơn hàng để hệ
+                                    thống tạo mã QR.
+                                  </p>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2706,20 +3044,22 @@ const CheckoutPage = () => {
                     submitting ||
                     shippingLoading ||
                     !shippingCalculation.success ||
+                    paymentIntentLoading ||
                     (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-                      Boolean(paymentIntent?.id) &&
-                      !paymentVerified)
+                      (!paymentIntent?.id || !paymentVerified))
                   }
                   className="mt-6 w-full rounded-lg bg-pink-600 px-6 py-3 font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
                   {submitting
                     ? "Đang xử lý..."
                     : formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD
-                      ? !paymentIntent?.id
-                        ? "Tạo mã QR thanh toán"
-                        : !paymentVerified
-                          ? "Đang chờ thanh toán"
-                          : "Đặt hàng"
+                      ? paymentIntentLoading
+                        ? "Đang chuẩn bị thanh toán..."
+                        : !paymentIntent?.id
+                          ? "Đang chuẩn bị thanh toán..."
+                          : !paymentVerified
+                            ? "Đang chờ thanh toán"
+                            : "Đặt hàng"
                       : "Đặt hàng"}
                 </button>
               </div>

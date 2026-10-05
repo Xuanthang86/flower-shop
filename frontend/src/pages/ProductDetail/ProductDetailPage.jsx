@@ -205,7 +205,7 @@ const ProductDetailPage = () => {
     }/products/${encodeURIComponent(productId)}`;
 
     if (!product) {
-      document.title = "Không tìm thấy sản phẩm | Flower Shop";
+      document.title = "Không tìm thấy sản phẩm | HTH Flower Shop";
 
       ensureMeta(
         "name",
@@ -221,19 +221,19 @@ const ProductDetailPage = () => {
     }
 
     const description = String(
-      product.description || `Khám phá ${product.name} tại Flower Shop.`
+      product.description || `Khám phá ${product.name} tại HTH Flower Shop.`
     )
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 160);
 
-    document.title = `${product.name} | Flower Shop`;
+    document.title = `${product.name} | HTH Flower Shop`;
 
     ensureMeta("name", "description", description);
 
     ensureMeta("name", "robots", "index,follow");
 
-    ensureMeta("property", "og:title", `${product.name} | Flower Shop`);
+    ensureMeta("property", "og:title", `${product.name} | HTH Flower Shop`);
 
     ensureMeta("property", "og:description", description);
 
@@ -264,7 +264,7 @@ const ProductDetailPage = () => {
 
       brand: {
         "@type": "Brand",
-        name: "Flower Shop",
+        name: "HTH Flower Shop",
       },
 
       offers: {

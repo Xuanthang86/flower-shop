@@ -168,11 +168,23 @@ const Cart = () => {
                 type="button"
                 onClick={clearCart}
                 className="
-                  text-sm
-                  text-red-500
-                  hover:text-red-700
-                  transition
-                "
+    inline-flex
+    items-center
+    justify-center
+    rounded-xl
+    border
+    border-red-200
+    bg-white
+    px-4
+    py-2.5
+    text-sm
+    font-medium
+    text-red-500
+    transition
+    hover:border-red-300
+    hover:bg-red-50
+    hover:text-red-700
+  "
               >
                 Xóa toàn bộ giỏ hàng
               </button>
@@ -222,12 +234,25 @@ const Cart = () => {
                 <Link
                   to="/products"
                   className="
-                    block
-                    text-center
-                    mt-4
-                    text-pink-600
-                    hover:text-pink-700
-                  "
+    mt-4
+    inline-flex
+    w-full
+    items-center
+    justify-center
+    rounded-xl
+    border
+    border-pink-200
+    bg-white
+    px-4
+    py-3
+    text-center
+    font-semibold
+    text-pink-600
+    transition
+    hover:border-pink-300
+    hover:bg-pink-50
+    hover:text-pink-700
+  "
                 >
                   ← Tiếp tục mua hàng
                 </Link>

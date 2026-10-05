@@ -133,7 +133,7 @@ const AdminOrderDetailPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    if (localOrder || !orderId) {
+    if (!orderId) {
       return undefined;
     }
 
@@ -162,7 +162,7 @@ const AdminOrderDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [localOrder, orderId, getOrderById]);
+  }, [orderId, getOrderById]);
 
   const payment = order?.payment || null;
 
@@ -332,8 +332,8 @@ const AdminOrderDetailPage = () => {
   const customer = order.customerSnapshot || order.customer || {};
 
   const address =
-    order.recipientSnapshot ||
     order.shippingAddress ||
+    order.recipientSnapshot ||
     customer.address ||
     order.customerAddress ||
     order.address ||
@@ -390,10 +390,20 @@ const AdminOrderDetailPage = () => {
   );
 
   const handleStatusChange = async (event) => {
-    const result = await updateOrderStatus(order.id, event.target.value);
+    const nextStatus = event.target.value;
+
+    const result = await updateOrderStatus(order.id, {
+      status: nextStatus,
+    });
 
     if (result?.success === false) {
-      window.alert(result.message || "Không thể cập nhật trạng thái.");
+      window.alert(result.message || "Không thể cập nhật trạng thái đơn hàng.");
+
+      return;
+    }
+
+    if (result?.order) {
+      setRemoteOrder(result.order);
     }
   };
 
@@ -411,7 +421,7 @@ const AdminOrderDetailPage = () => {
 
           <div className="mt-5">
             <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Chi tiết đơn hàng #{order.id}
+              Chi tiết đơn hàng {order.orderCode || order.id}
             </h1>
           </div>
         </div>
@@ -473,7 +483,7 @@ const AdminOrderDetailPage = () => {
 
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-sm text-gray-600">
-                          Còn lại khi nhận hoa
+                          Còn lại thanh toán khi nhận hoa
                         </span>
 
                         <span className="text-sm font-semibold text-gray-800">
