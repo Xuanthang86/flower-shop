@@ -244,25 +244,17 @@ const CartSession = ({ user, products, children }) => {
       return;
     }
 
-    /*
-     * Catalog chưa sẵn sàng:
-     * tuyệt đối không reset cart.
-     */
     if (!Array.isArray(products) || products.length === 0) {
       return;
     }
 
-    const savedCart = readCart(userId);
-
-    const nextItems = syncCartWithProducts(
-      savedCart.map(normalizeCartItem),
-      products
+    setCartItems((currentItems) =>
+      syncCartWithProducts(
+        Array.isArray(currentItems) ? currentItems.map(normalizeCartItem) : [],
+        products
+      )
     );
-
-    setCartItems(nextItems);
-
-    persistCart(nextItems);
-  }, [userId, products, persistCart]);
+  }, [userId, products]);
 
   useEffect(() => {
     if (!userId) {
@@ -330,6 +322,73 @@ const CartSession = ({ user, products, children }) => {
 
     return () => {
       cancelled = true;
+    };
+  }, [userId, products]);
+
+  useEffect(() => {
+    if (!userId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const refreshServerCart = async () => {
+      try {
+        const serverCart = await getServerCart();
+
+        if (cancelled) {
+          return;
+        }
+
+        const normalizedServerCart = Array.isArray(serverCart)
+          ? serverCart.map(normalizeCartItem)
+          : [];
+
+        const nextItems =
+          Array.isArray(products) && products.length > 0
+            ? syncCartWithProducts(normalizedServerCart, products)
+            : normalizedServerCart;
+
+        setCartItems(nextItems);
+
+        const storageKey = getCartStorageKey(userId);
+
+        if (storageKey) {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(nextItems));
+          } catch (error) {
+            console.error("Không thể cập nhật cache giỏ hàng:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Không thể refresh giỏ hàng từ máy chủ:", error);
+      }
+    };
+
+    const handleFocus = () => {
+      refreshServerCart();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshServerCart();
+      }
+    };
+
+    const timer = window.setInterval(refreshServerCart, 10000);
+
+    window.addEventListener("focus", handleFocus);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+
+      window.clearInterval(timer);
+
+      window.removeEventListener("focus", handleFocus);
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [userId, products]);
 
@@ -632,15 +691,17 @@ const CartSession = ({ user, products, children }) => {
 
     const storageKey = getCartStorageKey(userId);
 
-    if (!storageKey) {
-      return;
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (error) {
+        console.error("Lỗi xóa giỏ hàng:", error);
+      }
     }
 
-    try {
-      localStorage.removeItem(storageKey);
-    } catch (error) {
-      console.error("Lỗi xóa giỏ hàng:", error);
-    }
+    saveServerCart([]).catch((error) => {
+      console.error("Không thể xóa giỏ hàng trên máy chủ:", error);
+    });
   }, [userId]);
 
   /*

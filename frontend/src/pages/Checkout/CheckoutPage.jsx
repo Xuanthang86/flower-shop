@@ -399,6 +399,14 @@ const CheckoutPage = () => {
 
     const bankName = String(bankTransfer.bankName || "").trim();
 
+    if (/^\d{6}$/.test(bankCode)) {
+      setResolvedBankCode(bankCode);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!bankCode && !bankName) {
       setResolvedBankCode("");
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useOrder } from "@/context/OrderContext";
+import { formatVietnamDateTime } from "@/utils/dateFormat";
 
 import {
   STATUS_OPTIONS,
@@ -48,19 +49,7 @@ const getProductCount = (order) => {
 const getOrderId = (order) =>
   String(order?.id || order?.orderId || "").replace(/^#/, "");
 
-const formatDate = (date) => {
-  if (!date) {
-    return "—";
-  }
-
-  const parsed = new Date(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "—";
-  }
-
-  return parsed.toLocaleString("vi-VN");
-};
+const formatDate = (date) => formatVietnamDateTime(date);
 
 const AdminOrderList = () => {
   const { orders = [], pagination, loading, refreshOrders } = useOrder();

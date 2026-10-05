@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { formatVietnamDateTime } from "@/utils/dateFormat";
+import { formatVietnamDate, formatVietnamDateTime } from "@/utils/dateFormat";
 
 import {
   FiArrowLeft,
@@ -519,7 +519,7 @@ const AdminOrderDetailPage = () => {
               <p className="text-sm text-gray-500">Ngày giao</p>
 
               <p className="mt-1 font-semibold text-gray-800">
-                {deliveryDate || "—"}
+                {formatVietnamDate(deliveryDate)}
               </p>
             </div>
 
