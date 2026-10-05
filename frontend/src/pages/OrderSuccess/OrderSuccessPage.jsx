@@ -54,7 +54,10 @@ const OrderSuccessPage = () => {
               <span className="text-gray-600">Tổng tiền</span>
 
               <span className="font-bold text-pink-600">
-                {order.grandTotal ?? order.total.toLocaleString("vi-VN")} ₫
+                {Number(order.grandTotal ?? order.total ?? 0).toLocaleString(
+                  "vi-VN"
+                )}{" "}
+                ₫
               </span>
             </div>
           )}

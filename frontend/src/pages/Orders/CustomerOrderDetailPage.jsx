@@ -147,7 +147,9 @@ const formatCurrency = (value = 0) => {
 ===================================================== */
 
 const getOrderId = (order) => {
-  return String(order?.id || order?.orderId || "").replace(/^#/, "");
+  return String(order?.orderCode || order?.code || "")
+    .replace(/^#/, "")
+    .trim();
 };
 
 /* =====================================================
@@ -232,19 +234,6 @@ const getFullAddress = (address) => {
   ].filter(Boolean);
 
   return parts.length ? parts.join(", ") : "—";
-};
-
-const getOrderCode = (order) => {
-  return String(order?.orderCode || order?.code || "")
-    .replace(/^#/, "")
-    .trim();
-};
-
-const getOrderRouteId = (order) => {
-  return String(order?.id || order?._id || order?.orderId || "").replace(
-    /^#/,
-    ""
-  );
 };
 
 /* =====================================================

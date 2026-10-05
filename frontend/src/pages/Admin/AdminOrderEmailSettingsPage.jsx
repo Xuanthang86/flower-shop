@@ -1,3 +1,4 @@
+import api from "@/services/api";
 import { useState } from "react";
 import { FiMail, FiSave } from "react-icons/fi";
 
@@ -45,13 +46,55 @@ const AdminOrderEmailSettingsPage = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      saveSiteSettings(settings);
+      const response = await api.get("/data/snapshot", {
+        params: {
+          _: Date.now(),
+        },
+      });
+
+      const snapshot = response?.data?.snapshot || {};
+
+      const nextSettings = {
+        ...(snapshot.settings || {}),
+        notifications: {
+          ...(snapshot.settings?.notifications || {}),
+          ...(settings.notifications || {}),
+        },
+      };
+
+      const saveResponse = await api.put("/data/snapshot", {
+        products: Array.isArray(snapshot.products) ? snapshot.products : [],
+
+        categories: Array.isArray(snapshot.categories)
+          ? snapshot.categories
+          : [],
+
+        settings: nextSettings,
+      });
+
+      if (saveResponse?.data?.success !== true) {
+        throw new Error(
+          saveResponse?.data?.message ||
+            "Không thể lưu cấu hình email vào backend."
+        );
+      }
+
+      saveSiteSettings({
+        ...settings,
+        notifications: nextSettings.notifications,
+      });
 
       notifySuccess("Đã lưu cấu hình email thông báo đơn hàng.");
     } catch (error) {
-      notifyError(error?.message || "Không thể lưu cấu hình email.");
+      console.error("Không thể lưu cấu hình email:", error);
+
+      notifyError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể lưu cấu hình email."
+      );
     }
   };
 

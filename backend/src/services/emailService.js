@@ -230,7 +230,7 @@ const buildOrderHtml = (order, title) => {
 
       <p>
         <strong>Thời gian đặt:</strong>
-        ${formatDateTime(order?.createdAt)}
+        ${formatVietnamDateTime(order?.createdAt)}
       </p>
 
       <hr />
@@ -316,12 +316,12 @@ const buildOrderHtml = (order, title) => {
 
       <p>
         <strong>Ngày giao:</strong>
-        ${order?.deliveryDate ? formatDateTime(order.deliveryDate) : ""}
+        ${order?.deliveryDate ? formatVietnamDate(order.deliveryDate) : ""}
       </p>
 
       <p>
         <strong>Khung giờ:</strong>
-        ${order?.deliveryTimeSlot || ""}
+        ${formatDeliveryTimeSlot(order?.deliveryTimeSlot)}
       </p>
 
       ${order?.notes ? `<p><strong>Ghi chú:</strong> ${order.notes}</p>` : ""}

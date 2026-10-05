@@ -51,9 +51,6 @@ const getOrderId = (order) =>
     .replace(/^#/, "")
     .trim();
 
-const getOrderRouteId = (order) =>
-  String(order?.id || order?._id || order?.orderId || "").replace(/^#/, "");
-
 const formatDate = (date) => formatVietnamDateTime(date);
 
 const AdminOrderList = () => {
