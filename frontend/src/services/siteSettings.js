@@ -558,6 +558,54 @@ export const DEFAULT_SITE_SETTINGS = {
 
   notifications: {
     orderEmail: "",
+
+    newOrderSubject: "Đơn hàng mới {{orderCode}}",
+
+    newOrderTitle: "Có đơn hàng mới",
+
+    statusSubject: "Cập nhật trạng thái đơn hàng {{orderCode}}",
+
+    statusTitle: "Đơn hàng {{orderCode}} đã cập nhật trạng thái",
+
+    senderNameLabel: "Tên người gửi",
+
+    senderPhoneLabel: "Số điện thoại người gửi",
+
+    senderEmailLabel: "Email người gửi",
+
+    recipientNameLabel: "Tên người nhận",
+
+    recipientPhoneLabel: "Số điện thoại người nhận",
+
+    recipientEmailLabel: "Email người nhận",
+
+    orderTimeLabel: "Thời gian đặt",
+
+    addressLabel: "Địa chỉ giao hàng",
+
+    deliveryDateLabel: "Ngày giao",
+
+    deliveryTimeLabel: "Khung giờ",
+
+    paymentMethodLabel: "Hình thức thanh toán",
+
+    paid50Label: "Đã thanh toán trước 50%",
+
+    paid100Label: "Đã thanh toán 100%",
+
+    remainingLabel: "Còn lại khi nhận hoa",
+
+    productColumns: {
+      nameWidth: "40%",
+      quantityWidth: "12%",
+      unitPriceWidth: "24%",
+      subtotalWidth: "24%",
+
+      nameAlign: "left",
+      quantityAlign: "center",
+      unitPriceAlign: "right",
+      subtotalAlign: "right",
+    },
   },
 
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
@@ -1003,14 +1051,26 @@ const mergeSettings = (input = {}) => {
       : [],
   };
 
+  const notificationDefaults = defaults.notifications;
+
+  const sourceNotifications = source.notifications || {};
+
   const notifications = {
+    ...notificationDefaults,
+
+    ...sourceNotifications,
+
     orderEmail: String(
-      source.notifications?.orderEmail ||
-        defaults.notifications.orderEmail ||
-        ""
+      sourceNotifications.orderEmail || notificationDefaults.orderEmail || ""
     )
       .trim()
       .toLowerCase(),
+
+    productColumns: {
+      ...notificationDefaults.productColumns,
+
+      ...(sourceNotifications.productColumns || {}),
+    },
   };
 
   const normalizedBlogCategories = normalizeBlogCategories(

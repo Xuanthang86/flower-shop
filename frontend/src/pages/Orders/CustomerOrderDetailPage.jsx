@@ -234,6 +234,19 @@ const getFullAddress = (address) => {
   return parts.length ? parts.join(", ") : "—";
 };
 
+const getOrderCode = (order) => {
+  return String(order?.orderCode || order?.code || "")
+    .replace(/^#/, "")
+    .trim();
+};
+
+const getOrderRouteId = (order) => {
+  return String(order?.id || order?._id || order?.orderId || "").replace(
+    /^#/,
+    ""
+  );
+};
+
 /* =====================================================
    COMPONENT
 ===================================================== */
@@ -592,8 +605,10 @@ const CustomerOrderDetailPage = () => {
 
               <p className="font-medium text-gray-800 mt-1">
                 {order?.paymentMethod === "cod"
-                  ? "Thanh toán khi nhận hàng (COD)"
-                  : order?.paymentMethod || "—"}
+                  ? "Thanh toán khi nhận hàng"
+                  : order?.paymentMethod === "bank_transfer"
+                    ? "Chuyển khoản"
+                    : order?.paymentMethod || "—"}
               </p>
             </div>
 

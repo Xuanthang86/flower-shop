@@ -159,7 +159,16 @@ const formatCurrency = (value = 0) => {
 ===================================================== */
 
 const getOrderId = (order) => {
-  return String(order?.id || order?.orderId || "").replace(/^#/, "");
+  return String(order?.orderCode || order?.code || "")
+    .replace(/^#/, "")
+    .trim();
+};
+
+const getOrderRouteId = (order) => {
+  return String(order?.id || order?._id || order?.orderId || "").replace(
+    /^#/,
+    ""
+  );
 };
 
 /* =====================================================
@@ -238,9 +247,11 @@ const getPaymentMethod = (order) => {
 ===================================================== */
 
 const OrdersPage = () => {
-  const { getMyOrders } = useContext(OrderContext);
+  const orderContext = useContext(OrderContext);
 
-  const orders = typeof getMyOrders === "function" ? getMyOrders() : [];
+  const orders = Array.isArray(orderContext?.orders) ? orderContext.orders : [];
+
+  const refreshOrders = orderContext?.refreshOrders;
 
   const [searchKeyword, setSearchKeyword] = useState("");
 
@@ -270,6 +281,17 @@ const OrdersPage = () => {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof refreshOrders !== "function") {
+      return;
+    }
+
+    refreshOrders({
+      page: 1,
+      limit: 50,
+    });
+  }, [refreshOrders]);
 
   /* ===================================================
      LỌC
@@ -319,7 +341,7 @@ const OrdersPage = () => {
               </h1>
 
               <p className="mt-1 text-sm text-gray-500">
-                Theo dõi các đơn hàng bạn đã đặt tại T Flower Shop.
+                Theo dõi các đơn hàng bạn đã đặt tại HTH Flower Shop.
               </p>
             </div>
           </div>
@@ -507,7 +529,7 @@ const OrdersPage = () => {
 
                   <div className="mt-5 flex justify-end">
                     <Link
-                      to={`/orders/${getOrderId(order)}`}
+                      to={`/orders/${getOrderRouteId(order)}`}
                       className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-gray-700 transition hover:border-pink-300 hover:text-pink-600"
                     >
                       <FiEye size={17} />

@@ -51,6 +51,8 @@ import NotFoundPage from "@/pages/NotFound/NotFoundPage";
 
 import UnsavedChangesGuard from "@/utils/unsavedChanges";
 
+import AdminOrderEmailSettingsPage from "@/pages/Admin/AdminOrderEmailSettingsPage";
+
 const LoadingPage = ({ text }) => (
   <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
     <div className="text-center">
@@ -316,6 +318,17 @@ const AppRoutes = () => {
               <AdminOnlyRoute>
                 <AdminSubPage>
                   <AdminPaymentSettingsPage />
+                </AdminSubPage>
+              </AdminOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/admin/order-email"
+            element={
+              <AdminOnlyRoute>
+                <AdminSubPage>
+                  <AdminOrderEmailSettingsPage />
                 </AdminSubPage>
               </AdminOnlyRoute>
             }

@@ -122,6 +122,14 @@ const AdminManagementPage = () => {
     },
 
     isAdmin && {
+      to: "/admin/order-email",
+      title: "Cấu hình email đơn hàng",
+      description:
+        "Cấu hình tiêu đề, nội dung, thông tin người gửi, người nhận, ngày giao và bảng sản phẩm trong email.",
+      icon: FiMail,
+    },
+
+    isAdmin && {
       to: "/admin/payment",
       title: "Cấu hình thanh toán",
       description:

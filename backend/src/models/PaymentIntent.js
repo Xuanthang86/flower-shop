@@ -9,12 +9,19 @@ const paymentIntentSchema = new mongoose.Schema(
       index: true,
     },
 
+    /*
+     * Order CHƯA tồn tại khi PaymentIntent được tạo.
+     *
+     * Sau khi SePay xác nhận giao dịch và khách bấm
+     * "Đặt hàng", backend mới gắn Order._id vào đây.
+     */
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
-      required: true,
-      unique: true,
+      default: null,
       index: true,
+      sparse: true,
+      unique: true,
     },
 
     customerId: {
@@ -24,6 +31,12 @@ const paymentIntentSchema = new mongoose.Schema(
       index: true,
     },
 
+    /*
+     * Mã này được tạo NGAY KHI tạo PaymentIntent.
+     *
+     * Ví dụ:
+     * HTH261005-4821
+     */
     orderCode: {
       type: String,
       required: true,
@@ -56,6 +69,29 @@ const paymentIntentSchema = new mongoose.Schema(
       type: Number,
       enum: [50, 100],
       default: 100,
+    },
+
+    /*
+     * Signature của Checkout tại thời điểm tạo PaymentIntent.
+     *
+     * Dùng để tránh tạo lại QR/PaymentIntent liên tục
+     * khi React render lại.
+     */
+    checkoutSignature: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
+    /*
+     * Toàn bộ snapshot Checkout dùng để tạo Order
+     * SAU KHI thanh toán đã được xác minh.
+     *
+     * Không tạo Order tại thời điểm này.
+     */
+    checkoutSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
 
     status: {

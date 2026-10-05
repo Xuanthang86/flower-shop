@@ -47,7 +47,12 @@ const getProductCount = (order) => {
 };
 
 const getOrderId = (order) =>
-  String(order?.id || order?.orderId || "").replace(/^#/, "");
+  String(order?.orderCode || order?.code || "")
+    .replace(/^#/, "")
+    .trim();
+
+const getOrderRouteId = (order) =>
+  String(order?.id || order?._id || order?.orderId || "").replace(/^#/, "");
 
 const formatDate = (date) => formatVietnamDateTime(date);
 
@@ -188,8 +193,10 @@ const AdminOrderList = () => {
 
                     <td className="px-5 py-4 text-sm text-center">
                       {order.paymentMethod === "cod"
-                        ? "COD"
-                        : order.paymentMethod || "COD"}
+                        ? "Thanh toán khi nhận hàng"
+                        : order.paymentMethod === "bank_transfer"
+                          ? "Chuyển khoản"
+                          : order.paymentMethod || "—"}
                     </td>
 
                     <td className="px-5 py-4 text-center">

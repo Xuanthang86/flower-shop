@@ -705,7 +705,11 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
   };
 };
 
-const create = async ({ payload = {}, user }) => {
+const create = async ({
+  payload = {},
+  user,
+  suppressNewOrderEmail = false,
+}) => {
   if (!user?._id) {
     throw Object.assign(new Error("Bạn cần đăng nhập để tạo đơn hàng."), {
       status: 401,
@@ -969,7 +973,10 @@ const create = async ({ payload = {}, user }) => {
   await order.save();
 
   const finalOrder = await Order.findById(order._id).lean();
-  void sendNewOrderNotification(finalOrder);
+
+  if (!suppressNewOrderEmail) {
+    void sendNewOrderNotification(finalOrder);
+  }
 
   return {
     order: finalOrder,

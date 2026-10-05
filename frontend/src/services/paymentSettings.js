@@ -277,8 +277,6 @@ export const savePaymentSettings = async (paymentSettings = {}) => {
    */
   window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
 
-  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
-
   return saved;
 };
 

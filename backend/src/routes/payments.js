@@ -59,8 +59,12 @@ const verifyWebhook = (req) => {
 router.post("/intents", requireAuth, async (req, res, next) => {
   try {
     const intent = await createIntent({
-      orderId: req.body?.orderId,
       depositPercent: req.body?.depositPercent,
+
+      draft: req.body?.draft,
+
+      checkoutSignature: req.body?.checkoutSignature,
+
       user: req.user,
     });
 
@@ -89,6 +93,23 @@ router.post(
     }
   },
 );
+
+router.post("/intents/:intentId/order", requireAuth, async (req, res, next) => {
+  try {
+    const order = await finalizePaidBankTransferOrder(
+      req.params.intentId,
+      req.user,
+    );
+
+    res.status(201).json({
+      success: true,
+
+      order,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/intents/:intentId", requireAuth, async (req, res, next) => {
   try {

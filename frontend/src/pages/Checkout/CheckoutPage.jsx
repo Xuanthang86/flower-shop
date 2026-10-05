@@ -845,362 +845,319 @@ const CheckoutPage = () => {
 
   /*
   ==========================================================
-  PAYMENT INTENT
-  ==========================================================
-  */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const prepareBankTransferPayment = async () => {
-      if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
-        setPaymentIntent(EMPTY_PAYMENT_INTENT);
-        setPaymentVerified(false);
-        setPaymentError("");
-        setPaymentIntentLoading(false);
-        setPaymentOrder(null);
-
-        paymentOrderRef.current = {
-          signature: "",
-          orderId: "",
-        };
-
-        return;
-      }
-
-      if (paymentSettings?.bankTransfer?.enabled === false) {
-        setPaymentIntent(EMPTY_PAYMENT_INTENT);
-        setPaymentVerified(false);
-        setPaymentError("Shop hiện chưa bật thanh toán chuyển khoản.");
-        setPaymentIntentLoading(false);
-        setPaymentOrder(null);
-
-        paymentOrderRef.current = {
-          signature: "",
-          orderId: "",
-        };
-
-        return;
-      }
-
-      if (!shippingCalculation.success || checkoutPaymentAmount <= 0) {
-        setPaymentIntent(EMPTY_PAYMENT_INTENT);
-        setPaymentVerified(false);
-        setPaymentError("");
-        setPaymentIntentLoading(false);
-        setPaymentOrder(null);
-
-        return;
-      }
-
-      const couponForOrder =
-        appliedCoupon?.coupon?.code || couponCode.trim().toUpperCase() || "";
-
-      const orderSignature = JSON.stringify({
-        items: cartItems.map((item) => ({
-          productId: item.id,
-
-          id: item.id,
-
-          productSlug: item.slug || item.productSlug || "",
-
-          productName: item.name || item.productName || "",
-
-          quantity: Number(item.quantity) || 1,
-        })),
-        couponCode: couponForOrder,
-        shippingFee: Number(shippingFee) || 0,
-        paymentDepositPercent,
-        recipient: formData.recipient,
-        address: formData.address,
-        deliveryDate,
-        deliveryTimeSlot,
-        note: formData.note,
-      });
-
-      setPaymentIntentLoading(true);
-      setPaymentError("");
-      setPaymentVerified(false);
-
-      try {
-        let orderId = paymentOrderRef.current.orderId;
-        let order = paymentOrder;
-
-        if (!orderId || paymentOrderRef.current.signature !== orderSignature) {
-          const orderResult = await createOrder({
-            items: cartItems.map((item) => ({
-              productId: item.id,
-
-              id: item.id,
-
-              productSlug: item.slug || item.productSlug || "",
-
-              productName: item.name || item.productName || "",
-
-              quantity: Number(item.quantity) || 1,
-            })),
-
-            paymentMethod: BANK_TRANSFER_PAYMENT_METHOD,
-
-            paymentDepositPercent,
-
-            couponCode: couponForOrder,
-
-            shippingFee: Math.max(0, Math.round(Number(shippingFee) || 0)),
-
-            deliveryDate,
-
-            deliveryTimeSlot,
-
-            deliveryMode,
-
-            notes: String(formData.note || "").trim(),
-
-            channel: "website",
-
-            customer: {
-              name: user?.name || "",
-              email: user?.email || "",
-              phone: user?.phone || "",
-            },
-
-            recipient: {
-              fullName: formData.recipient.fullName.trim(),
-              name: formData.recipient.fullName.trim(),
-              phone: formData.recipient.phone.trim(),
-              email: formData.recipient.email.trim(),
-            },
-
-            shippingAddress: {
-              provinceCode: formData.address.provinceCode,
-              provinceName: formData.address.provinceName,
-              wardCode: formData.address.wardCode,
-              wardName: formData.address.wardName,
-              houseNumber: formData.address.houseNumber.trim(),
-              street: formData.address.street.trim(),
-              note: String(formData.note || "").trim(),
-            },
-
-            address: {
-              provinceCode: formData.address.provinceCode,
-              provinceName: formData.address.provinceName,
-              wardCode: formData.address.wardCode,
-              wardName: formData.address.wardName,
-              houseNumber: formData.address.houseNumber.trim(),
-              street: formData.address.street.trim(),
-              note: String(formData.note || "").trim(),
-            },
-          });
-
-          if (!orderResult?.success || !orderResult?.order) {
-            throw new Error(
-              orderResult?.message || "Không thể tạo đơn hàng chờ thanh toán."
-            );
-          }
-
-          order = orderResult.order;
-
-          orderId = String(order.id || order._id || order.orderId || "").trim();
-
-          if (!orderId) {
-            throw new Error("Backend không trả về Order ID hợp lệ.");
-          }
-
-          paymentOrderRef.current = {
-            signature: orderSignature,
-            orderId,
-          };
-
-          setPaymentOrder(order);
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        const intentResult = await createBankTransferPaymentIntent({
-          orderId,
-          depositPercent: paymentDepositPercent,
-        });
-
-        if (cancelled) {
-          return;
-        }
-
-        const intent = intentResult?.paymentIntent;
-
-        if (!intent?.id || !intent?.orderCode) {
-          throw new Error("Backend không trả về Payment Intent hợp lệ.");
-        }
-
-        const serverOrderAmount = Math.round(
-          Number(order?.paymentDepositAmount ?? paymentDepositAmount) || 0
-        );
-
-        const receivedAmount = Math.round(Number(intent.amount) || 0);
-
-        if (serverOrderAmount <= 0 || receivedAmount !== serverOrderAmount) {
-          throw new Error(
-            "Số tiền Payment Intent không khớp với số tiền thanh toán của Order."
-          );
-        }
-
-        setPaymentIntent(intent);
-      } catch (intentError) {
-        if (cancelled) {
-          return;
-        }
-
-        setPaymentIntent(EMPTY_PAYMENT_INTENT);
-        setPaymentVerified(false);
-        setPaymentError(
-          intentError?.message ||
-            "Không thể tạo yêu cầu thanh toán chuyển khoản."
-        );
-      } finally {
-        if (!cancelled) {
-          setPaymentIntentLoading(false);
-        }
-      }
-    };
-
-    prepareBankTransferPayment();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    formData.paymentMethod,
-    formData.recipient,
-    formData.address,
-    formData.note,
-    paymentSettings?.bankTransfer?.enabled,
-    shippingCalculation.success,
-    checkoutPaymentAmount,
-    paymentDepositAmount,
-    paymentDepositPercent,
-    shippingFee,
-    couponCode,
-    appliedCoupon?.coupon?.code,
-    cartItems,
-    deliveryDate,
-    deliveryTimeSlot,
-    deliveryMode,
-    user?.id,
-    user?.name,
-    user?.email,
-    user?.phone,
-  ]);
-
-  /*
-  ==========================================================
   PAYMENT POLLING
   ==========================================================
   */
 
-  useEffect(() => {
-    if (formData.paymentMethod !== BANK_TRANSFER_PAYMENT_METHOD) {
-      return undefined;
+  if (
+  formData.paymentMethod ===
+  BANK_TRANSFER_PAYMENT_METHOD
+) {
+  /*
+   * ======================================================
+   * LẦN BẤM ĐẦU:
+   *
+   * CHỈ tạo PaymentIntent + QR.
+   *
+   * KHÔNG:
+   * - tạo Order
+   * - trừ tồn kho
+   * - tăng coupon usedCount
+   * - gửi email
+   * - clear cart
+   * - navigate
+   * ======================================================
+   */
+  if (!paymentIntent?.id) {
+    const checkoutSignature =
+      JSON.stringify({
+        items: cartItems.map((item) => ({
+          productId: item.id,
+
+          productSlug:
+            item.slug ||
+            item.productSlug ||
+            "",
+
+          productName:
+            item.name ||
+            item.productName ||
+            "",
+
+          quantity:
+            Number(item.quantity) || 1,
+        })),
+
+        couponCode:
+          finalCouponResult?.coupon?.code ||
+          appliedCoupon?.coupon?.code ||
+          "",
+
+        shippingFee:
+          Math.max(
+            0,
+            Math.round(
+              Number(finalShippingFee) || 0
+            )
+          ),
+
+        grandTotal:
+          Math.round(
+            Number(finalGrandTotal) || 0
+          ),
+
+        paymentDepositPercent,
+
+        sender: formData.sender,
+
+        recipient: formData.recipient,
+
+        address: formData.address,
+
+        deliveryDate:
+          finalShippingCalculation.deliveryDate,
+
+        deliveryTimeSlot:
+          finalShippingCalculation.deliveryTimeSlot,
+
+        deliveryMode:
+          finalShippingCalculation.deliveryMode,
+
+        notes:
+          String(
+            formData.note || ""
+          ).trim(),
+      });
+
+    const intentResult =
+      await createBankTransferPaymentIntent({
+        depositPercent:
+          paymentDepositPercent,
+
+        checkoutSignature,
+
+        draft: {
+          paymentMethod:
+            BANK_TRANSFER_PAYMENT_METHOD,
+
+          items: cartItems.map((item) => ({
+            id: item.id,
+
+            productId: item.id,
+
+            name: item.name,
+
+            productName: item.name,
+
+            price:
+              Number(item.price) || 0,
+
+            unitPrice:
+              Number(item.price) || 0,
+
+            quantity:
+              Number(item.quantity) || 1,
+
+            image:
+              item.image || "",
+
+            productImage:
+              item.image || "",
+          })),
+
+          couponCode:
+            finalCouponResult?.coupon?.code ||
+            appliedCoupon?.coupon?.code ||
+            "",
+
+          shippingFee:
+            finalShippingFee,
+
+          sender: {
+            name:
+              formData.sender.name.trim(),
+
+            phone:
+              formData.sender.phone.trim(),
+
+            email:
+              formData.sender.email.trim(),
+
+            isHiddenFromRecipient:
+              formData.sender
+                .isHiddenFromRecipient !==
+              false,
+          },
+
+          recipient: {
+            fullName:
+              formData.recipient.fullName.trim(),
+
+            name:
+              formData.recipient.fullName.trim(),
+
+            phone:
+              formData.recipient.phone.trim(),
+
+            email:
+              formData.recipient.email.trim(),
+          },
+
+          shippingAddress: {
+            ...formData.address,
+
+            houseNumber:
+              formData.address.houseNumber.trim(),
+
+            street:
+              formData.address.street.trim(),
+
+            note:
+              String(
+                formData.note || ""
+              ).trim(),
+          },
+
+          address: {
+            ...formData.address,
+
+            houseNumber:
+              formData.address.houseNumber.trim(),
+
+            street:
+              formData.address.street.trim(),
+
+            note:
+              String(
+                formData.note || ""
+              ).trim(),
+          },
+
+          deliveryDate:
+            finalShippingCalculation.deliveryDate,
+
+          deliveryTimeSlot:
+            finalShippingCalculation.deliveryTimeSlot,
+
+          deliveryMode:
+            finalShippingCalculation.deliveryMode,
+
+          deliveryModeLabel:
+            finalShippingCalculation.deliveryModeLabel,
+
+          deliveryTimeSlotLabel:
+            finalShippingCalculation.deliveryTimeSlotLabel,
+
+          estimatedDeliveryTime:
+            finalShippingCalculation.estimatedDeliveryTime,
+
+          deliveryDistanceKm:
+            finalShippingCalculation.distanceKm,
+
+          deliveryNote:
+            finalShippingCalculation.deliveryNote,
+
+          shippingSnapshot,
+
+          notes:
+            String(
+              formData.note || ""
+            ).trim(),
+
+          channel: "website",
+        },
+      });
+
+    const intent =
+      intentResult?.paymentIntent;
+
+    if (
+      !intent?.id ||
+      !intent?.orderCode
+    ) {
+      throw new Error(
+        "Backend không trả về Payment Intent hợp lệ."
+      );
     }
 
-    if (!paymentIntent?.id) {
-      return undefined;
-    }
+    setPaymentIntent(intent);
 
-    let cancelled = false;
+    setPaymentVerified(
+      intent.status === "paid"
+    );
 
-    let timer = null;
+    setPaymentError("");
 
-    const checkStatus = async () => {
-      try {
-        const result = await getBankTransferPaymentStatus(paymentIntent.id);
+    /*
+     * RẤT QUAN TRỌNG:
+     * Không clear cart.
+     * Không navigate.
+     * Không tạo Order.
+     */
+    return;
+  }
 
-        if (cancelled) {
-          return;
-        }
+  /*
+   * ======================================================
+   * ĐÃ CÓ PAYMENT INTENT NHƯNG CHƯA PAID
+   * ======================================================
+   */
+  if (!paymentVerified) {
+    setError(
+      "Vui lòng hoàn tất thanh toán và chờ hệ thống xác minh giao dịch."
+    );
 
-        const nextIntent = result?.paymentIntent;
+    return;
+  }
 
-        if (!nextIntent?.id) {
-          return;
-        }
+  /*
+   * ======================================================
+   * PAYMENT ĐÃ PAID
+   *
+   * LẦN BẤM THỨ HAI:
+   * mới tạo Order.
+   * ======================================================
+   */
+  const finalPayment =
+    await getBankTransferPaymentStatus(
+      paymentIntent.id
+    );
 
-        setPaymentIntent((currentIntent) => ({
-          ...currentIntent,
-          ...nextIntent,
-        }));
+  if (
+    finalPayment?.paymentIntent?.status !==
+    "paid"
+  ) {
+    setPaymentVerified(false);
 
-        const status = nextIntent.status || "pending";
+    setError(
+      "Thanh toán chưa được xác minh thành công."
+    );
 
-        if (status === "paid") {
-          setPaymentVerified(true);
+    return;
+  }
 
-          setPaymentError("");
+  const finalOrderResult =
+    await finalizeBankTransferOrder(
+      paymentIntent.id
+    );
 
-          if (timer) {
-            clearInterval(timer);
-            timer = null;
-          }
+  if (
+    !finalOrderResult?.success ||
+    !finalOrderResult?.order
+  ) {
+    throw new Error(
+      finalOrderResult?.message ||
+        "Không thể hoàn tất đơn hàng."
+    );
+  }
 
-          return;
-        }
-
-        setPaymentVerified(false);
-
-        if (status === "failed" || status === "refunded") {
-          setPaymentError(
-            status === "failed"
-              ? "Giao dịch thanh toán thất bại. Vui lòng kiểm tra lại và thực hiện thanh toán lại."
-              : "Giao dịch đã được hoàn tiền."
-          );
-
-          if (timer) {
-            clearInterval(timer);
-            timer = null;
-          }
-
-          return;
-        }
-
-        if (status === "expired" || status === "cancelled") {
-          setPaymentError(
-            "Yêu cầu thanh toán đã hết hạn. Vui lòng tạo lại thanh toán."
-          );
-
-          if (timer) {
-            clearInterval(timer);
-            timer = null;
-          }
-
-          return;
-        }
-
-        setPaymentError("");
-      } catch (statusError) {
-        if (cancelled) {
-          return;
-        }
-
-        setPaymentVerified(false);
-
-        setPaymentError(
-          statusError?.message || "Chưa thể kiểm tra trạng thái thanh toán."
-        );
-      }
-    };
-
-    checkStatus();
-
-    timer = setInterval(checkStatus, 3000);
-
-    return () => {
-      cancelled = true;
-
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [formData.paymentMethod, paymentIntent?.id]);
+  newOrder =
+    finalOrderResult.order;
+} else {
+  /*
+   * COD:
+   * giữ nguyên createOrder hiện tại.
+   */
 
   const transferContent = paymentIntent?.orderCode
     ? buildTransferContent(
@@ -2172,14 +2129,102 @@ const CheckoutPage = () => {
                   </label>
 
                   <input
-                    id="deliveryDate"
-                    type="date"
-                    value={deliveryDate}
-                    min={getTodayDateKey(currentTime)}
-                    max={getMaxDeliveryDate()}
-                    onChange={handleDeliveryDateChange}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
-                  />
+  id="deliveryDate"
+  type="text"
+  inputMode="numeric"
+  autoComplete="off"
+  value={formatDeliveryDateDisplay(deliveryDate)}
+  onChange={(event) => {
+    const value = String(
+      event.target.value || ""
+    )
+      .replace(/[^\d/]/g, "")
+      .slice(0, 10);
+
+    const match =
+      value.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+      );
+
+    if (!match) {
+      return;
+    }
+
+    const [, day, month, year] = match;
+
+    const parsedDay = Number(day);
+    const parsedMonth = Number(month);
+    const parsedYear = Number(year);
+
+    const testDate = new Date(
+      parsedYear,
+      parsedMonth - 1,
+      parsedDay
+    );
+
+    if (
+      testDate.getFullYear() !== parsedYear ||
+      testDate.getMonth() !==
+        parsedMonth - 1 ||
+      testDate.getDate() !== parsedDay
+    ) {
+      setError(
+        "Ngày giao hàng không hợp lệ."
+      );
+
+      return;
+    }
+
+    const nextDateKey = [
+      String(parsedYear).padStart(4, "0"),
+      String(parsedMonth).padStart(2, "0"),
+      String(parsedDay).padStart(2, "0"),
+    ].join("-");
+
+    if (
+      nextDateKey <
+      getTodayDateKey(currentTime)
+    ) {
+      setError(
+        "Ngày giao hàng không được nhỏ hơn ngày hiện tại."
+      );
+
+      return;
+    }
+
+    if (
+      nextDateKey >
+      getMaxDeliveryDate()
+    ) {
+      setError(
+        `Ngày giao hàng chỉ được đặt trước tối đa ${SHIPPING_CONFIG.maxAdvanceDays} ngày.`
+      );
+
+      return;
+    }
+
+    setDeliveryDate(nextDateKey);
+
+    setDeliveryTimeSlot("");
+
+    setShippingCalculation(
+      EMPTY_SHIPPING_RESULT
+    );
+
+    setPaymentIntent(
+      EMPTY_PAYMENT_INTENT
+    );
+
+    setPaymentVerified(false);
+
+    setPaymentError("");
+
+    setError("");
+  }}
+  placeholder="DD/MM/YYYY"
+  aria-label="Ngày giao hàng"
+  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+/>
 
                   <p className="mt-2 text-xs text-gray-500">
                     Bạn có thể đặt trước ngày giao hàng để hẹn shop giao vào
@@ -2701,15 +2746,28 @@ const CheckoutPage = () => {
                 <button
                   type="submit"
                   disabled={
-                    submitting ||
-                    shippingLoading ||
-                    !shippingCalculation.success ||
-                    (formData.paymentMethod === BANK_TRANSFER_PAYMENT_METHOD &&
-                      !paymentVerified)
-                  }
+  submitting ||
+  shippingLoading ||
+  !shippingCalculation.success ||
+  (
+    formData.paymentMethod ===
+      BANK_TRANSFER_PAYMENT_METHOD &&
+    Boolean(paymentIntent?.id) &&
+    !paymentVerified
+  )
+}
                   className="mt-6 w-full rounded-lg bg-pink-600 px-6 py-3 font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
-                  {submitting ? "Đang đặt hàng..." : "Đặt hàng"}
+                  {submitting
+  ? "Đang xử lý..."
+  : formData.paymentMethod ===
+      BANK_TRANSFER_PAYMENT_METHOD
+    ? !paymentIntent?.id
+      ? "Tạo mã QR thanh toán"
+      : !paymentVerified
+        ? "Đang chờ thanh toán"
+        : "Đặt hàng"
+    : "Đặt hàng"}
                 </button>
               </div>
             </div>

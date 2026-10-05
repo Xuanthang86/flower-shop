@@ -38,11 +38,13 @@ const OrderSuccessPage = () => {
           </p>
 
           {/* MÃ ĐƠN HÀNG */}
-          {order?.id && (
+          {order?.orderCode && (
             <div className="mt-6 bg-pink-50 rounded-xl p-4">
               <p className="text-sm text-gray-500">Mã đơn hàng</p>
 
-              <p className="mt-1 text-lg font-bold text-pink-600">{order.id}</p>
+              <p className="mt-1 text-lg font-bold text-pink-600">
+                {order.orderCode}
+              </p>
             </div>
           )}
 
@@ -52,7 +54,7 @@ const OrderSuccessPage = () => {
               <span className="text-gray-600">Tổng tiền</span>
 
               <span className="font-bold text-pink-600">
-                {order.total.toLocaleString("vi-VN")} ₫
+                {order.grandTotal ?? order.total.toLocaleString("vi-VN")} ₫
               </span>
             </div>
           )}
@@ -63,9 +65,11 @@ const OrderSuccessPage = () => {
               <span className="text-gray-600">Thanh toán</span>
 
               <span className="font-medium text-gray-800">
-                {order.paymentMethod === "cod"
+                {order?.paymentMethod === "cod"
                   ? "Thanh toán khi nhận hàng"
-                  : order.paymentMethod}
+                  : order?.paymentMethod === "bank_transfer"
+                    ? "Chuyển khoản"
+                    : order.paymentMethod}
               </span>
             </div>
           )}

@@ -55,21 +55,118 @@ const getNotificationEmail = async () => {
 const formatMoney = (value) =>
   `${Math.round(Number(value) || 0).toLocaleString("vi-VN")}đ`;
 
-const formatDateTime = (value) => {
+const formatVietnamDateTime = (value) => {
   if (!value) {
     return "";
   }
 
-  const date = new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return "";
   }
 
-  return date.toLocaleString("vi-VN", {
-    dateStyle: "short",
-    timeStyle: "short",
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+
+    year: "numeric",
+
+    month: "2-digit",
+
+    day: "2-digit",
+
+    hour: "2-digit",
+
+    minute: "2-digit",
+
+    second: "2-digit",
+
+    hourCycle: "h23",
   });
+
+  const parts = formatter.formatToParts(date);
+
+  const result = {};
+
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
+  });
+
+  return `${result.day}/${result.month}/${result.year} ${result.hour}:${result.minute}:${result.second}`;
+};
+
+const formatVietnamDate = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  const raw = String(value).trim();
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (iso) {
+    return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  }
+
+  return formatVietnamDateTime(value).split(" ")[0];
+};
+
+const formatDeliveryTimeSlot = (value) => {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  const match = raw.match(
+    /^(\d{1,2})(?::\d{2})?\s*[-–]\s*(\d{1,2})(?::\d{2})?$/,
+  );
+
+  if (!match) {
+    return raw;
+  }
+
+  const [, start, end] = match;
+
+  return `Từ ${Number(start)} giờ đến ${Number(end)} giờ`;
+};
+
+const getPaymentDescription = (order) => {
+  if (order?.paymentMethod !== "bank_transfer") {
+    return "Thanh toán khi nhận hàng";
+  }
+
+  const depositPercent = Number(order?.paymentDepositPercent) === 50 ? 50 : 100;
+
+  const depositAmount = Math.max(0, Number(order?.paymentDepositAmount) || 0);
+
+  const remainingAmount = Math.max(
+    0,
+    Number(order?.paymentRemainingAmount) || 0,
+  );
+
+  if (depositPercent === 50) {
+    return `Đã thanh toán trước 50% — ${formatMoney(
+      depositAmount,
+    )}; còn lại ${formatMoney(remainingAmount)} khi nhận hoa.`;
+  }
+
+  return `Đã thanh toán 100% — ${formatMoney(depositAmount)}.`;
+};
+
+const getFullRecipientAddress = (recipient = {}) => {
+  const parts = [
+    recipient.houseNumber,
+    recipient.street,
+    recipient.wardName,
+    recipient.provinceName,
+  ]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
 };
 
 const getStatusLabel = (status) => {
