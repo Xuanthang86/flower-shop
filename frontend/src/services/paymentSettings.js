@@ -189,11 +189,14 @@ export const readPaymentSettings = () => {
   return clone(DEFAULT_PAYMENT_SETTINGS);
 };
 
-export const fetchPaymentSettings = async () => {
+export const fetchPaymentSettings = async ({ emitEvent = true } = {}) => {
   const response = await api.get("/data/snapshot", {
     headers: {
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-store, max-age=0",
       Pragma: "no-cache",
+    },
+    params: {
+      _: Date.now(),
     },
   });
 
@@ -220,37 +223,61 @@ export const fetchPaymentSettings = async () => {
     console.warn("Không thể cập nhật cache cấu hình thanh toán:", storageError);
   }
 
-  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+  /*
+   * Khi đang ở giữa quá trình Save,
+   * KHÔNG dispatch event ở đây.
+   *
+   * Nếu dispatch:
+   *
+   * fetch → event → component fetch lại → backend cũ
+   *
+   * có thể làm form quay ngược dữ liệu.
+   */
+  if (emitEvent) {
+    window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+  }
 
   return normalized;
 };
 
 export const savePaymentSettings = async (paymentSettings = {}) => {
-  /*
-   * Khi Admin đã fetch dữ liệu mới nhất từ backend,
-   * paymentSettings chính là snapshot mới nhất.
-   *
-   * Không được lấy localStorage cũ làm base nữa.
-   */
   const next = normalizeSettings(paymentSettings);
 
-  const saved = writeStoredPaymentSettings(next);
-
-  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
-
-  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
-
+  /*
+   * ========================================================
+   * BACKEND FIRST
+   * ========================================================
+   *
+   * Backend là nguồn dữ liệu chính.
+   *
+   * Chỉ cập nhật local cache + dispatch event
+   * SAU KHI backend đã lưu thành công.
+   */
   try {
-    await syncPaymentSettingsToBackend(saved);
+    await syncPaymentSettingsToBackend(next);
   } catch (error) {
     throw new Error(
-      error?.message ||
-        "Đã lưu trên trình duyệt nhưng chưa đồng bộ được backend.",
+      error?.message || "Không thể đồng bộ cấu hình thanh toán với backend.",
       {
         cause: error,
       }
     );
   }
+
+  /*
+   * Backend đã thành công.
+   *
+   * Bây giờ mới cập nhật cache trình duyệt.
+   */
+  const saved = writeStoredPaymentSettings(next);
+
+  /*
+   * Thông báo cho các component/browser context
+   * rằng dữ liệu mới đã thực sự được lưu.
+   */
+  window.dispatchEvent(new Event("flower-shop-payment-settings-updated"));
+
+  window.dispatchEvent(new Event("flower-shop-site-settings-updated"));
 
   return saved;
 };

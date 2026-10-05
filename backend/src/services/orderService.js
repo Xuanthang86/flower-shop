@@ -32,6 +32,272 @@ const slugifyProductName = (value) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+/*
+ * ==========================================================
+ * SNAPSHOT PRODUCT FALLBACK
+ * ==========================================================
+ *
+ * Catalog frontend hiện có thể chứa Product mới trong
+ * SharedSnapshot trước khi collection Product được đồng bộ.
+ *
+ * Trường hợp này đặc biệt dễ xảy ra với dữ liệu legacy:
+ *
+ * frontend:
+ *   id = 10
+ *   name = Grand Success
+ *
+ * backend Product:
+ *   chưa có document tương ứng
+ *
+ * SharedSnapshot:
+ *   đã có Grand Success
+ *
+ * Backend phải tự hydrate Product từ snapshot trước khi
+ * tạo Order để Order / Payment / Inventory vẫn sử dụng
+ * Product collection làm nguồn dữ liệu giao dịch.
+ */
+
+const getSharedSnapshotProducts = async () => {
+  if (!mongoose.connection?.db) {
+    return [];
+  }
+
+  try {
+    const collection = mongoose.connection.db.collection("sharedsnapshots");
+
+    const snapshot = await collection.findOne(
+      {
+        key: "main",
+      },
+      {
+        projection: {
+          products: 1,
+        },
+      },
+    );
+
+    return Array.isArray(snapshot?.products) ? snapshot.products : [];
+  } catch (error) {
+    console.warn(
+      "Không thể đọc Product từ SharedSnapshot:",
+      error?.message || error,
+    );
+
+    return [];
+  }
+};
+
+const findSnapshotProductForCartItem = (item, snapshotProducts) => {
+  if (!Array.isArray(snapshotProducts)) {
+    return null;
+  }
+
+  const productId = String(item?.productId || item?.id || "").trim();
+
+  const productSlug = String(item?.productSlug || item?.slug || "")
+    .trim()
+    .toLowerCase();
+
+  const productName = String(item?.productName || item?.name || "")
+    .trim()
+    .toLowerCase();
+
+  /*
+   * 1. Legacy ID / current ID
+   */
+  if (productId) {
+    const byId = snapshotProducts.find(
+      (product) =>
+        String(
+          product?.id || product?._id || product?.productId || "",
+        ).trim() === productId,
+    );
+
+    if (byId) {
+      return byId;
+    }
+  }
+
+  /*
+   * 2. Slug
+   */
+  if (productSlug) {
+    const bySlug = snapshotProducts.find(
+      (product) =>
+        String(product?.slug || product?.productSlug || "")
+          .trim()
+          .toLowerCase() === productSlug,
+    );
+
+    if (bySlug) {
+      return bySlug;
+    }
+  }
+
+  /*
+   * 3. Tên sản phẩm
+   */
+  if (productName) {
+    const byName = snapshotProducts.find(
+      (product) =>
+        String(product?.name || "")
+          .trim()
+          .toLowerCase() === productName,
+    );
+
+    if (byName) {
+      return byName;
+    }
+  }
+
+  return null;
+};
+
+const hydrateMissingProductsFromSnapshot = async (
+  requestedItems,
+  existingProducts,
+) => {
+  const snapshotProducts = await getSharedSnapshotProducts();
+
+  if (!snapshotProducts.length) {
+    return;
+  }
+
+  const existingBySlug = new Set(
+    existingProducts
+      .map((product) =>
+        String(product?.slug || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  const existingByName = new Set(
+    existingProducts
+      .map((product) =>
+        String(product?.name || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  for (const item of requestedItems) {
+    const snapshotProduct = findSnapshotProductForCartItem(
+      item,
+      snapshotProducts,
+    );
+
+    if (!snapshotProduct) {
+      continue;
+    }
+
+    const name = String(snapshotProduct.name || "").trim();
+
+    const slug = String(
+      snapshotProduct.slug ||
+        snapshotProduct.productSlug ||
+        slugifyProductName(name),
+    ).trim();
+
+    if (!name || !slug) {
+      continue;
+    }
+
+    /*
+     * Nếu Product đã tồn tại theo slug hoặc tên,
+     * tuyệt đối không tạo bản sao.
+     */
+    if (
+      existingBySlug.has(slug.toLowerCase()) ||
+      existingByName.has(name.toLowerCase())
+    ) {
+      continue;
+    }
+
+    const stockQuantity = Math.max(
+      0,
+      Math.floor(
+        Number(snapshotProduct.stockQuantity ?? snapshotProduct.stock ?? 0) ||
+          0,
+      ),
+    );
+
+    const active =
+      snapshotProduct.active !== false &&
+      snapshotProduct.disabled !== true &&
+      snapshotProduct.soldOut !== true;
+
+    try {
+      await Product.updateOne(
+        {
+          slug,
+        },
+        {
+          $setOnInsert: {
+            name,
+            slug,
+
+            categorySlug: String(
+              snapshotProduct.categorySlug || snapshotProduct.category || "",
+            ).trim(),
+
+            price: Math.max(0, Number(snapshotProduct.price) || 0),
+
+            oldPrice: Math.max(0, Number(snapshotProduct.oldPrice) || 0),
+
+            badge: String(snapshotProduct.badge || "").trim(),
+
+            image: String(
+              snapshotProduct.image || snapshotProduct.imageUrl || "",
+            ).trim(),
+
+            description: String(snapshotProduct.description || ""),
+
+            salesCount: Math.max(0, Number(snapshotProduct.salesCount || 0)),
+
+            stockQuantity,
+
+            isNew: Boolean(snapshotProduct.isNew),
+
+            active,
+
+            seoTitle: String(snapshotProduct.seoTitle || ""),
+
+            seoDescription: String(snapshotProduct.seoDescription || ""),
+
+            imageAlt: String(snapshotProduct.imageAlt || ""),
+
+            priceType:
+              snapshotProduct.priceType === "contact" ? "contact" : "fixed",
+          },
+        },
+        {
+          upsert: true,
+        },
+      );
+
+      existingBySlug.add(slug.toLowerCase());
+
+      existingByName.add(name.toLowerCase());
+    } catch (error) {
+      /*
+       * Race condition:
+       * Browser khác có thể vừa tạo Product này.
+       *
+       * Không làm hỏng toàn bộ Checkout.
+       */
+      if (error?.code !== 11000) {
+        console.warn(
+          `Không thể hydrate Product "${name}":`,
+          error?.message || error,
+        );
+      }
+    }
+  }
+};
+
 const generateOrderCode = async (preferredCode = "") => {
   const normalizedPreferred = String(preferredCode || "")
     .trim()
@@ -176,11 +442,97 @@ const calculateOrder = async ({ items, couponCode = "", shippingFee = 0 }) => {
     );
   }
 
-  const products = await Product.find({
+  let products = await Product.find({
     active: true,
 
     $or: productOrConditions,
   }).lean();
+
+  /*
+   * ==========================================================
+   * SELF-HEAL PRODUCT
+   * ==========================================================
+   *
+   * Nếu Product collection chưa có một Product mà Cart đang
+   * gửi lên, thử lấy Product đó từ SharedSnapshot và hydrate
+   * vào Product collection.
+   *
+   * Điều này xử lý dữ liệu legacy như:
+   *
+   * id = 10
+   * name = Grand Success
+   *
+   * mà không làm Checkout phụ thuộc vào ID legacy.
+   */
+
+  const existingByIdForHydration = new Set(
+    products.map((product) => String(product._id)),
+  );
+
+  const existingBySlugForHydration = new Set(
+    products
+      .map((product) =>
+        String(product.slug || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  const existingByNameForHydration = new Set(
+    products
+      .map((product) =>
+        String(product.name || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  const hasProductMatch = (item) => {
+    const productId = String(item.productId || "").trim();
+
+    const productSlug = String(item.productSlug || "")
+      .trim()
+      .toLowerCase();
+
+    const productName = String(item.productName || "")
+      .trim()
+      .toLowerCase();
+
+    if (
+      productId &&
+      mongoose.Types.ObjectId.isValid(productId) &&
+      existingByIdForHydration.has(productId)
+    ) {
+      return true;
+    }
+
+    if (productSlug && existingBySlugForHydration.has(productSlug)) {
+      return true;
+    }
+
+    if (productName && existingByNameForHydration.has(productName)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const unresolvedItems = requested.filter((item) => !hasProductMatch(item));
+
+  if (unresolvedItems.length > 0) {
+    await hydrateMissingProductsFromSnapshot(unresolvedItems, products);
+
+    /*
+     * Query lại Product collection sau hydrate.
+     */
+    products = await Product.find({
+      active: true,
+
+      $or: productOrConditions,
+    }).lean();
+  }
 
   const byId = new Map();
 

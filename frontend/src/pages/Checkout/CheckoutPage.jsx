@@ -1216,15 +1216,22 @@ const CheckoutPage = () => {
     Boolean(paymentIntent?.orderCode) &&
     paymentIntentAmount === paymentDepositAmount;
 
-  const dynamicQrUrl = checkoutAmountIsSynchronized
-    ? buildVietQrUrl({
-        bankCode: resolvedBankCode,
-        accountNumber: paymentSettings?.bankTransfer?.accountNumber,
-        amount: paymentIntentAmount,
-        accountName: paymentSettings?.bankTransfer?.accountName,
-        transferContent,
-      })
-    : "";
+  const dynamicQrUrl =
+    checkoutAmountIsSynchronized &&
+    resolvedBankCode &&
+    paymentSettings?.bankTransfer?.accountNumber
+      ? buildVietQrUrl({
+          bankCode: resolvedBankCode,
+
+          accountNumber: paymentSettings?.bankTransfer?.accountNumber,
+
+          amount: paymentIntentAmount,
+
+          accountName: paymentSettings?.bankTransfer?.accountName,
+
+          transferContent,
+        })
+      : "";
 
   const qrCodeUrl = dynamicQrUrl;
 
@@ -2517,6 +2524,35 @@ const CheckoutPage = () => {
                                 src={qrCodeUrl}
                                 alt="Mã QR thanh toán"
                                 className="h-64 w-64 object-contain"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+
+                                  const parent =
+                                    event.currentTarget.parentElement;
+
+                                  if (!parent) {
+                                    return;
+                                  }
+
+                                  const existingMessage =
+                                    parent.querySelector("[data-qr-error]");
+
+                                  if (existingMessage) {
+                                    return;
+                                  }
+
+                                  const message = document.createElement("p");
+
+                                  message.dataset.qrError = "true";
+
+                                  message.className =
+                                    "mt-2 text-center text-sm text-red-500";
+
+                                  message.textContent =
+                                    "Không thể tải mã QR thanh toán. Vui lòng kiểm tra lại thông tin ngân hàng.";
+
+                                  parent.appendChild(message);
+                                }}
                               />
                               <button
                                 type="button"

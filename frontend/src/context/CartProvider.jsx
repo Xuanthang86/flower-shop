@@ -112,21 +112,84 @@ const syncCartWithProducts = (cartItems, products) => {
   const nextItems = [];
 
   for (const item of cartItems) {
-    const product = getProductById(item.id, products);
+    const normalizedItem = normalizeCartItem(item);
 
     /*
-     * Nếu Catalog chưa tìm thấy sản phẩm,
-     * giữ item cũ thay vì xóa ngay.
+     * ========================================================
+     * RESOLVE PRODUCT ID
+     * ========================================================
      *
-     * Điều này tránh mất giỏ hàng trong
-     * lúc Catalog đang đồng bộ.
+     * Ưu tiên:
+     *
+     * 1. ID hiện tại
+     * 2. slug
+     * 3. tên sản phẩm
+     *
+     * Đây là phần sửa quan trọng để xử lý Cart legacy.
+     *
+     * Ví dụ:
+     *
+     * Cart cũ:
+     *   id = 10
+     *   name = Grand Success
+     *
+     * Catalog mới:
+     *   id = Mongo ObjectId
+     *   slug = grand-success
+     *   name = Grand Success
+     *
+     * → Không được giữ id = 10.
+     * → Phải lấy Product mới và thay toàn bộ identity.
+     */
+    let product = getProductById(normalizedItem.id, products);
+
+    if (!product && normalizedItem.slug) {
+      product =
+        products.find(
+          (candidate) =>
+            String(candidate?.slug || "")
+              .trim()
+              .toLowerCase() === normalizedItem.slug.trim().toLowerCase()
+        ) || null;
+    }
+
+    if (!product && normalizedItem.productSlug) {
+      product =
+        products.find(
+          (candidate) =>
+            String(candidate?.slug || candidate?.productSlug || "")
+              .trim()
+              .toLowerCase() === normalizedItem.productSlug.trim().toLowerCase()
+        ) || null;
+    }
+
+    if (!product && normalizedItem.name) {
+      const normalizedName = normalizedItem.name.trim().toLowerCase();
+
+      product =
+        products.find(
+          (candidate) =>
+            String(candidate?.name || "")
+              .trim()
+              .toLowerCase() === normalizedName
+        ) || null;
+    }
+
+    /*
+     * Nếu Catalog vẫn chưa tìm thấy:
+     * giữ item cũ để không làm mất giỏ hàng trong lúc
+     * dữ liệu Catalog đang hydrate/sync.
      */
     if (!product) {
-      nextItems.push(normalizeCartItem(item));
+      nextItems.push(normalizedItem);
 
       continue;
     }
 
+    /*
+     * Product đã tìm thấy nhưng không còn bán:
+     * loại khỏi Cart.
+     */
     if (!isProductSellable(product)) {
       continue;
     }
@@ -138,32 +201,42 @@ const syncCartWithProducts = (cartItems, products) => {
     }
 
     const quantity = Math.min(
-      Math.max(1, Math.floor(Number(item.quantity) || 1)),
+      Math.max(1, Math.floor(Number(normalizedItem.quantity) || 1)),
       stock
     );
 
+    /*
+     * QUAN TRỌNG:
+     *
+     * Từ đây Cart sử dụng ID hiện tại của Product,
+     * không sử dụng ID legacy nữa.
+     */
     nextItems.push(
       normalizeCartItem({
-        ...item,
+        ...normalizedItem,
+
+        id: product.id,
+
         slug:
           product.slug ||
           product.productSlug ||
-          item.slug ||
-          item.productSlug ||
+          normalizedItem.slug ||
+          normalizedItem.productSlug ||
           "",
 
         productSlug:
           product.slug ||
           product.productSlug ||
-          item.productSlug ||
-          item.slug ||
+          normalizedItem.productSlug ||
+          normalizedItem.slug ||
           "",
 
-        name: product.name || item.name,
+        name: product.name || normalizedItem.name,
 
         price: Number(product.price) || 0,
 
-        image: product.image || product.images?.[0] || item.image || "",
+        image:
+          product.image || product.images?.[0] || normalizedItem.image || "",
 
         stock,
 

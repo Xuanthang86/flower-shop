@@ -1,3 +1,37 @@
+const pad2 = (value) => String(value).padStart(2, "0");
+
+const formatDateParts = (date) => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+
+    year: "numeric",
+
+    month: "2-digit",
+
+    day: "2-digit",
+
+    hour: "2-digit",
+
+    minute: "2-digit",
+
+    second: "2-digit",
+
+    hourCycle: "h23",
+  });
+
+  const parts = formatter.formatToParts(date);
+
+  const result = {};
+
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
+  });
+
+  return result;
+};
+
 export const formatVietnamDateTime = (value) => {
   if (!value) {
     return "—";
@@ -10,24 +44,27 @@ export const formatVietnamDateTime = (value) => {
   }
 
   /*
-   * DD/MM/YYYY hoặc D/M/YYYY
+   * ========================================================
+   * DD/MM/YYYY
+   * ========================================================
+   *
+   * Nếu dữ liệu đã ở định dạng Việt Nam,
+   * chuẩn hóa lại padding.
    */
   const vietnameseDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)$/);
 
   if (vietnameseDate) {
     const [, day, month, year, rest] = vietnameseDate;
 
-    return `${String(day).padStart(2, "0")}/${String(month).padStart(
-      2,
-      "0"
-    )}/${year}${rest || ""}`;
+    return `${pad2(day)}/${pad2(month)}/${year}${rest || ""}`;
   }
 
   /*
+   * ========================================================
    * YYYY-MM-DD
+   * ========================================================
    *
-   * Không dùng new Date() cho phần ngày này
-   * để tránh lệch ngày do timezone.
+   * Không dùng new Date() cho date-only.
    */
   const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](.*))?$/);
 
@@ -38,13 +75,35 @@ export const formatVietnamDateTime = (value) => {
       return `${day}/${month}/${year}`;
     }
 
-    const time = timePart.slice(0, 5);
+    /*
+     * Dữ liệu datetime không có timezone:
+     * lấy phần giờ/phút trực tiếp.
+     */
+    const timeMatch = timePart.match(/^(\d{2}):(\d{2})(?::(\d{2}))?/);
 
-    return `${day}/${month}/${year}${time ? ` ${time}` : ""}`;
+    if (timeMatch) {
+      const [, hour, minute, second] = timeMatch;
+
+      return `${day}/${month}/${year} ${hour}:${minute}${
+        second ? `:${second}` : ""
+      }`;
+    }
+
+    return `${day}/${month}/${year}`;
   }
 
   /*
-   * ISO datetime / Date object / timestamp.
+   * ========================================================
+   * ISO DATETIME / Date / TIMESTAMP
+   * ========================================================
+   *
+   * Không dùng toLocaleString().
+   *
+   * Luôn format bằng Intl.DateTimeFormat + timezone
+   * Asia/Ho_Chi_Minh rồi tự ghép DD/MM/YYYY.
+   *
+   * Vì vậy Chrome / Edge / Firefox đều nhận cùng một
+   * chuỗi đầu ra.
    */
   const date = value instanceof Date ? value : new Date(value);
 
@@ -52,7 +111,27 @@ export const formatVietnamDateTime = (value) => {
     return "—";
   }
 
-  return date.toLocaleString("vi-VN");
+  const parts = formatDateParts(date);
+
+  const day = parts.day;
+  const month = parts.month;
+  const year = parts.year;
+
+  const hour = parts.hour;
+  const minute = parts.minute;
+  const second = parts.second;
+
+  if (!day || !month || !year) {
+    return "—";
+  }
+
+  if (!hour || !minute) {
+    return `${day}/${month}/${year}`;
+  }
+
+  return `${day}/${month}/${year} ${hour}:${minute}${
+    second ? `:${second}` : ""
+  }`;
 };
 
 export const formatVietnamDate = (value) =>

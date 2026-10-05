@@ -274,7 +274,9 @@ const AdminPaymentSettingsPage = () => {
       /*
        * Lấy cấu hình mới nhất từ backend trước khi save.
        */
-      const latestSettings = await fetchPaymentSettings();
+      const latestSettings = await fetchPaymentSettings({
+        emitEvent: false,
+      });
 
       const latestBankTransfer = latestSettings?.bankTransfer || {};
 
